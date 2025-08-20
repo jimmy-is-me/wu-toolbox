@@ -11,8 +11,8 @@ if (!defined('ABSPATH')) exit;
 // === 後台父選單 ===
 function wu_toolbox_menu() {
     add_menu_page(
-        'WU工具箱',      // 頁面標題
-        'WU工具箱',      // 選單標題
+        'WU 工具箱',      // 頁面標題
+        'WU 工具箱',      // 選單標題
         'manage_options',// 權限
         'wu-toolbox',    // slug
         '__return_null', // 不顯示頁面
@@ -29,3 +29,4 @@ if (is_dir($includes_dir)) {
         require_once $file;
     }
 }
+
