@@ -5,8 +5,8 @@ if (!defined('ABSPATH')) exit;
 function moving_mode_menu() {
     add_submenu_page(
         'wu-toolbox',
-        'Moving Mode',
-        'Moving Mode',
+        '維護模式',
+        '維護模式',
         'manage_options',
         'moving-mode',
         'moving_mode_settings_page'
@@ -30,7 +30,7 @@ function moving_mode_settings_page() {
     $emoji   = get_option('moving_mode_emoji','🛠️');
     ?>
     <div class="wrap">
-        <h1>Wumetax 維護模式設定</h1>
+        <h1>維護模式設定</h1>
         <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">
 
             <!-- 設定表單 -->
@@ -41,7 +41,7 @@ function moving_mode_settings_page() {
                     <label>
                         <input type="radio" name="moving_mode_status" value="on" <?php checked($status,'on'); ?>>
                         開啟維護模式<br>
-                        （前台訪客將會看到維護頁，僅管理員可登入並使用網站）
+                        （前台訪客將會看到維護頁，僅管理員可登入並使用網站，設定後請清除快取）
                     </label><br><br>
                     <label>
                         <input type="radio" name="moving_mode_status" value="off" <?php checked($status,'off'); ?>>
@@ -53,7 +53,7 @@ function moving_mode_settings_page() {
                 <h2>維護頁面內容</h2>
                 <p>標題：<input type="text" id="moving_mode_title" name="moving_mode_title" value="<?php echo esc_attr($title); ?>" class="regular-text"></p>
                 <p>描述：<textarea id="moving_mode_message" name="moving_mode_message" rows="3" class="large-text"><?php echo esc_textarea($message); ?></textarea></p>
-                <p>Emoji（即時預覽圖示）：<input type="text" id="moving_mode_emoji" name="moving_mode_emoji" value="<?php echo esc_attr($emoji); ?>" class="regular-text"></p>
+                <p>Emoji圖示：<input type="text" id="moving_mode_emoji" name="moving_mode_emoji" value="<?php echo esc_attr($emoji); ?>" class="regular-text"></p>
                 <p><input type="submit" name="moving_mode_save" class="button-primary" value="儲存設定"></p>
             </form>
 
@@ -151,3 +151,4 @@ function moving_mode_output() {
     exit;
 }
 add_action('template_redirect','moving_mode_output');
+
