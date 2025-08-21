@@ -1,63 +1,52 @@
 <?php
-/**
- * Plugin Name: Hide WP Login Page - Simple
- * Plugin URI: https://example.com/
- * Description: 隱藏 WordPress 後台登入頁，並可自訂登入網址。
- * Version: 1.0
- * Author: Wu Wu
- * Author URI: https://example.com/
- * License: GPL2
- * Text Domain: hide-wp-login
- */
-
 if (!defined('ABSPATH')) exit;
 
+/* === 後台子選單 === */
+function wu_toolbox_hide_login_menu() {
+    add_submenu_page(
+        'wu-toolbox',
+        '隱藏後台登入',
+        '隱藏後台登入',
+        'manage_options',
+        'hide-login',
+        'wu_toolbox_hide_login_settings_page'
+    );
+}
+add_action('admin_menu','wu_toolbox_hide_login_menu');
+
 /* === 後台設定頁 === */
-function hwlp_settings_page() {
-    if (isset($_POST['hwlp_save']) && check_admin_referer('hwlp_save_nonce','hwlp_nonce')) {
-        update_option('hwlp_status', sanitize_text_field($_POST['hwlp_status']));
-        update_option('hwlp_url', sanitize_text_field($_POST['hwlp_url']));
+function wu_toolbox_hide_login_settings_page() {
+    if (isset($_POST['hide_login_save']) && check_admin_referer('hide_login_save','hide_login_nonce')) {
+        update_option('hide_login_status', sanitize_text_field($_POST['hide_login_status']));
+        update_option('hide_login_url', sanitize_text_field($_POST['hide_login_url']));
         echo '<div class="updated"><p>設定已更新 ✅</p></div>';
     }
 
-    $status = get_option('hwlp_status', 'off');
-    $url    = get_option('hwlp_url', 'loginwu');
+    $status = get_option('hide_login_status', 'off');
+    $url    = get_option('hide_login_url', 'loginwu');
     ?>
     <div class="wrap">
         <h1>隱藏後台登入設定</h1>
         <form method="post" style="max-width:400px;">
-            <?php wp_nonce_field('hwlp_save_nonce','hwlp_nonce'); ?>
+            <?php wp_nonce_field('hide_login_save','hide_login_nonce'); ?>
             <p>
-                <label><input type="radio" name="hwlp_status" value="on" <?php checked($status,'on'); ?>> 啟用隱藏登入</label><br>
-                <label><input type="radio" name="hwlp_status" value="off" <?php checked($status,'off'); ?>> 停用隱藏登入</label>
+                <label><input type="radio" name="hide_login_status" value="on" <?php checked($status,'on'); ?>> 啟用隱藏登入</label><br>
+                <label><input type="radio" name="hide_login_status" value="off" <?php checked($status,'off'); ?>> 停用隱藏登入</label>
             </p>
             <p>
-                登入網址：<input type="text" name="hwlp_url" value="<?php echo esc_attr($url); ?>" class="regular-text">
-                <br><small>請輸入自訂登入路徑，例如 loginwu、adminlogin，不要加 /</small>
+                登入網址：<input type="text" name="hide_login_url" value="<?php echo esc_attr($url); ?>" class="regular-text">
+                <br><small>請輸入您想要的登入路徑，例如 loginwu、adminlogin 等，不要加 / </small>
             </p>
-            <p><input type="submit" name="hwlp_save" class="button-primary" value="儲存設定"></p>
+            <p><input type="submit" name="hide_login_save" class="button-primary" value="儲存設定"></p>
         </form>
     </div>
     <?php
 }
 
-/* === 後台子選單 === */
-function hwlp_add_admin_menu() {
-    add_submenu_page(
-        'options-general.php',
-        '隱藏後台登入',
-        '隱藏後台登入',
-        'manage_options',
-        'hwlp-settings',
-        'hwlp_settings_page'
-    );
-}
-add_action('admin_menu','hwlp_add_admin_menu');
-
-/* === 前台登入重導 === */
-function hwlp_redirect_login() {
-    $status = get_option('hwlp_status', 'off');
-    $login_path = get_option('hwlp_url', 'loginwu');
+/* === 前台登入重寫 & wp-login.php 保護 === */
+function wu_toolbox_hide_login_redirect() {
+    $status = get_option('hide_login_status', 'off');
+    $login_path = get_option('hide_login_url', 'loginwu');
 
     if ($status !== 'on') return;
 
@@ -65,50 +54,37 @@ function hwlp_redirect_login() {
     $request = untrailingslashit($request);
     $custom_login = '/' . $login_path;
 
-    if (is_user_logged_in()) return;
+    // 允許訪問自訂登入頁
+    if ($request === $custom_login) {
+        require_once ABSPATH . 'wp-login.php';
+        exit;
+    }
 
-    if ($request === $custom_login) return;
-
+    // 嘗試訪問 wp-login.php 或 wp-admin
     if (strpos($request, 'wp-login.php') !== false || strpos($request, 'wp-admin') !== false) {
-        wp_redirect(home_url($custom_login));
+        wp_redirect(home_url());
         exit;
     }
 }
-add_action('init', 'hwlp_redirect_login', 1);
+add_action('init', 'wu_toolbox_hide_login_redirect', 1);
 
-/* === 改寫登入 URL === */
-add_filter('login_url', function($login_url) {
-    $status = get_option('hwlp_status', 'off');
-    $url = get_option('hwlp_url', 'loginwu');
+/* === 改變登入/登出 URL === */
+function wu_toolbox_custom_login_url($login_url, $redirect, $force_reauth) {
+    $status = get_option('hide_login_status', 'off');
+    $url = get_option('hide_login_url', 'loginwu');
+
     if ($status === 'on') {
         return home_url('/' . $url . '/');
     }
     return $login_url;
-}, 10, 1);
+}
+add_filter('login_url', 'wu_toolbox_custom_login_url', 10, 3);
 
-add_filter('logout_url', function($logout_url, $redirect) {
-    $status = get_option('hwlp_status', 'off');
-    $url = get_option('hwlp_url', 'loginwu');
+add_filter('logout_url', function($logout_url, $redirect){
+    $status = get_option('hide_login_status', 'off');
+    $url = get_option('hide_login_url', 'loginwu');
     if ($status === 'on') {
         return home_url('/' . $url . '/?action=logout');
     }
     return $logout_url;
 }, 10, 2);
-
-/* === 自訂登入頁路由 === */
-function hwlp_custom_login_page() {
-    $status = get_option('hwlp_status', 'off');
-    $login_path = get_option('hwlp_url', 'loginwu');
-
-    if ($status !== 'on') return;
-
-    $request = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-    $request = untrailingslashit($request);
-    $custom_login = '/' . $login_path;
-
-    if ($request === $custom_login) {
-        require_once ABSPATH . 'wp-login.php';
-        exit;
-    }
-}
-add_action('init', 'hwlp_custom_login_page');
