@@ -30,8 +30,8 @@ function hide_login_settings_page() {
         <form method="post" style="max-width:400px;">
             <?php wp_nonce_field('hide_login_save','hide_login_nonce'); ?>
             <p>
-                <label><input type="radio" name="hide_login_status" value="on" <?php checked($status,'on'); ?>> 啟用隱藏登入（前台預設登入將被隱藏）</label><br>
-                <label><input type="radio" name="hide_login_status" value="off" <?php checked($status,'off'); ?>> 停用隱藏登入（恢復原始登入頁）</label>
+                <label><input type="radio" name="hide_login_status" value="on" <?php checked($status,'on'); ?>> 啟用隱藏登入</label><br>
+                <label><input type="radio" name="hide_login_status" value="off" <?php checked($status,'off'); ?>> 停用隱藏登入</label>
             </p>
             <p>
                 登入網址：<input type="text" name="hide_login_url" value="<?php echo esc_attr($url); ?>" class="regular-text">
@@ -43,20 +43,22 @@ function hide_login_settings_page() {
     <?php
 }
 
-/* === 前台登入重寫功能 === */
+/* === 前台登入重寫 === */
 function hide_login_redirect() {
     $status = get_option('hide_login_status', 'off');
-    $login_url = get_option('hide_login_url', 'loginwu');
+    $login_path = get_option('hide_login_url', 'loginwu');
 
     if ($status !== 'on') return;
 
-    $request_uri = $_SERVER['REQUEST_URI'];
+    $request = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    $request = untrailingslashit($request);
+    $custom_login = '/' . $login_path;
 
     // 允許訪問自訂登入頁
-    if (strpos($request_uri, '/' . $login_url . '/') !== false) return;
+    if ($request === $custom_login) return;
 
     // 嘗試訪問 wp-login.php 或 wp-admin
-    if (strpos($request_uri, 'wp-login.php') !== false || strpos($request_uri, 'wp-admin') !== false) {
+    if (strpos($request, 'wp-login.php') !== false || strpos($request, 'wp-admin') !== false) {
         wp_redirect(home_url());
         exit;
     }
@@ -83,14 +85,18 @@ add_filter('logout_url', function($logout_url, $redirect){
     return $logout_url;
 }, 10, 2);
 
-/* === 自訂登入頁面路由 === */
+/* === 自訂登入頁路由 === */
 function custom_login_page_route() {
     $status = get_option('hide_login_status', 'off');
-    $url = get_option('hide_login_url', 'loginwu');
+    $login_path = get_option('hide_login_url', 'loginwu');
+
     if ($status !== 'on') return;
 
-    $request_uri = $_SERVER['REQUEST_URI'];
-    if (strpos($request_uri, '/' . $url . '/') !== false) {
+    $request = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    $request = untrailingslashit($request);
+    $custom_login = '/' . $login_path;
+
+    if ($request === $custom_login) {
         require_once ABSPATH . 'wp-login.php';
         exit;
     }
