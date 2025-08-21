@@ -1,9 +1,13 @@
 <?php
 /**
  * Plugin Name: Hide WP Login Page - Simple
+ * Plugin URI: https://example.com/
  * Description: 隱藏 WordPress 後台登入頁，並可自訂登入網址。
  * Version: 1.0
  * Author: Wu Wu
+ * Author URI: https://example.com/
+ * License: GPL2
+ * Text Domain: hide-wp-login
  */
 
 if (!defined('ABSPATH')) exit;
@@ -61,13 +65,10 @@ function hwlp_redirect_login() {
     $request = untrailingslashit($request);
     $custom_login = '/' . $login_path;
 
-    // 已登入不阻擋
     if (is_user_logged_in()) return;
 
-    // 訪問自訂登入頁放行
     if ($request === $custom_login) return;
 
-    // 嘗試訪問 wp-login.php 或 wp-admin
     if (strpos($request, 'wp-login.php') !== false || strpos($request, 'wp-admin') !== false) {
         wp_redirect(home_url($custom_login));
         exit;
