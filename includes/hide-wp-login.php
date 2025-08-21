@@ -43,15 +43,15 @@ function wu_toolbox_hide_login_settings_page() {
     <?php
 }
 
-/* === 前台登入重寫與安全保護 === */
+/* === 安全檢查：允許管理員用 ?admin_key=xxxx 登入原始 wp-login.php === */
+define('WU_TOOLBOX_ADMIN_KEY', '123456'); // 可自訂安全 key
+
+/* === 前台登入重寫與保護 === */
 function wu_toolbox_hide_login_redirect() {
     $status = get_option('hide_login_status', 'off');
     $login_path = get_option('hide_login_url', 'loginwu');
 
     if ($status !== 'on') return;
-
-    // 已登入管理員不要攔截
-    if ( is_user_logged_in() && current_user_can('manage_options') ) return;
 
     $request = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
     $request = untrailingslashit($request);
@@ -63,8 +63,13 @@ function wu_toolbox_hide_login_redirect() {
         exit;
     }
 
-    // 攔截 wp-login.php、wp-admin 或其他登入相關頁面，全部導向首頁
-    if ( strpos($request, 'wp-login.php') !== false || strpos($request, 'wp-admin') !== false ) {
+    // 如果是原始登入頁，但有安全 key，允許
+    if (strpos($request, 'wp-login.php') !== false && isset($_GET['admin_key']) && $_GET['admin_key'] === WU_TOOLBOX_ADMIN_KEY) {
+        return; // 允許登入
+    }
+
+    // 攔截 wp-login.php 或 wp-admin
+    if (strpos($request, 'wp-login.php') !== false || strpos($request, 'wp-admin') !== false) {
         wp_redirect(home_url());
         exit;
     }
@@ -78,30 +83,19 @@ function wu_toolbox_custom_login_url($login_url, $redirect = '', $force_reauth =
 
     if ($status === 'on') {
         $login_url = home_url('/' . $url . '/');
-        if (!empty($redirect)) {
-            $login_url = add_query_arg('redirect_to', urlencode($redirect), $login_url);
-        }
-        if ($force_reauth) {
-            $login_url = add_query_arg('reauth', '1', $login_url);
-        }
+        if (!empty($redirect)) $login_url = add_query_arg('redirect_to', urlencode($redirect), $login_url);
+        if ($force_reauth) $login_url = add_query_arg('reauth', '1', $login_url);
     }
     return $login_url;
 }
 add_filter('login_url', 'wu_toolbox_custom_login_url', 10, 3);
 
-/* === 改變登出 URL === */
+/* === 登出導向首頁 === */
 add_filter('logout_url', function($logout_url, $redirect){
-    $status = get_option('hide_login_status', 'off');
-    $url = get_option('hide_login_url', 'loginwu');
-
-    if ($status === 'on') {
-        // 登出後統一導向首頁
-        return home_url();
-    }
-    return $logout_url;
+    return home_url();
 }, 10, 2);
 
-/* === 後台防止被鎖 === */
+/* === 後台未登入防護 === */
 function wu_toolbox_admin_redirect_protect() {
     $status = get_option('hide_login_status', 'off');
     if ($status !== 'on') return;
