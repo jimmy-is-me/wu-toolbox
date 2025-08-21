@@ -1,15 +1,4 @@
 <?php
-/**
- * Plugin Name: Hide WP Login Page - Simple
- * Plugin URI: https://example.com/
- * Description: 隱藏 WordPress 後台登入頁，並可自訂登入網址。
- * Version: 1.0
- * Author: Wu Wu
- * Author URI: https://example.com/
- * License: GPL2
- * Text Domain: hide-wp-login
- */
-
 if (!defined('ABSPATH')) exit;
 
 /* === 後台子選單 === */
