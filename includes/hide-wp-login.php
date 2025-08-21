@@ -43,30 +43,35 @@ function wu_toolbox_hide_login_settings_page() {
     <?php
 }
 
-/* === 前台登入重寫 & wp-login.php 保護 === */
+/* === 前台登入重寫與安全保護 === */
 function wu_toolbox_hide_login_redirect() {
     $status = get_option('hide_login_status', 'off');
     $login_path = get_option('hide_login_url', 'loginwu');
 
     if ($status !== 'on') return;
 
+    // 已登入管理員不要攔截
+    if ( is_user_logged_in() && current_user_can('manage_options') ) {
+        return;
+    }
+
     $request = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
     $request = untrailingslashit($request);
     $custom_login = '/' . $login_path;
 
-    // 允許訪問自訂登入頁
+    // 訪問自訂登入頁
     if ($request === $custom_login) {
         require_once ABSPATH . 'wp-login.php';
         exit;
     }
 
-    // 嘗試訪問 wp-login.php 或 wp-admin
-    if (strpos($request, 'wp-login.php') !== false || strpos($request, 'wp-admin') !== false) {
+    // 攔截 wp-login.php
+    if ( strpos($request, 'wp-login.php') !== false ) {
         wp_redirect(home_url());
         exit;
     }
 }
-add_action('init', 'wu_toolbox_hide_login_redirect', 1);
+add_action('template_redirect', 'wu_toolbox_hide_login_redirect');
 
 /* === 改變登入/登出 URL === */
 function wu_toolbox_custom_login_url($login_url, $redirect, $force_reauth) {
