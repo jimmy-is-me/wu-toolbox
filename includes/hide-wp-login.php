@@ -1,18 +1,16 @@
 <?php
-if (!defined('ABSPATH')) exit;
+/**
+ * Plugin Name: Hide WP Login Page - Simple
+ * Plugin URI: https://example.com/
+ * Description: 隱藏 WordPress 後台登入頁，並可自訂登入網址。
+ * Version: 1.0
+ * Author: Wu Wu
+ * Author URI: https://example.com/
+ * License: GPL2
+ * Text Domain: hide-wp-login
+ */
 
-/* === 後台子選單 === */
-function hwlp_add_admin_menu() {
-    add_submenu_page(
-        'options-general.php',
-        '隱藏後台登入',
-        '隱藏後台登入',
-        'manage_options',
-        'hwlp-settings',
-        'hwlp_settings_page'
-    );
-}
-add_action('admin_menu','hwlp_add_admin_menu');
+if (!defined('ABSPATH')) exit;
 
 /* === 後台設定頁 === */
 function hwlp_settings_page() {
@@ -42,6 +40,19 @@ function hwlp_settings_page() {
     </div>
     <?php
 }
+
+/* === 後台子選單 === */
+function hwlp_add_admin_menu() {
+    add_submenu_page(
+        'options-general.php',
+        '隱藏後台登入',
+        '隱藏後台登入',
+        'manage_options',
+        'hwlp-settings',
+        'hwlp_settings_page'
+    );
+}
+add_action('admin_menu','hwlp_add_admin_menu');
 
 /* === 前台登入重導 === */
 function hwlp_redirect_login() {
