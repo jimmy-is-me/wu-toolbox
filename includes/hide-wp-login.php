@@ -78,6 +78,31 @@ function wu_toolbox_add_query_vars($vars) {
 }
 add_filter('query_vars', 'wu_toolbox_add_query_vars');
 
+/* === 強制阻擋 wp-login.php 訪問 === */
+function wu_toolbox_block_wp_login() {
+    $status = get_option('hide_login_status', 'off');
+    if ($status !== 'on') return;
+
+    // 檢查是否為 wp-login.php 請求
+    if (strpos($_SERVER['REQUEST_URI'], 'wp-login.php') !== false) {
+        // 檢查是否有管理員 key
+        if (isset($_GET['admin_key']) && $_GET['admin_key'] === WU_TOOLBOX_ADMIN_KEY) {
+            // 有正確的 key，允許訪問
+            return;
+        }
+        
+        // 沒有 key 或 key 錯誤，強制阻擋
+        wp_die(
+            '<h1>存取被拒絕</h1>' .
+            '<p>此登入頁面已被管理員停用。</p>' .
+            '<p>如需登入，請聯繫網站管理員。</p>',
+            '存取被拒絕',
+            array('response' => 403)
+        );
+    }
+}
+add_action('init', 'wu_toolbox_block_wp_login', 1);
+
 /* === 前台登入重寫與保護 === */
 function wu_toolbox_hide_login_redirect() {
     $status = get_option('hide_login_status', 'off');
@@ -101,17 +126,6 @@ function wu_toolbox_hide_login_redirect() {
         
         // 載入登入頁面
         require_once ABSPATH . 'wp-login.php';
-        exit;
-    }
-    
-    // 如果是原始登入頁，但有安全 key，允許
-    if (strpos($request_path, 'wp-login.php') !== false) {
-        if (isset($_GET['admin_key']) && $_GET['admin_key'] === WU_TOOLBOX_ADMIN_KEY) {
-            return; // 允許登入
-        }
-        
-        // 沒有安全 key，重導向首頁
-        wp_redirect(home_url());
         exit;
     }
     
@@ -163,6 +177,44 @@ function wu_toolbox_admin_redirect_protect() {
     }
 }
 add_action('admin_init', 'wu_toolbox_admin_redirect_protect');
+
+/* === 強制阻擋 wp-login.php 的 HTTP 請求 === */
+function wu_toolbox_block_wp_login_early() {
+    $status = get_option('hide_login_status', 'off');
+    if ($status !== 'on') return;
+
+    // 在更早的階段阻擋 wp-login.php
+    if (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'wp-login.php') !== false) {
+        // 檢查管理員 key
+        if (!isset($_GET['admin_key']) || $_GET['admin_key'] !== WU_TOOLBOX_ADMIN_KEY) {
+            // 發送 403 狀態碼並顯示錯誤頁面
+            http_response_code(403);
+            echo '<!DOCTYPE html>
+            <html>
+            <head>
+                <title>存取被拒絕</title>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                    .error-box { background: #f8f8f8; border: 1px solid #ddd; padding: 30px; max-width: 500px; margin: 0 auto; border-radius: 5px; }
+                    .error-icon { font-size: 48px; color: #d63638; }
+                </style>
+            </head>
+            <body>
+                <div class="error-box">
+                    <div class="error-icon">🚫</div>
+                    <h1>存取被拒絕</h1>
+                    <p>此登入頁面已被管理員停用。</p>
+                    <p>如需登入，請聯繫網站管理員。</p>
+                    <p><a href="' . home_url() . '">返回首頁</a></p>
+                </div>
+            </body>
+            </html>';
+            exit;
+        }
+    }
+}
+add_action('init', 'wu_toolbox_block_wp_login_early', 1);
 
 /* === 啟用時清除重寫規則 === */
 function wu_toolbox_flush_rewrite_rules() {
