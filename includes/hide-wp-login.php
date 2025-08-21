@@ -51,9 +51,7 @@ function wu_toolbox_hide_login_redirect() {
     if ($status !== 'on') return;
 
     // 已登入管理員不要攔截
-    if ( is_user_logged_in() && current_user_can('manage_options') ) {
-        return;
-    }
+    if ( is_user_logged_in() && current_user_can('manage_options') ) return;
 
     $request = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
     $request = untrailingslashit($request);
@@ -65,31 +63,52 @@ function wu_toolbox_hide_login_redirect() {
         exit;
     }
 
-    // 攔截 wp-login.php
-    if ( strpos($request, 'wp-login.php') !== false ) {
+    // 攔截 wp-login.php、wp-admin 或其他登入相關頁面，全部導向首頁
+    if ( strpos($request, 'wp-login.php') !== false || strpos($request, 'wp-admin') !== false ) {
         wp_redirect(home_url());
         exit;
     }
 }
 add_action('template_redirect', 'wu_toolbox_hide_login_redirect');
 
-/* === 改變登入/登出 URL === */
-function wu_toolbox_custom_login_url($login_url, $redirect, $force_reauth) {
+/* === 改變登入 URL === */
+function wu_toolbox_custom_login_url($login_url, $redirect = '', $force_reauth = false) {
     $status = get_option('hide_login_status', 'off');
     $url = get_option('hide_login_url', 'loginwu');
 
     if ($status === 'on') {
-        return home_url('/' . $url . '/');
+        $login_url = home_url('/' . $url . '/');
+        if (!empty($redirect)) {
+            $login_url = add_query_arg('redirect_to', urlencode($redirect), $login_url);
+        }
+        if ($force_reauth) {
+            $login_url = add_query_arg('reauth', '1', $login_url);
+        }
     }
     return $login_url;
 }
 add_filter('login_url', 'wu_toolbox_custom_login_url', 10, 3);
 
+/* === 改變登出 URL === */
 add_filter('logout_url', function($logout_url, $redirect){
     $status = get_option('hide_login_status', 'off');
     $url = get_option('hide_login_url', 'loginwu');
+
     if ($status === 'on') {
-        return home_url('/' . $url . '/?action=logout');
+        // 登出後統一導向首頁
+        return home_url();
     }
     return $logout_url;
 }, 10, 2);
+
+/* === 後台防止被鎖 === */
+function wu_toolbox_admin_redirect_protect() {
+    $status = get_option('hide_login_status', 'off');
+    if ($status !== 'on') return;
+
+    if (is_admin() && !is_user_logged_in() && !defined('DOING_AJAX')) {
+        wp_redirect(home_url());
+        exit;
+    }
+}
+add_action('admin_init', 'wu_toolbox_admin_redirect_protect');
