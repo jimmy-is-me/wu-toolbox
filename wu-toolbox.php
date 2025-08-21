@@ -22,9 +22,9 @@ function wu_toolbox_menu() {
 }
 add_action('admin_menu', 'wu_toolbox_menu');
 
-// === 點擊父選單直接跳轉到第一個子選單（維護模式） ===
+// === 點擊父選單直接跳轉到第一個子選單（外掛清單） ===
 function wu_toolbox_redirect() {
-    $first_child_slug = 'moving-mode'; // 第一個子選單 slug
+    $first_child_slug = 'plugins.php'; // 第一個子選單 slug 改為外掛清單
     wp_safe_redirect(admin_url('admin.php?page=' . $first_child_slug));
     exit;
 }
