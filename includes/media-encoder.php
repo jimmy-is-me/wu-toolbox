@@ -19,7 +19,7 @@ function media_encoder_get_settings() {
     return array(
         'enabled' => get_option('media_encoder_enabled', 'off'),
         'quality' => intval(get_option('media_encoder_quality', 82)),
-        'replace_original' => get_option('media_encoder_replace_original', 'off'),
+        'replace_original' => 'on', // 強制啟用以節省主機容量
         'enable_logging' => get_option('media_encoder_enable_logging', 'off'),
     );
 }
@@ -44,7 +44,7 @@ function media_encoder_save_settings() {
     update_option('media_encoder_enabled', isset($_POST['media_encoder_enabled']) ? sanitize_text_field($_POST['media_encoder_enabled']) : 'off');
     $quality = isset($_POST['media_encoder_quality']) ? max(1, min(100, intval($_POST['media_encoder_quality']))) : 82;
     update_option('media_encoder_quality', $quality);
-    update_option('media_encoder_replace_original', isset($_POST['media_encoder_replace_original']) ? 'on' : 'off');
+    // 移除 replace_original 選項儲存，因為強制啟用
     update_option('media_encoder_enable_logging', isset($_POST['media_encoder_enable_logging']) ? 'on' : 'off');
     
     echo '<div class="updated"><p>媒體編碼器設定已更新 ✅</p></div>';
@@ -58,7 +58,7 @@ function media_encoder_settings_page() {
     ?>
     <div class="wrap">
         <h1>媒體編碼器（JPEG/PNG → WebP）</h1>
-        <p>自動將上傳的圖像轉換為 WebP，以獲得更佳效能與更小檔案。僅當您啟用本功能時才會載入相關 PHP 類與掛鉤，以節省伺服器資源。</p>
+        <p>自動將上傳的圖像轉換為 WebP，以獲得更佳效能與更小檔案。系統會自動替換原圖以節省主機容量。</p>
 
         <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">
             <form method="post" style="flex:1;min-width:320px;max-width:560px;">
@@ -68,18 +68,16 @@ function media_encoder_settings_page() {
                     <label>
                         <input type="checkbox" name="media_encoder_enabled" value="on" <?php checked($settings['enabled'], 'on'); ?>> 啟用媒體編碼器
                     </label><br>
-                    <small>啟用後，系統會在圖片上傳時自動轉換為 WebP。</small>
+                    <small>啟用後，系統會在圖片上傳時自動轉換為 WebP 並替換原檔案。</small>
                 </p>
                 <p>
                     <label>品質（1–100）：<input type="number" name="media_encoder_quality" min="1" max="100" value="<?php echo esc_attr($quality); ?>" style="width:90px;"></label>
                     <br><small>建議 75–90。數值越高品質越好、檔案越大。</small>
                 </p>
-                <p>
-                    <label>
-                        <input type="checkbox" name="media_encoder_replace_original" <?php checked($settings['replace_original'], 'on'); ?>> 將原圖與尺寸皆替換為 WebP
-                    </label><br>
-                    <small>啟用後會以 .webp 覆蓋附件檔案與各尺寸；停用則僅在旁生成 .webp。</small>
-                </p>
+                <!-- 移除替換原圖選項，因為強制啟用 -->
+                <div style="background:#e7f3ff;border:1px solid #0073aa;padding:10px;border-radius:4px;margin:10px 0;">
+                    <strong>📁 檔案處理模式：</strong>自動替換原圖為 WebP 格式以節省主機容量
+                </div>
                 <p>
                     <label>
                         <input type="checkbox" name="media_encoder_enable_logging" <?php checked($settings['enable_logging'], 'on'); ?>> 啟用錯誤日誌記錄
@@ -96,7 +94,7 @@ function media_encoder_settings_page() {
                         <?php
                         $imgs = get_posts(array(
                             'post_type' => 'attachment',
-                            'posts_per_page' => 5, // 限制為 5 張圖片
+                            'posts_per_page' => 5,
                             'post_mime_type' => array('image/jpeg', 'image/png'),
                             'orderby' => 'date',
                             'order' => 'DESC',
@@ -114,7 +112,7 @@ function media_encoder_settings_page() {
                 <div id="media-encoder-preview-result" style="display:none;border:1px solid #ddd;padding:12px;border-radius:8px;"></div>
 
                 <h2>批次轉換（舊有圖片 → WebP）</h2>
-                <p>將目前媒體庫中的 JPEG/PNG 批量轉換為 WebP。為避免逾時，將以分批 AJAX 方式處理。</p>
+                <p>將目前媒體庫中的 JPEG/PNG 批量轉換為 WebP。系統會自動略過已經是 WebP 格式的檔案。</p>
                 <p>
                     <button type="button" class="button button-primary" id="media-encoder-bulk-start">開始批次轉換</button>
                     <span id="media-encoder-bulk-status" style="margin-left:10px;"></span>
@@ -122,32 +120,35 @@ function media_encoder_settings_page() {
             </form>
 
             <div style="flex:1;min-width:320px;">
-                <h2>伺服器設定（Apache / Nginx）</h2>
-                <p>若您未啟用「替換原圖」，建議透過伺服器規則在瀏覽器支援時優先提供 .webp 版本。</p>
-                <h3>Apache（.htaccess）</h3>
-                <pre style="background:#f6f6f6;padding:12px;white-space:pre-wrap;"># 將支援 WebP 的瀏覽器導向對應的 .webp
-RewriteEngine On
-RewriteCond %{HTTP_ACCEPT} image/webp
-RewriteCond %{REQUEST_FILENAME} \.(jpe?g|png)$ [NC]
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME}webp -f
-RewriteRule ^(.+)\.(jpe?g|png)$ $1.$0webp [T=image/webp,E=accept:1]
-AddType image/webp .webp</pre>
-                <h3>Nginx</h3>
-                <pre style="background:#f6f6f6;padding:12px;white-space:pre-wrap;"># 在 server { } 內加入
-location ~* ^(.+)\.(jpg|jpeg|png)$ {
-    set $webp "$1.$2webp";
-    if ($http_accept ~* "webp") {
-        try_files $webp $uri =404;
-    }
-}</pre>
+                <h2>系統資訊</h2>
+                <div style="background:#f9f9f9;padding:12px;border-radius:4px;margin-bottom:20px;">
+                    <h4>WebP 支援狀態</h4>
+                    <p>
+                        Imagick: <?php echo class_exists('Imagick') ? '<span style="color:green;">✅ 可用</span>' : '<span style="color:red;">❌ 不可用</span>'; ?><br>
+                        GD WebP: <?php echo function_exists('imagewebp') ? '<span style="color:green;">✅ 可用</span>' : '<span style="color:red;">❌ 不可用</span>'; ?>
+                    </p>
+                    <?php if (!media_encoder_can_convert()): ?>
+                    <p style="color:red;"><strong>⚠️ 警告：</strong>您的伺服器不支援 WebP 轉換。請聯繫主機商啟用 Imagick 或 GD WebP 支援。</p>
+                    <?php endif; ?>
+                </div>
+
+                <h2>檔案管理說明</h2>
+                <div style="background:#fff3cd;border:1px solid #ffeaa7;padding:12px;border-radius:4px;">
+                    <h4>💾 節省空間模式</h4>
+                    <p>系統採用<strong>替換原檔案</strong>模式運作，所有 JPEG/PNG 檔案轉換後會直接替換為 WebP 格式，有效節省主機儲存空間。</p>
+                    <ul style="margin:10px 0 10px 20px;">
+                        <li>✅ 原檔案會被 WebP 完全取代</li>
+                        <li>✅ 所有縮圖尺寸同步轉換</li>
+                        <li>✅ 媒體庫資訊自動更新</li>
+                        <li>✅ 最大化節省儲存空間</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
     jQuery(function($){
-        // 使用 esc_js() 避免 XSS 攻擊
         const nonce = '<?php echo esc_js(wp_create_nonce('media_encoder_ajax')); ?>';
         
         $('#media-encoder-run-preview').on('click', function(){
@@ -175,7 +176,7 @@ location ~* ^(.+)\.(jpg|jpeg|png)$ {
                 let html = '<div style="color:green;">✅ 轉換成功</div>';
                 html += '<div>原圖：' + d.original_size_human + ' → WebP：' + d.webp_size_human;
                 if(d.saving_percent !== null) {
-                    html += '（節省 ' + d.saving_percent + '%）';
+                    html += ' <strong style="color:green;">（節省 ' + d.saving_percent + '%）</strong>';
                 }
                 html += '</div>';
                 
@@ -258,60 +259,8 @@ function media_encoder_maybe_register_hooks() {
     
     // 掛鉤上傳時轉換
     add_filter('wp_generate_attachment_metadata', 'media_encoder_convert_on_upload', 10, 2);
-    
-    // 掛鉤前台 WebP 過濾器（僅在未替換原圖時）
-    if ($settings['replace_original'] !== 'on') {
-        add_filter('wp_get_attachment_url', 'media_encoder_filter_attachment_url', 10, 2);
-        add_filter('wp_calculate_image_srcset', 'media_encoder_filter_srcset', 10, 5);
-    }
 }
 add_action('init', 'media_encoder_maybe_register_hooks');
-
-/* === 前台 WebP 過濾器 === */
-function media_encoder_filter_attachment_url($url, $attachment_id) {
-    // 檢查瀏覽器是否支援 WebP
-    if (!media_encoder_browser_supports_webp()) return $url;
-    
-    $file = get_attached_file($attachment_id);
-    if (!$file) return $url;
-    
-    $mime = get_post_mime_type($attachment_id);
-    if (!in_array($mime, array('image/jpeg', 'image/png'))) return $url;
-    
-    $webp_file = preg_replace('/\.(jpe?g|png)$/i', '.webp', $file);
-    
-    // 檢查 WebP 檔案是否實際存在
-    if (!file_exists($webp_file)) return $url;
-    
-    // 將 URL 替換為 WebP 版本
-    $upload_dir = wp_upload_dir();
-    $webp_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $webp_file);
-    
-    return $webp_url;
-}
-
-function media_encoder_filter_srcset($sources, $size_array, $image_src, $image_meta, $attachment_id) {
-    if (!media_encoder_browser_supports_webp()) return $sources;
-    
-    $upload_dir = wp_upload_dir();
-    $base_dir = trailingslashit($upload_dir['basedir']);
-    $base_url = trailingslashit($upload_dir['baseurl']);
-    
-    foreach ($sources as $width => $source) {
-        $file_path = str_replace($base_url, $base_dir, $source['url']);
-        $webp_path = preg_replace('/\.(jpe?g|png)$/i', '.webp', $file_path);
-        
-        if (file_exists($webp_path)) {
-            $sources[$width]['url'] = str_replace($base_dir, $base_url, $webp_path);
-        }
-    }
-    
-    return $sources;
-}
-
-function media_encoder_browser_supports_webp() {
-    return isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'image/webp') !== false;
-}
 
 /* === 轉換工具：GD 或 Imagick === */
 function media_encoder_can_convert() {
@@ -417,28 +366,26 @@ function media_encoder_convert_on_upload($metadata, $attachment_id) {
     
     if (!in_array($mime, array('image/jpeg','image/png'))) return $metadata;
 
-    // 轉換原圖
+    // 轉換原圖並強制替換
     $res = media_encoder_convert_file_to_webp($file, $settings['quality']);
     if (!is_wp_error($res) && file_exists($res['path'])) {
-        if ($settings['replace_original'] === 'on') {
-            // 以 webp 覆蓋附件檔案
-            if (@unlink($file)) {
-                update_attached_file($attachment_id, $res['path']);
-                wp_update_post(array('ID' => $attachment_id, 'post_mime_type' => 'image/webp'));
-                
-                // 更新元數據檔案路徑
-                if (isset($metadata['file'])) {
-                    $metadata['file'] = str_replace(basename($metadata['file']), basename($res['path']), $metadata['file']);
-                }
-            } else {
-                media_encoder_log_error('無法刪除原始檔案', array('file' => $file));
+        // 刪除原檔案並更新附件資訊
+        if (@unlink($file)) {
+            update_attached_file($attachment_id, $res['path']);
+            wp_update_post(array('ID' => $attachment_id, 'post_mime_type' => 'image/webp'));
+            
+            // 更新元數據檔案路徑
+            if (isset($metadata['file'])) {
+                $metadata['file'] = str_replace(basename($metadata['file']), basename($res['path']), $metadata['file']);
             }
+        } else {
+            media_encoder_log_error('無法刪除原始檔案', array('file' => $file));
         }
     } else if (is_wp_error($res)) {
         media_encoder_log_error('原圖轉換失敗', array('error' => $res->get_error_message(), 'file' => $file));
     }
 
-    // 轉換各尺寸
+    // 轉換各尺寸並強制替換
     if (!empty($metadata['sizes']) && is_array($metadata['sizes'])) {
         $upload_dir = wp_upload_dir();
         $base_dir = trailingslashit($upload_dir['basedir']);
@@ -449,12 +396,11 @@ function media_encoder_convert_on_upload($metadata, $attachment_id) {
             if (file_exists($size_path)) {
                 $r = media_encoder_convert_file_to_webp($size_path, $settings['quality']);
                 if (!is_wp_error($r) && file_exists($r['path'])) {
-                    if ($settings['replace_original'] === 'on') {
-                        if (@unlink($size_path)) {
-                            $metadata['sizes'][$size_key]['file'] = basename($r['path']);
-                        } else {
-                            media_encoder_log_error('無法刪除尺寸檔案', array('file' => $size_path));
-                        }
+                    if (@unlink($size_path)) {
+                        $metadata['sizes'][$size_key]['file'] = basename($r['path']);
+                        $metadata['sizes'][$size_key]['mime-type'] = 'image/webp';
+                    } else {
+                        media_encoder_log_error('無法刪除尺寸檔案', array('file' => $size_path));
                     }
                 } else if (is_wp_error($r)) {
                     media_encoder_log_error('尺寸轉換失敗', array('error' => $r->get_error_message(), 'file' => $size_path));
@@ -549,12 +495,13 @@ function media_encoder_ajax_bulk() {
     $offset = isset($_POST['offset']) ? intval($_POST['offset']) : 0;
     $limit = isset($_POST['limit']) ? max(1, min(100, intval($_POST['limit']))) : 10;
 
+    // 只查詢 JPEG/PNG 檔案，排除已經是 WebP 的檔案
     $q = new WP_Query(array(
         'post_type' => 'attachment',
         'post_status' => 'inherit',
         'posts_per_page' => $limit,
         'offset' => $offset,
-        'post_mime_type' => array('image/jpeg','image/png'),
+        'post_mime_type' => array('image/jpeg','image/png'), // 只處理這兩種格式
         'fields' => 'ids',
         'orderby' => 'ID',
         'order' => 'ASC',
@@ -572,14 +519,14 @@ function media_encoder_ajax_bulk() {
             continue; 
         }
         
-        $webp_path = preg_replace('/\.(jpe?g|png)$/i', '.webp', $file);
-        $need = (!file_exists($webp_path) || $settings['replace_original'] === 'on');
-        
-        if (!$need) { 
-            $skipped++; 
-            continue; 
+        // 檢查檔案格式，如果已經是 WebP 就略過
+        $mime = get_post_mime_type($id);
+        if ($mime === 'image/webp') {
+            $skipped++;
+            continue;
         }
         
+        // 進行轉換
         $r = media_encoder_convert_file_to_webp($file, $settings['quality']);
         if (is_wp_error($r)) { 
             $errors++;
@@ -587,46 +534,48 @@ function media_encoder_ajax_bulk() {
             continue; 
         }
 
-        if ($settings['replace_original'] === 'on') {
-            $meta = wp_get_attachment_metadata($id);
+        // 強制替換模式
+        $meta = wp_get_attachment_metadata($id);
+        
+        // 刪除原檔案並更新附件
+        if (@unlink($file)) {
+            update_attached_file($id, $r['path']);
+            wp_update_post(array('ID' => $id, 'post_mime_type' => 'image/webp'));
             
-            // 刪除原檔案並更新附件
-            if (@unlink($file)) {
-                update_attached_file($id, $r['path']);
-                wp_update_post(array('ID' => $id, 'post_mime_type' => 'image/webp'));
+            // 處理各尺寸
+            if (!empty($meta['sizes'])) {
+                $upload_dir = wp_upload_dir();
+                $base_dir = trailingslashit($upload_dir['basedir']);
+                $base_file_dir = trailingslashit(pathinfo($meta['file'], PATHINFO_DIRNAME));
                 
-                // 處理各尺寸
-                if (!empty($meta['sizes'])) {
-                    $upload_dir = wp_upload_dir();
-                    $base_dir = trailingslashit($upload_dir['basedir']);
-                    $base_file_dir = trailingslashit(pathinfo($meta['file'], PATHINFO_DIRNAME));
-                    
-                    foreach ($meta['sizes'] as $k => $info) {
-                        $size_path = $base_dir . $base_file_dir . $info['file'];
-                        if (file_exists($size_path)) {
-                            $rr = media_encoder_convert_file_to_webp($size_path, $settings['quality']);
-                            if (!is_wp_error($rr) && file_exists($rr['path'])) {
-                                if (@unlink($size_path)) {
-                                    $meta['sizes'][$k]['file'] = basename($rr['path']);
-                                }
+                foreach ($meta['sizes'] as $k => $info) {
+                    $size_path = $base_dir . $base_file_dir . $info['file'];
+                    if (file_exists($size_path)) {
+                        $rr = media_encoder_convert_file_to_webp($size_path, $settings['quality']);
+                        if (!is_wp_error($rr) && file_exists($rr['path'])) {
+                            if (@unlink($size_path)) {
+                                $meta['sizes'][$k]['file'] = basename($rr['path']);
+                                $meta['sizes'][$k]['mime-type'] = 'image/webp';
                             }
                         }
                     }
                 }
-                
-                // 更新檔案路徑並儲存元數據
-                if (isset($meta['file'])) {
-                    $meta['file'] = str_replace(basename($meta['file']), basename($r['path']), $meta['file']);
-                    wp_update_attachment_metadata($id, $meta);
-                }
-            } else {
-                $errors++;
-                media_encoder_log_error('無法刪除原檔案進行替換', array('id' => $id, 'file' => $file));
-                continue;
             }
+            
+            // 更新檔案路徑並儲存元數據
+            if (isset($meta['file'])) {
+                $meta['file'] = str_replace(basename($meta['file']), basename($r['path']), $meta['file']);
+            }
+            
+            // 儲存更新後的元數據
+            wp_update_attachment_metadata($id, $meta);
+            
+            $converted++;
+        } else {
+            $errors++;
+            media_encoder_log_error('無法刪除原檔案進行替換', array('id' => $id, 'file' => $file));
+            continue;
         }
-        
-        $converted++;
     }
 
     $done = (count($q->posts) < $limit);
