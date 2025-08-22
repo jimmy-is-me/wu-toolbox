@@ -4,6 +4,9 @@
  * Description: Wumetax 工具箱，整合多個功能模組。
  * Version: 1.0
  * Author: Wumetax
+ * Author URI: https://wumetax.com/
+ * License: GPL-2.0+
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.txt
  */
 
 if (!defined('ABSPATH')) exit;
@@ -29,3 +32,4 @@ if (is_dir($includes_dir)) {
         require_once $file;
     }
 }
+
