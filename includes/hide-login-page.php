@@ -160,13 +160,111 @@ class WU_Hide_Login_Page {
     }
     
     /**
-     * 重定向網址回調
+     * 重定向網址回調 - 修改為下拉式選擇器
      */
     public function redirect_url_callback() {
         $redirect_url = isset($this->options['redirect_url']) ? $this->options['redirect_url'] : home_url();
+        
+        // 獲取所有已發布的頁面
+        $pages = get_pages(array(
+            'post_status' => 'publish',
+            'sort_column' => 'menu_order, post_title'
+        ));
+        
         ?>
-        <input type="url" name="<?php echo $this->option_name; ?>[redirect_url]" value="<?php echo esc_url($redirect_url); ?>" class="regular-text" />
-        <p class="description">當訪客嘗試訪問被隱藏的登入頁面時，將重定向到此網址。</p>
+        <select name="<?php echo $this->option_name; ?>[redirect_url]" class="regular-text">
+            <option value="<?php echo esc_url(home_url()); ?>" <?php selected($redirect_url, home_url()); ?>>
+                首頁
+            </option>
+            <?php foreach ($pages as $page): 
+                $page_url = get_permalink($page->ID);
+            ?>
+            <option value="<?php echo esc_url($page_url); ?>" <?php selected($redirect_url, $page_url); ?>>
+                <?php echo esc_html($page->post_title); ?>
+            </option>
+            <?php endforeach; ?>
+            
+            <?php 
+            // 如果當前設置的URL不在上述選項中，添加自定義選項
+            $found_match = false;
+            if ($redirect_url === home_url()) {
+                $found_match = true;
+            } else {
+                foreach ($pages as $page) {
+                    if ($redirect_url === get_permalink($page->ID)) {
+                        $found_match = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!$found_match && !empty($redirect_url)): ?>
+            <option value="<?php echo esc_url($redirect_url); ?>" selected>
+                自定義網址：<?php echo esc_url($redirect_url); ?>
+            </option>
+            <?php endif; ?>
+        </select>
+        
+        <p class="description">選擇當訪客嘗試訪問被隱藏的登入頁面時要重定向的頁面。</p>
+        
+        <div style="margin-top: 10px;">
+            <label>
+                <input type="checkbox" id="wu_custom_redirect_toggle" /> 
+                使用自定義網址
+            </label>
+            <br>
+            <input type="url" id="wu_custom_redirect_url" placeholder="輸入自定義網址" class="regular-text" style="margin-top: 5px; display: none;" />
+        </div>
+        
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            var $select = $('select[name="<?php echo $this->option_name; ?>[redirect_url]"]');
+            var $toggle = $('#wu_custom_redirect_toggle');
+            var $customInput = $('#wu_custom_redirect_url');
+            
+            // 切換自定義輸入
+            $toggle.on('change', function() {
+                if ($(this).is(':checked')) {
+                    $customInput.show();
+                    $select.hide();
+                } else {
+                    $customInput.hide();
+                    $select.show();
+                }
+            });
+            
+            // 當輸入自定義網址時，更新選擇器
+            $customInput.on('blur', function() {
+                var customUrl = $(this).val();
+                if (customUrl) {
+                    // 檢查是否已存在該選項
+                    var exists = false;
+                    $select.find('option').each(function() {
+                        if ($(this).val() === customUrl) {
+                            exists = true;
+                            return false;
+                        }
+                    });
+                    
+                    // 如果不存在，添加新選項
+                    if (!exists) {
+                        $select.append($('<option>', {
+                            value: customUrl,
+                            text: '自定義網址：' + customUrl,
+                            selected: true
+                        }));
+                    } else {
+                        $select.val(customUrl);
+                    }
+                }
+                
+                // 隱藏自定義輸入，顯示選擇器
+                $toggle.prop('checked', false);
+                $customInput.hide();
+                $select.show();
+            });
+        });
+        </script>
         <?php
     }
     
