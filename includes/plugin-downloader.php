@@ -315,6 +315,107 @@ function get_all_installed_plugins() {
     return $installed_plugins;
 }
 
+/* === 取得所有已安裝主題 === */
+function get_all_installed_themes() {
+    $all_themes = wp_get_themes();
+    $installed_themes = array();
+    $current_theme = get_stylesheet();
+    
+    foreach ($all_themes as $theme_slug => $theme_data) {
+        $is_active = ($theme_slug === $current_theme);
+        $needs_update = false;
+        
+        // 檢查是否需要更新
+        $update_themes = get_site_transient('update_themes');
+        if (isset($update_themes->response[$theme_slug])) {
+            $needs_update = true;
+        }
+        
+        $installed_themes[$theme_slug] = array(
+            'name' => $theme_data->get('Name'),
+            'description' => $theme_data->get('Description') ?: '已安裝的主題',
+            'slug' => $theme_slug,
+            'author' => $theme_data->get('Author'),
+            'version' => $theme_data->get('Version'),
+            'template' => $theme_data->get_template(),
+            'stylesheet' => $theme_data->get_stylesheet(),
+            'theme_uri' => $theme_data->get('ThemeURI') ?: '#',
+            'status' => $is_active ? 'active' : 'installed',
+            'needs_update' => $needs_update,
+            'screenshot' => $theme_data->get_screenshot() ? $theme_data->get_screenshot() : null
+        );
+    }
+    
+    return $installed_themes;
+}
+
+/* === 主題下載函數 === */
+function download_theme_as_zip($theme_slug) {
+    if (!current_user_can('manage_options')) {
+        wp_die('權限不足');
+    }
+    
+    $theme = wp_get_theme($theme_slug);
+    if (!$theme->exists()) {
+        wp_die('主題不存在');
+    }
+    
+    require_once ABSPATH . 'wp-admin/includes/class-wp-filesystem-base.php';
+    require_once ABSPATH . 'wp-admin/includes/class-wp-filesystem-direct.php';
+    
+    $theme_dir = $theme->get_stylesheet_directory();
+    $theme_name = $theme->get('Name');
+    $zip_filename = sanitize_file_name($theme_name . '-' . $theme->get('Version')) . '.zip';
+    
+    // 創建臨時 ZIP 檔案
+    $upload_dir = wp_upload_dir();
+    $temp_file = $upload_dir['path'] . '/' . $zip_filename;
+    
+    $zip = new ZipArchive();
+    if ($zip->open($temp_file, ZipArchive::CREATE) !== TRUE) {
+        wp_die('無法創建 ZIP 檔案');
+    }
+    
+    // 遞歸添加主題檔案到 ZIP
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($theme_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+    
+    foreach ($iterator as $file) {
+        $file_path = $file->getRealPath();
+        $relative_path = substr($file_path, strlen($theme_dir) + 1);
+        
+        if ($file->isDir()) {
+            $zip->addEmptyDir($relative_path);
+        } elseif ($file->isFile()) {
+            $zip->addFile($file_path, $relative_path);
+        }
+    }
+    
+    $zip->close();
+    
+    // 設定下載標頭
+    header('Content-Type: application/zip');
+    header('Content-Disposition: attachment; filename="' . $zip_filename . '"');
+    header('Content-Length: ' . filesize($temp_file));
+    header('Cache-Control: no-cache, must-revalidate');
+    header('Expires: Thu, 01 Jan 1970 00:00:00 GMT');
+    
+    // 輸出檔案並清理
+    readfile($temp_file);
+    unlink($temp_file);
+    exit;
+}
+
+/* === 處理主題下載請求 === */
+function handle_theme_download() {
+    if (isset($_GET['download_theme']) && isset($_GET['theme_slug']) && check_admin_referer('download_theme_' . $_GET['theme_slug'])) {
+        download_theme_as_zip(sanitize_text_field($_GET['theme_slug']));
+    }
+}
+add_action('admin_init', 'handle_theme_download');
+
 /* === 檢查外掛詳細狀態 === */
 function get_plugin_detailed_status($plugin_slug) {
     if (!function_exists('get_plugins')) {
@@ -559,6 +660,9 @@ function plugin_manager_settings_page() {
         }
     }
     
+    // 取得主題清單
+    $installed_themes = get_all_installed_themes();
+    
     // 取得所有分類
     $categories = array();
     foreach ($all_plugins as $plugin) {
@@ -724,16 +828,114 @@ function plugin_manager_settings_page() {
             </tbody>
         </table>
         
+        <hr style="margin:30px 0;">
+        
+        <!-- 主題管理 -->
+        <h2>🎨 主題管理與下載</h2>
+        <p>目前已安裝的主題列表，您可以下載備份任何主題。</p>
+        
+        <table class="wp-list-table widefat fixed striped">
+            <thead>
+                <tr>
+                    <th class="manage-column">預覽</th>
+                    <th class="manage-column column-primary">主題名稱</th>
+                    <th class="manage-column">狀態</th>
+                    <th class="manage-column">版本</th>
+                    <th class="manage-column">作者</th>
+                    <th class="manage-column">操作</th>
+                    <th class="manage-column">主題描述</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($installed_themes as $theme): 
+                    $row_class = $theme['status'] === 'active' ? 'active-theme' : '';
+                ?>
+                <tr class="<?php echo $row_class; ?>">
+                    <td class="theme-screenshot" style="width:80px;">
+                        <?php if ($theme['screenshot']): ?>
+                            <img src="<?php echo esc_url($theme['screenshot']); ?>" alt="<?php echo esc_attr($theme['name']); ?>" style="width:60px;height:45px;border:1px solid #ddd;border-radius:3px;">
+                        <?php else: ?>
+                            <div style="width:60px;height:45px;background:#f0f0f1;border:1px solid #ddd;border-radius:3px;display:flex;align-items:center;justify-content:center;color:#666;font-size:10px;">無預覽</div>
+                        <?php endif; ?>
+                    </td>
+                    <td class="theme-title column-primary">
+                        <strong>
+                            <?php if ($theme['theme_uri'] !== '#'): ?>
+                                <a href="<?php echo esc_url($theme['theme_uri']); ?>" target="_blank">
+                                    <?php echo esc_html($theme['name']); ?>
+                                </a>
+                            <?php else: ?>
+                                <?php echo esc_html($theme['name']); ?>
+                            <?php endif; ?>
+                        </strong>
+                        <?php if ($theme['status'] === 'active'): ?>
+                            <span style="color:#46b450;font-weight:bold;"> (目前啟用)</span>
+                        <?php endif; ?>
+                    </td>
+                    <td class="theme-status">
+                        <span class="status-<?php echo $theme['status']; ?>" style="padding:3px 8px;border-radius:3px;font-size:11px;font-weight:bold;<?php 
+                            if ($theme['status'] === 'active') {
+                                echo $theme['needs_update'] ? 'background:#ff6900;color:white;' : 'background:#46b450;color:white;';
+                            } else {
+                                echo 'background:#0073aa;color:white;';
+                            } ?>">
+                            <?php 
+                            if ($theme['status'] === 'active') {
+                                echo $theme['needs_update'] ? '啟用中 (有更新)' : '啟用中';
+                            } else {
+                                echo '已安裝';
+                            }
+                            ?>
+                        </span>
+                    </td>
+                    <td class="theme-version">
+                        v<?php echo esc_html($theme['version']); ?>
+                    </td>
+                    <td class="theme-author">
+                        <?php echo wp_kses_post($theme['author']); ?>
+                    </td>
+                    <td class="theme-actions">
+                        <?php 
+                        $download_nonce = wp_create_nonce('download_theme_' . $theme['slug']);
+                        $download_url = admin_url('admin.php?page=wu-toolbox&download_theme=1&theme_slug=' . $theme['slug'] . '&_wpnonce=' . $download_nonce);
+                        ?>
+                        <a href="<?php echo $download_url; ?>" class="button button-primary" title="下載主題為 ZIP 檔案">
+                            📥 下載
+                        </a>
+                        <?php if ($theme['needs_update']): ?>
+                            <a href="<?php echo admin_url('update-core.php'); ?>" class="button button-secondary" title="前往更新頁面">
+                                🔄 更新
+                            </a>
+                        <?php endif; ?>
+                    </td>
+                    <td class="theme-description">
+                        <?php echo esc_html($theme['description']); ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        
         <div style="margin-top:20px;padding:15px;background:#f1f1f1;border-left:4px solid #0073aa;">
             <h3>使用說明</h3>
             <ul>
-                <li><strong>檔案上傳：</strong>上傳本地ZIP檔案直接安裝外掛，上傳後會在外掛列表中顯示</li>
-                <li><strong>安裝：</strong>從 WordPress.org 安裝外掛到網站</li>
-                <li><strong>啟用/停用：</strong>控制外掛執行狀態（操作後建議重新整理前台確保變更生效）</li>
-                <li><strong>刪除：</strong>移除已停用的外掛檔案</li>
-                <li><strong>更新：</strong>外掛有新版本時可更新</li>
-                <li><strong>分類篩選：</strong>使用下拉選單快速篩選特定分類外掛</li>
-                <li><strong>醒目標記：</strong>已安裝外掛顯示淺綠色背景，手動安裝外掛顯示淺藍色背景</li>
+                <li><strong>外掛管理：</strong></li>
+                <ul>
+                    <li><strong>檔案上傳：</strong>上傳本地ZIP檔案直接安裝外掛，上傳後會在外掛列表中顯示</li>
+                    <li><strong>安裝：</strong>從 WordPress.org 安裝外掛到網站</li>
+                    <li><strong>啟用/停用：</strong>控制外掛執行狀態（操作後建議重新整理前台確保變更生效）</li>
+                    <li><strong>刪除：</strong>移除已停用的外掛檔案</li>
+                    <li><strong>更新：</strong>外掛有新版本時可更新</li>
+                    <li><strong>分類篩選：</strong>使用下拉選單快速篩選特定分類外掛</li>
+                    <li><strong>醒目標記：</strong>已安裝外掛顯示淺綠色背景，手動安裝外掛顯示淺藍色背景</li>
+                </ul>
+                <li><strong>主題管理：</strong></li>
+                <ul>
+                    <li><strong>下載：</strong>將主題打包為 ZIP 檔案下載，方便備份或遷移</li>
+                    <li><strong>狀態顯示：</strong>清楚顯示主題是否為目前啟用主題</li>
+                    <li><strong>更新提醒：</strong>顯示需要更新的主題並提供快速連結</li>
+                    <li><strong>預覽圖：</strong>顯示主題截圖預覽（如果可用）</li>
+                </ul>
             </ul>
         </div>
     </div>
@@ -753,6 +955,18 @@ function plugin_manager_settings_page() {
     .wp-list-table tr.installed-plugin{background-color:#f0fff4 !important;}
     .wp-list-table tr.manual-installed{background-color:#f3f8ff !important;}
     .wp-list-table tr.installed-plugin:hover,.wp-list-table tr.manual-installed:hover{opacity:0.8;}
+    .wp-list-table tr.active-theme{background-color:#fff3cd !important;}
+    .wp-list-table tr.active-theme:hover{opacity:0.8;}
+    
+    /* 主題表格樣式 */
+    .theme-screenshot{width:80px!important;}
+    .theme-title{width:25%!important;}
+    .theme-status{width:12%!important;}
+    .theme-version{width:8%!important;}
+    .theme-author{width:15%!important;}
+    .theme-actions{width:12%!important;}
+    .theme-description{width:28%!important;}
+    .theme-actions .button{margin:1px;font-size:11px;}
     </style>
     <?php
 }
