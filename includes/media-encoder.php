@@ -111,38 +111,32 @@ function media_encoder_settings_page() {
                 </p>
                 <div id="media-encoder-preview-result" style="display:none;border:1px solid #ddd;padding:12px;border-radius:8px;"></div>
 
-                <h2>批次轉換（舊有圖片 → WebP）</h2>
-                <p>將目前媒體庫中的 JPEG/PNG 批量轉換為 WebP。系統會自動略過已經是 WebP 格式的檔案。</p>
+                <h2>智能批次轉換（舊有圖片 → WebP）</h2>
+                <p>將目前媒體庫中的 JPEG/PNG 批量轉換為 WebP。系統會<strong>自動調整處理速度</strong>以避免影響網站效能。</p>
                 
-                <!-- 批次設定 -->
+                <!-- 自動負載偵測說明 -->
                 <div style="background:#f0f6fc;border:1px solid #0969da;padding:12px;border-radius:4px;margin:10px 0;">
-                    <p><strong>⚙️ 批次設定：</strong></p>
-                    <label>每批次處理數量：
-                        <select id="media-encoder-batch-size" style="margin-left:8px;">
-                            <option value="5">5 張</option>
-                            <option value="10" selected>10 張</option>
-                            <option value="20">20 張</option>
-                            <option value="50">50 張</option>
-                        </select>
-                    </label>
-                    <span style="margin-left:20px;">
-                        <label>每批次預估時間：
-                            <input type="number" id="media-encoder-batch-time" value="3" min="1" max="60" style="width:50px;margin-left:8px;"> 秒
-                        </label>
-                    </span>
+                    <p><strong>🧠 智能處理模式：</strong></p>
+                    <ul style="margin:5px 0 5px 20px;font-size:14px;">
+                        <li>✅ 自動偵測系統負載，調整處理速度</li>
+                        <li>✅ 根據伺服器效能動態調整批次大小</li>
+                        <li>✅ 智能延遲機制，避免影響網站訪問</li>
+                        <li>✅ 可隨時暫停、繼續或取消處理</li>
+                    </ul>
                 </div>
                 
                 <p>
-                    <button type="button" class="button button-primary" id="media-encoder-bulk-start">開始批次轉換</button>
+                    <button type="button" class="button button-primary" id="media-encoder-bulk-start">開始智能轉換</button>
                     <button type="button" class="button" id="media-encoder-bulk-pause" style="display:none;">暫停</button>
                     <button type="button" class="button" id="media-encoder-bulk-resume" style="display:none;">繼續</button>
+                    <button type="button" class="button button-secondary" id="media-encoder-bulk-cancel" style="display:none;">取消</button>
                 </p>
 
                 <!-- 進度顯示區域 -->
                 <div id="media-encoder-progress-container" style="display:none;background:#f9f9f9;border:1px solid #ddd;padding:15px;border-radius:6px;margin:15px 0;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                         <strong>轉換進度</strong>
-                        <div id="media-encoder-countdown" style="font-weight:bold;color:#0073aa;"></div>
+                        <div id="media-encoder-status" style="font-weight:bold;color:#0073aa;"></div>
                     </div>
                     
                     <!-- 進度條 -->
@@ -150,8 +144,16 @@ function media_encoder_settings_page() {
                         <div id="media-encoder-progress-bar" style="background:linear-gradient(90deg, #00a0d2, #0073aa);height:100%;width:0%;transition:width 0.3s ease;"></div>
                     </div>
                     
+                    <!-- 系統狀態 -->
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:10px;margin-bottom:10px;font-size:13px;">
+                        <div><strong>處理模式：</strong><span id="processing-mode">智能偵測中</span></div>
+                        <div><strong>當前批次：</strong><span id="current-batch-size">-</span> 張</div>
+                        <div><strong>處理間隔：</strong><span id="processing-delay">-</span> 秒</div>
+                        <div><strong>系統負載：</strong><span id="system-load">偵測中</span></div>
+                    </div>
+                    
                     <!-- 統計資訊 -->
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minwidth(120px, 1fr));gap:10px;margin-bottom:10px;">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));gap:10px;margin-bottom:10px;">
                         <div><strong>已處理：</strong><span id="stats-processed">0</span></div>
                         <div><strong>已轉換：</strong><span id="stats-converted">0</span></div>
                         <div><strong>已略過：</strong><span id="stats-skipped">0</span></div>
@@ -175,6 +177,15 @@ function media_encoder_settings_page() {
                     <?php if (!media_encoder_can_convert()): ?>
                     <p style="color:red;"><strong>⚠️ 警告：</strong>您的伺服器不支援 WebP 轉換。請聯繫主機商啟用 Imagick 或 GD WebP 支援。</p>
                     <?php endif; ?>
+                    
+                    <h4 style="margin-top:15px;">伺服器效能參考</h4>
+                    <p style="font-size:13px;">
+                        PHP 記憶體限制: <?php echo ini_get('memory_limit'); ?><br>
+                        最大執行時間: <?php echo ini_get('max_execution_time'); ?> 秒<br>
+                        <?php if (function_exists('sys_getloadavg')): ?>
+                        系統負載: <?php $load = sys_getloadavg(); echo round($load[0], 2); ?><br>
+                        <?php endif; ?>
+                    </p>
                 </div>
 
                 <h2>檔案管理說明</h2>
@@ -187,6 +198,14 @@ function media_encoder_settings_page() {
                         <li>✅ 媒體庫資訊自動更新</li>
                         <li>✅ 最大化節省儲存空間</li>
                     </ul>
+                    
+                    <h4 style="margin-top:15px;">🧠 智能處理特色</h4>
+                    <ul style="margin:10px 0 10px 20px;">
+                        <li>🔄 動態調整批次大小 (1-20張)</li>
+                        <li>⏱️ 智能延遲控制 (1-10秒)</li>
+                        <li>📊 即時系統負載監控</li>
+                        <li>🛑 隨時可暫停、繼續或取消</li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -197,11 +216,11 @@ function media_encoder_settings_page() {
         const nonce = '<?php echo esc_js(wp_create_nonce('media_encoder_ajax')); ?>';
         let bulkRunning = false;
         let bulkPaused = false;
-        let countdownInterval = null;
-        let totalEstimatedTime = 0;
-        let remainingTime = 0;
+        let bulkCancelled = false;
         let totalImages = 0;
         let processedImages = 0;
+        let currentBatchSize = 5; // 初始批次大小
+        let currentDelay = 2; // 初始延遲時間(秒)
         
         // 預覽功能
         $('#media-encoder-run-preview').on('click', function(){
@@ -252,45 +271,25 @@ function media_encoder_settings_page() {
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
-        // 格式化時間
-        function formatTime(seconds) {
-            if (seconds < 60) return seconds + ' 秒';
-            const minutes = Math.floor(seconds / 60);
-            const remainingSeconds = seconds % 60;
-            return minutes + ' 分 ' + remainingSeconds + ' 秒';
-        }
-
-        // 更新倒數計時
-        function updateCountdown() {
-            if (remainingTime <= 0) {
-                $('#media-encoder-countdown').text('處理中...');
-                if (countdownInterval) {
-                    clearInterval(countdownInterval);
-                    countdownInterval = null;
-                }
-                return;
+        // 更新系統狀態顯示
+        function updateSystemStatus(data) {
+            if (data.suggested_batch_size) {
+                currentBatchSize = data.suggested_batch_size;
+                $('#current-batch-size').text(currentBatchSize);
             }
-            
-            $('#media-encoder-countdown').text('預估剩餘時間：' + formatTime(remainingTime));
-            remainingTime--;
-        }
-
-        // 開始倒數計時
-        function startCountdown(estimatedSeconds) {
-            remainingTime = estimatedSeconds;
-            if (countdownInterval) clearInterval(countdownInterval);
-            
-            updateCountdown();
-            countdownInterval = setInterval(updateCountdown, 1000);
-        }
-
-        // 停止倒數計時
-        function stopCountdown() {
-            if (countdownInterval) {
-                clearInterval(countdownInterval);
-                countdownInterval = null;
+            if (data.suggested_delay) {
+                currentDelay = data.suggested_delay;
+                $('#processing-delay').text(currentDelay);
             }
-            $('#media-encoder-countdown').text('');
+            if (data.load_level) {
+                let loadColor = '#00aa00';
+                if (data.load_level === 'medium') loadColor = '#ff8800';
+                if (data.load_level === 'high') loadColor = '#ff0000';
+                $('#system-load').html('<span style="color:' + loadColor + ';">' + data.load_level.toUpperCase() + '</span>');
+            }
+            if (data.processing_mode) {
+                $('#processing-mode').text(data.processing_mode);
+            }
         }
 
         // 更新進度條
@@ -299,6 +298,12 @@ function media_encoder_settings_page() {
             
             const percentage = Math.round((processedImages / totalImages) * 100);
             $('#media-encoder-progress-bar').css('width', percentage + '%');
+            
+            if (bulkRunning && !bulkPaused && !bulkCancelled) {
+                const remaining = totalImages - processedImages;
+                const estimatedTime = Math.ceil(remaining / currentBatchSize) * currentDelay;
+                $('#media-encoder-status').text('處理中... (' + percentage + '% - 約剩 ' + estimatedTime + ' 秒)');
+            }
         }
 
         // 添加檔案處理結果到顯示區域
@@ -334,12 +339,9 @@ function media_encoder_settings_page() {
             $container.scrollTop(0);
         }
 
-        // 批次轉換主函數
+        // 智能批次轉換主函數
         $('#media-encoder-bulk-start').on('click', function(){
             if (bulkRunning) return;
-            
-            const batchSize = parseInt($('#media-encoder-batch-size').val()) || 10;
-            const batchTime = parseInt($('#media-encoder-batch-time').val()) || 3;
             
             // 初始化變數
             let offset = 0;
@@ -351,20 +353,24 @@ function media_encoder_settings_page() {
             
             bulkRunning = true;
             bulkPaused = false;
+            bulkCancelled = false;
             
             const $startBtn = $(this);
             const $pauseBtn = $('#media-encoder-bulk-pause');
             const $resumeBtn = $('#media-encoder-bulk-resume');
+            const $cancelBtn = $('#media-encoder-bulk-cancel');
             const $progressContainer = $('#media-encoder-progress-container');
             
-            $startBtn.prop('disabled', true).text('處理中...');
+            $startBtn.prop('disabled', true).text('智能分析中...');
             $pauseBtn.show();
+            $cancelBtn.show();
             $progressContainer.show();
             
             // 清空之前的結果
             $('#media-encoder-current-files').empty();
+            $('#media-encoder-status').text('正在分析系統狀態...');
             
-            // 首先獲取總圖片數量來計算進度
+            // 首先獲取總圖片數量
             $.post(ajaxurl, {
                 action: 'media_encoder_get_total_count',
                 _wpnonce: nonce
@@ -373,18 +379,14 @@ function media_encoder_settings_page() {
                     totalImages = countRes.data.total;
                     processedImages = 0;
                     
-                    // 計算總預估時間
-                    const estimatedBatches = Math.ceil(totalImages / batchSize);
-                    totalEstimatedTime = estimatedBatches * batchTime;
-                    
                     if (totalImages === 0) {
                         $('#media-encoder-current-files').html('<div style="text-align:center;color:#666;padding:20px;">沒有需要轉換的 JPEG/PNG 圖片</div>');
                         resetBulkUI();
                         return;
                     }
                     
-                    startCountdown(totalEstimatedTime);
-                    $('#media-encoder-current-files').html('<div style="text-align:center;color:#0073aa;padding:10px;">找到 ' + totalImages + ' 張圖片需要轉換，預估時間：' + formatTime(totalEstimatedTime) + '</div>');
+                    $('#media-encoder-current-files').html('<div style="text-align:center;color:#0073aa;padding:10px;">找到 ' + totalImages + ' 張圖片需要轉換，正在啟動智能處理模式...</div>');
+                    $startBtn.text('處理中...');
                     
                     // 開始處理
                     setTimeout(step, 1000);
@@ -395,13 +397,17 @@ function media_encoder_settings_page() {
             });
 
             function step(){
-                if (!bulkRunning || bulkPaused) return;
+                if (!bulkRunning || bulkCancelled) return;
+                if (bulkPaused) {
+                    setTimeout(step, 1000);
+                    return;
+                }
                 
                 $.post(ajaxurl, { 
                     action: 'media_encoder_bulk', 
                     _wpnonce: nonce, 
                     offset: offset, 
-                    limit: batchSize 
+                    limit: currentBatchSize 
                 }, function(res){
                     if(!res || !res.success){ 
                         const errorMsg = res && res.data ? res.data : '批次失敗';
@@ -416,7 +422,7 @@ function media_encoder_settings_page() {
                     errors += res.data.errors || 0;
                     totalSavedSpace += res.data.saved_space || 0;
                     processedImages = processed;
-                    offset += batchSize;
+                    offset += currentBatchSize;
                     
                     // 更新統計顯示
                     $('#stats-processed').text(processed);
@@ -424,6 +430,11 @@ function media_encoder_settings_page() {
                     $('#stats-skipped').text(skipped);
                     $('#stats-errors').text(errors);
                     $('#stats-saved-space').text(formatBytes(totalSavedSpace));
+                    
+                    // 更新系統狀態
+                    if (res.data.system_status) {
+                        updateSystemStatus(res.data.system_status);
+                    }
                     
                     // 更新進度條
                     updateProgress();
@@ -436,9 +447,9 @@ function media_encoder_settings_page() {
                     }
                     
                     if(res.data.done) {
-                        stopCountdown();
+                        $('#media-encoder-status').text('✅ 處理完成！');
                         let completionMsg = '<div style="color:green;padding:15px;background:#e8f5e8;border-radius:4px;margin:10px 0;text-align:center;">';
-                        completionMsg += '<h4 style="margin:0 0 10px 0;">🎉 批次轉換完成！</h4>';
+                        completionMsg += '<h4 style="margin:0 0 10px 0;">🎉 智能批次轉換完成！</h4>';
                         completionMsg += '<div>總共處理 ' + processed + ' 張圖片</div>';
                         completionMsg += '<div>成功轉換 ' + converted + ' 張</div>';
                         completionMsg += '<div>略過 ' + skipped + ' 張</div>';
@@ -449,11 +460,8 @@ function media_encoder_settings_page() {
                         $('#media-encoder-current-files').prepend(completionMsg);
                         resetBulkUI();
                     } else {
-                        // 繼續下一批次，調整倒數時間
-                        const remainingBatches = Math.ceil((totalImages - processed) / batchSize);
-                        remainingTime = Math.max(0, remainingBatches * batchTime);
-                        
-                        setTimeout(step, batchTime * 1000);
+                        // 使用智能延遲繼續下一批次
+                        setTimeout(step, currentDelay * 1000);
                     }
                 }).fail(function(){
                     $('#media-encoder-current-files').prepend('<div style="color:red;padding:10px;background:#ffe6e6;border-radius:4px;margin-bottom:10px;">❌ 網路錯誤，請重試</div>');
@@ -465,10 +473,9 @@ function media_encoder_settings_page() {
         // 暫停功能
         $('#media-encoder-bulk-pause').on('click', function() {
             bulkPaused = true;
-            stopCountdown();
             $(this).hide();
             $('#media-encoder-bulk-resume').show();
-            $('#media-encoder-countdown').text('⏸️ 已暫停');
+            $('#media-encoder-status').text('⏸️ 已暫停');
         });
 
         // 繼續功能
@@ -476,10 +483,17 @@ function media_encoder_settings_page() {
             bulkPaused = false;
             $(this).hide();
             $('#media-encoder-bulk-pause').show();
-            
-            // 重新開始倒數
-            if (remainingTime > 0) {
-                startCountdown(remainingTime);
+            $('#media-encoder-status').text('▶️ 繼續處理中...');
+        });
+
+        // 取消功能
+        $('#media-encoder-bulk-cancel').on('click', function() {
+            if (confirm('確定要取消批次轉換嗎？已處理的檔案不會回復。')) {
+                bulkCancelled = true;
+                bulkRunning = false;
+                $('#media-encoder-status').text('❌ 已取消');
+                $('#media-encoder-current-files').prepend('<div style="color:orange;padding:10px;background:#fff3cd;border-radius:4px;margin-bottom:10px;">⚠️ 批次轉換已被使用者取消</div>');
+                resetBulkUI();
             }
         });
 
@@ -487,11 +501,11 @@ function media_encoder_settings_page() {
         function resetBulkUI() {
             bulkRunning = false;
             bulkPaused = false;
-            stopCountdown();
             
-            $('#media-encoder-bulk-start').prop('disabled', false).text('開始批次轉換');
+            $('#media-encoder-bulk-start').prop('disabled', false).text('開始智能轉換');
             $('#media-encoder-bulk-pause').hide();
             $('#media-encoder-bulk-resume').hide();
+            $('#media-encoder-bulk-cancel').hide();
         }
     });
     </script>
@@ -599,6 +613,55 @@ function media_encoder_convert_file_to_webp($src_path, $quality = 82) {
         media_encoder_log_error('GD 轉換錯誤', array('error' => $e->getMessage(), 'src' => $src_path));
         return new WP_Error('gd_error', $e->getMessage());
     }
+}
+
+/* === 智能系統負載檢測 === */
+function media_encoder_get_system_status() {
+    $status = array(
+        'load_level' => 'low',
+        'suggested_batch_size' => 5,
+        'suggested_delay' => 2,
+        'processing_mode' => '標準模式'
+    );
+    
+    // 檢測系統負載
+    if (function_exists('sys_getloadavg')) {
+        $load = sys_getloadavg();
+        $avg_load = $load[0];
+        
+        if ($avg_load > 2.0) {
+            $status['load_level'] = 'high';
+            $status['suggested_batch_size'] = 2;
+            $status['suggested_delay'] = 8;
+            $status['processing_mode'] = '輕負載模式';
+        } elseif ($avg_load > 1.0) {
+            $status['load_level'] = 'medium';
+            $status['suggested_batch_size'] = 3;
+            $status['suggested_delay'] = 5;
+            $status['processing_mode'] = '平衡模式';
+        } else {
+            $status['suggested_batch_size'] = 8;
+            $status['suggested_delay'] = 2;
+            $status['processing_mode'] = '高效模式';
+        }
+    }
+    
+    // 檢測記憶體使用情況
+    $memory_limit = wp_convert_hr_to_bytes(ini_get('memory_limit'));
+    $current_memory = memory_get_usage();
+    $memory_usage_percent = ($current_memory / $memory_limit) * 100;
+    
+    if ($memory_usage_percent > 80) {
+        $status['load_level'] = 'high';
+        $status['suggested_batch_size'] = min($status['suggested_batch_size'], 2);
+        $status['suggested_delay'] = max($status['suggested_delay'], 10);
+        $status['processing_mode'] = '記憶體保護模式';
+    } elseif ($memory_usage_percent > 60) {
+        $status['suggested_batch_size'] = min($status['suggested_batch_size'], 5);
+        $status['suggested_delay'] = max($status['suggested_delay'], 3);
+    }
+    
+    return $status;
 }
 
 /* === 上傳時轉換 === */
@@ -752,7 +815,7 @@ function media_encoder_ajax_get_total_count() {
 }
 add_action('wp_ajax_media_encoder_get_total_count', 'media_encoder_ajax_get_total_count');
 
-/* === AJAX：批次轉換（增強版） === */
+/* === AJAX：智能批次轉換 === */
 function media_encoder_ajax_bulk() {
     if (!current_user_can('manage_options')) {
         wp_send_json_error('權限不足');
@@ -763,7 +826,7 @@ function media_encoder_ajax_bulk() {
     }
     
     $offset = isset($_POST['offset']) ? intval($_POST['offset']) : 0;
-    $limit = isset($_POST['limit']) ? max(1, min(100, intval($_POST['limit']))) : 10;
+    $limit = isset($_POST['limit']) ? max(1, min(20, intval($_POST['limit']))) : 5;
 
     $q = new WP_Query(array(
         'post_type' => 'attachment',
@@ -869,6 +932,9 @@ function media_encoder_ajax_bulk() {
 
     $done = (count($q->posts) < $limit);
     
+    // 獲取系統狀態建議
+    $system_status = media_encoder_get_system_status();
+    
     wp_send_json_success(array(
         'processed' => count($q->posts),
         'converted' => $converted,
@@ -877,6 +943,7 @@ function media_encoder_ajax_bulk() {
         'saved_space' => $total_saved_space,
         'files' => $files_details,
         'done' => $done,
+        'system_status' => $system_status
     ));
 }
 add_action('wp_ajax_media_encoder_bulk', 'media_encoder_ajax_bulk');
