@@ -24,7 +24,8 @@ class WU_Hide_Login_Page {
         $this->options = get_option($this->option_name, array(
             'enabled' => false,
             'custom_slug' => 'loginwu',
-            'redirect_url' => home_url()
+            'redirect_url' => home_url(),
+            'redirect_page_id' => 0
         ));
     }
     
@@ -76,9 +77,9 @@ class WU_Hide_Login_Page {
         );
         
         add_settings_field(
-            'redirect_url',
-            '重定向網址',
-            array($this, 'redirect_url_callback'),
+            'redirect_page_id',
+            '重定向頁面',
+            array($this, 'redirect_page_callback'),
             'wu-hide-login-page',
             'wu_hide_login_page_section'
         );
@@ -120,7 +121,7 @@ class WU_Hide_Login_Page {
                 <div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 4px; margin-top: 15px;">
                     <h3 style="margin-top: 0; color: #155724;">功能已啟用</h3>
                     <p><strong>新的登入網址：</strong> <code><?php echo home_url('/' . $this->options['custom_slug'] . '/'); ?></code></p>
-                    <p><strong>請將此網址加入書籤！</strong></p>
+                    <p><strong>訪客嘗試使用舊登入網址時將被導向：</strong> <code><?php echo esc_url($this->get_redirect_destination()); ?></code></p>
                 </div>
                 <?php endif; ?>
             </div>
@@ -160,14 +161,20 @@ class WU_Hide_Login_Page {
     }
     
     /**
-     * 重定向網址回調
+     * 重定向頁面回調（下拉選單）
      */
-    public function redirect_url_callback() {
-        $redirect_url = isset($this->options['redirect_url']) ? $this->options['redirect_url'] : home_url();
-        ?>
-        <input type="url" name="<?php echo $this->option_name; ?>[redirect_url]" value="<?php echo esc_url($redirect_url); ?>" class="regular-text" />
-        <p class="description">當訪客嘗試訪問被隱藏的登入頁面時，將重定向到此網址。</p>
-        <?php
+    public function redirect_page_callback() {
+        $selected = isset($this->options['redirect_page_id']) ? intval($this->options['redirect_page_id']) : 0;
+        
+        wp_dropdown_pages(array(
+            'name' => $this->option_name . '[redirect_page_id]',
+            'selected' => $selected,
+            'show_option_none' => '— 選擇一個頁面 —',
+            'option_none_value' => 0,
+            'post_status' => 'publish'
+        ));
+        
+        echo '<p class="description">選擇當訪客嘗試訪問被隱藏登入頁面時要導向的已發佈頁面。未選擇時將導向首頁。</p>';
     }
     
     /**
@@ -177,20 +184,45 @@ class WU_Hide_Login_Page {
         $sanitized = array();
         
         $sanitized['enabled'] = isset($input['enabled']) ? true : false;
-        $sanitized['custom_slug'] = sanitize_text_field($input['custom_slug']);
-        $sanitized['redirect_url'] = esc_url_raw($input['redirect_url']);
+        $sanitized['custom_slug'] = sanitize_text_field(isset($input['custom_slug']) ? $input['custom_slug'] : 'loginwu');
+        
+        // 新欄位：儲存頁面ID
+        $sanitized['redirect_page_id'] = isset($input['redirect_page_id']) ? absint($input['redirect_page_id']) : 0;
+        
+        // 舊欄位：維持相容，如選項已存在則保留
+        if (isset($this->options['redirect_url'])) {
+            $sanitized['redirect_url'] = esc_url_raw($this->options['redirect_url']);
+        } elseif (isset($input['redirect_url'])) {
+            $sanitized['redirect_url'] = esc_url_raw($input['redirect_url']);
+        } else {
+            $sanitized['redirect_url'] = home_url();
+        }
         
         // 確保custom_slug不為空
         if (empty($sanitized['custom_slug'])) {
             $sanitized['custom_slug'] = 'loginwu';
         }
         
-        // 確保redirect_url不為空
-        if (empty($sanitized['redirect_url'])) {
-            $sanitized['redirect_url'] = home_url();
-        }
-        
         return $sanitized;
+    }
+    
+    /**
+     * 取得重定向目的地URL（優先頁面，其次舊URL，最後首頁）
+     */
+    private function get_redirect_destination() {
+        // 1) 若選擇頁面
+        if (!empty($this->options['redirect_page_id'])) {
+            $page_link = get_permalink(intval($this->options['redirect_page_id']));
+            if ($page_link) {
+                return $page_link;
+            }
+        }
+        // 2) 舊設定的URL
+        if (!empty($this->options['redirect_url'])) {
+            return esc_url($this->options['redirect_url']);
+        }
+        // 3) 預設首頁
+        return home_url();
     }
     
     /**
@@ -251,8 +283,8 @@ class WU_Hide_Login_Page {
                 return;
             }
             
-            // 重定向到設定的網址
-            wp_redirect($this->options['redirect_url']);
+            // 重定向到設定的頁面或網址
+            wp_redirect($this->get_redirect_destination());
             exit;
         }
     }
