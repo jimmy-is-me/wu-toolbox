@@ -34,7 +34,7 @@ function moving_mode_settings_page() {
     $copyright = get_option('moving_mode_copyright','Copyright © 2025 <a href="https://wumetax.com/" target="_blank">Wumetax</a> All rights reserved ｜ 網站建置與維護');
     ?>
     <div class="wrap">
-        <h1>Wumetax 維護模式設定</h1>
+        <h1>維護模式設定</h1>
         <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">
 
 
@@ -229,3 +229,4 @@ function moving_mode_output() {
     exit;
 }
 add_action('template_redirect','moving_mode_output');
+
