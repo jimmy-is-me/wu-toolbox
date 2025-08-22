@@ -115,6 +115,7 @@ class WU_Enhanced_Downloader {
         
         $plugin_count = count(get_plugins());
         $theme_count = count(wp_get_themes());
+        $theme_downloader_enabled = get_option('wu_enable_theme_downloader', false);
         ?>
         <div class="wrap">
             <h1>增強下載器設定</h1>
@@ -129,8 +130,8 @@ class WU_Enhanced_Downloader {
                     </span>
                 </p>
                 <p><strong>主題下載器：</strong> 
-                    <span class="<?php echo get_option('wu_enable_theme_downloader', false) ? 'wu-status-enabled' : 'wu-status-disabled'; ?>">
-                        <?php echo get_option('wu_enable_theme_downloader', false) ? '已啟用' : '已禁用'; ?>
+                    <span class="<?php echo $theme_downloader_enabled ? 'wu-status-enabled' : 'wu-status-disabled'; ?>">
+                        <?php echo $theme_downloader_enabled ? '已啟用' : '已禁用'; ?>
                     </span>
                 </p>
             </div>
@@ -143,6 +144,13 @@ class WU_Enhanced_Downloader {
                 submit_button();
                 ?>
             </form>
+            
+            <?php 
+            // 如果主題下載器已啟用，顯示可供下載的主題清單
+            if ($theme_downloader_enabled) {
+                $this->display_downloadable_themes();
+            }
+            ?>
             
             <div class="card">
                 <h2>功能說明</h2>
@@ -194,7 +202,139 @@ class WU_Enhanced_Downloader {
         .card h2 { margin-top: 0; }
         .card h3 { color: #23282d; }
         .card ul, .card ol { margin-left: 20px; }
+        .wu-theme-list { margin: 20px 0; }
+        .wu-theme-item { 
+            display: flex; 
+            align-items: center; 
+            padding: 15px; 
+            border: 1px solid #ddd; 
+            margin-bottom: 10px; 
+            background: #fff;
+            border-radius: 5px;
+        }
+        .wu-theme-screenshot { 
+            width: 100px; 
+            height: 75px; 
+            margin-right: 15px; 
+            border: 1px solid #ddd;
+            overflow: hidden;
+            border-radius: 3px;
+        }
+        .wu-theme-screenshot img { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+        }
+        .wu-theme-info { 
+            flex: 1; 
+        }
+        .wu-theme-name { 
+            font-size: 16px; 
+            font-weight: bold; 
+            margin: 0 0 5px 0; 
+        }
+        .wu-theme-description { 
+            color: #666; 
+            font-size: 13px; 
+            margin: 0 0 5px 0; 
+            line-height: 1.4;
+        }
+        .wu-theme-meta { 
+            font-size: 12px; 
+            color: #888; 
+        }
+        .wu-theme-actions { 
+            margin-left: 15px; 
+        }
+        .wu-current-theme { 
+            background: #f0f8ff; 
+            border-color: #0073aa; 
+        }
+        .wu-current-badge {
+            background: #0073aa;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            margin-left: 10px;
+        }
+        .wu-no-screenshot {
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-size: 12px;
+        }
         </style>
+        <?php
+    }
+    
+    /**
+     * 顯示可供下載的主題清單
+     */
+    private function display_downloadable_themes() {
+        $themes = wp_get_themes();
+        $current_theme = get_stylesheet();
+        
+        if (empty($themes)) {
+            return;
+        }
+        ?>
+        <div class="card wu-theme-list">
+            <h2>可供下載的佈景主題清單</h2>
+            <p class="description">以下是目前已安裝的所有佈景主題，您可以點擊下載按鈕來備份任何主題。</p>
+            
+            <?php foreach ($themes as $theme_slug => $theme): ?>
+            <div class="wu-theme-item <?php echo ($theme_slug === $current_theme) ? 'wu-current-theme' : ''; ?>">
+                <div class="wu-theme-screenshot">
+                    <?php if ($theme->get_screenshot()): ?>
+                        <img src="<?php echo esc_url($theme->get_screenshot()); ?>" alt="<?php echo esc_attr($theme->get('Name')); ?>" />
+                    <?php else: ?>
+                        <div class="wu-no-screenshot">無預覽圖</div>
+                    <?php endif; ?>
+                </div>
+                
+                <div class="wu-theme-info">
+                    <div class="wu-theme-name">
+                        <?php echo esc_html($theme->get('Name')); ?>
+                        <?php if ($theme_slug === $current_theme): ?>
+                            <span class="wu-current-badge">使用中</span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="wu-theme-description">
+                        <?php echo esc_html(wp_trim_words($theme->get('Description'), 20)); ?>
+                    </div>
+                    <div class="wu-theme-meta">
+                        <strong>版本：</strong><?php echo esc_html($theme->get('Version')); ?> |
+                        <strong>作者：</strong><?php echo wp_kses_post($theme->get('Author')); ?> |
+                        <strong>資料夾：</strong><?php echo esc_html($theme_slug); ?>
+                    </div>
+                </div>
+                
+                <div class="wu-theme-actions">
+                    <?php
+                    $download_url = wp_nonce_url(
+                        admin_url('admin-post.php?action=wu_download_theme&theme=' . urlencode($theme_slug)),
+                        'wu_download_theme_' . $theme_slug
+                    );
+                    ?>
+                    <a href="<?php echo esc_url($download_url); ?>" 
+                       class="button button-primary"
+                       onclick="return confirm('確定要下載主題「<?php echo esc_js($theme->get('Name')); ?>」嗎？');"
+                       title="下載 <?php echo esc_attr($theme->get('Name')); ?>">
+                        <span class="dashicons dashicons-download" style="vertical-align: middle; margin-right: 5px;"></span>
+                        下載主題
+                    </a>
+                </div>
+            </div>
+            <?php endforeach; ?>
+            
+            <p class="description" style="margin-top: 15px;">
+                <strong>提示：</strong>下載的檔案將會是完整的主題資料夾壓縮包，包含所有主題檔案。
+                您也可以直接在「外觀 > 主題」頁面中點擊各主題的下載按鈕。
+            </p>
+        </div>
         <?php
     }
     
