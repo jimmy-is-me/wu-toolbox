@@ -19,7 +19,6 @@ function media_encoder_get_settings() {
 	return array(
 		'enabled' => get_option('media_encoder_enabled', 'off'),
 		'quality' => intval(get_option('media_encoder_quality', 82)),
-		'replace_original' => get_option('media_encoder_replace_original', 'off'),
 	);
 }
 
@@ -31,7 +30,6 @@ function media_encoder_save_settings() {
 	update_option('media_encoder_enabled', isset($_POST['media_encoder_enabled']) ? sanitize_text_field($_POST['media_encoder_enabled']) : 'off');
 	$quality = isset($_POST['media_encoder_quality']) ? max(1, min(100, intval($_POST['media_encoder_quality']))) : 82;
 	update_option('media_encoder_quality', $quality);
-	update_option('media_encoder_replace_original', isset($_POST['media_encoder_replace_original']) ? 'on' : 'off');
 	echo '<div class="updated"><p>媒體編碼器設定已更新 ✅</p></div>';
 }
 
@@ -59,12 +57,7 @@ function media_encoder_settings_page() {
 					<label>品質（1–100）：<input type="number" name="media_encoder_quality" min="1" max="100" value="<?php echo esc_attr($quality); ?>" style="width:90px;"></label>
 					<br><small>建議 75–90。數值越高品質越好、檔案越大。</small>
 				</p>
-				<p>
-					<label>
-						<input type="checkbox" name="media_encoder_replace_original" <?php checked($settings['replace_original'], 'on'); ?>> 將原圖與尺寸皆替換為 WebP
-					</label><br>
-					<small>啟用後會以 .webp 覆蓋附件檔案與各尺寸；停用則僅在旁生成 .webp。</small>
-				</p>
+
 				<p><input type="submit" class="button-primary" name="media_encoder_save" value="儲存設定"></p>
 
 				<h2>預覽模式</h2>
@@ -75,7 +68,7 @@ function media_encoder_settings_page() {
 						<?php
 						$imgs = get_posts(array(
 							'post_type' => 'attachment',
-							'posts_per_page' => 50,
+							'posts_per_page' => 5,
 							'post_mime_type' => array('image/jpeg', 'image/png'),
 							'orderby' => 'date',
 							'order' => 'DESC',
@@ -226,14 +219,10 @@ function media_encoder_convert_on_upload($metadata, $attachment_id) {
 	// 轉換原圖
 	$res = media_encoder_convert_file_to_webp($file, $settings['quality']);
 	if (!is_wp_error($res) && file_exists($res['path'])) {
-		if ($settings['replace_original'] === 'on') {
-			// 以 webp 覆蓋附件檔案
-			@unlink($file);
-			update_attached_file($attachment_id, $res['path']);
-			wp_update_post(array('ID' => $attachment_id, 'post_mime_type' => 'image/webp'));
-			$metadata['file'] = str_replace(basename($metadata['file']), basename($res['path']), $metadata['file']);
-		}
+		// 僅生成 .webp 並保留原檔；更新顯示用的檔案大小資訊
+		$metadata['filesize'] = file_exists($res['path']) ? filesize($res['path']) : (isset($metadata['filesize']) ? $metadata['filesize'] : null);
 	}
+
 
 	// 轉換各尺寸
 	if (!empty($metadata['sizes']) && is_array($metadata['sizes'])) {
@@ -244,9 +233,9 @@ function media_encoder_convert_on_upload($metadata, $attachment_id) {
 			$size_path = $base_dir . $base_file_dir . $size_info['file'];
 			if (file_exists($size_path)) {
 				$r = media_encoder_convert_file_to_webp($size_path, $settings['quality']);
-				if (!is_wp_error($r) && file_exists($r['path']) && $settings['replace_original'] === 'on') {
-					@unlink($size_path);
-					$metadata['sizes'][$size_key]['file'] = basename($r['path']);
+				// 保留原檔，僅生成 .webp；若要顯示新的尺寸大小可在後台自訂欄位呈現
+				if (!is_wp_error($r) && file_exists($r['path'])) {
+					$metadata['sizes'][$size_key]['filesize'] = filesize($r['path']);
 				}
 			}
 		}
@@ -316,33 +305,28 @@ function media_encoder_ajax_bulk() {
 		$file = get_attached_file($id);
 		if (!$file || !file_exists($file)) { $skipped++; continue; }
 		$webp_path = preg_replace('/\.(jpe?g|png)$/i', '.webp', $file);
-		$need = (!file_exists($webp_path) || $settings['replace_original'] === 'on');
+		$need = (!file_exists($webp_path));
 		if (!$need) { $skipped++; continue; }
 		$r = media_encoder_convert_file_to_webp($file, $settings['quality']);
 		if (is_wp_error($r)) { $skipped++; continue; }
 
-		if ($settings['replace_original'] === 'on') {
-			$meta = wp_get_attachment_metadata($id);
-			@unlink($file);
-			update_attached_file($id, $r['path']);
-			wp_update_post(array('ID' => $id, 'post_mime_type' => 'image/webp'));
-			if (!empty($meta['sizes'])) {
-				$upload_dir = wp_upload_dir();
-				$base_dir = trailingslashit($upload_dir['basedir']);
-				$base_file_dir = trailingslashit(pathinfo($meta['file'], PATHINFO_DIRNAME));
-				foreach ($meta['sizes'] as $k => $info) {
-					$size_path = $base_dir . $base_file_dir . $info['file'];
-					if (file_exists($size_path)) {
-						$rr = media_encoder_convert_file_to_webp($size_path, $settings['quality']);
-						if (!is_wp_error($rr) && file_exists($rr['path'])) {
-							@unlink($size_path);
-							$meta['sizes'][$k]['file'] = basename($rr['path']);
-						}
+		// 僅生成 .webp；更新顯示用大小
+		$meta = wp_get_attachment_metadata($id);
+		$meta['filesize'] = file_exists($r['path']) ? filesize($r['path']) : (isset($meta['filesize']) ? $meta['filesize'] : null);
+		if (!empty($meta['sizes'])) {
+			$upload_dir = wp_upload_dir();
+			$base_dir = trailingslashit($upload_dir['basedir']);
+			$base_file_dir = trailingslashit(pathinfo($meta['file'], PATHINFO_DIRNAME));
+			foreach ($meta['sizes'] as $k => $info) {
+				$size_path = $base_dir . $base_file_dir . $info['file'];
+				if (file_exists($size_path)) {
+					$rr = media_encoder_convert_file_to_webp($size_path, $settings['quality']);
+					if (!is_wp_error($rr) && file_exists($rr['path'])) {
+						$meta['sizes'][$k]['filesize'] = filesize($rr['path']);
 					}
 				}
-				$meta['file'] = str_replace(basename($meta['file']), basename($r['path']), $meta['file']);
-				wp_update_attachment_metadata($id, $meta);
 			}
+			wp_update_attachment_metadata($id, $meta);
 		}
 		$converted++;
 	}
@@ -356,3 +340,43 @@ function media_encoder_ajax_bulk() {
 	));
 }
 add_action('wp_ajax_media_encoder_bulk', 'media_encoder_ajax_bulk');
+
+/* === 前台輸出：<picture> 提供 WebP 與回退 === */
+function media_encoder_filter_image_html($html, $post_id, $post_image_id) {
+	$settings = media_encoder_get_settings();
+	if ($settings['enabled'] !== 'on') return $html;
+	$mime = get_post_mime_type($post_image_id);
+	if (!in_array($mime, array('image/jpeg','image/png','image/webp'))) return $html;
+	$src = wp_get_attachment_image_src($post_image_id, 'full');
+	if (!$src || empty($src[0])) return $html;
+	$orig_url = $src[0];
+	$webp_url = preg_replace('/\.(jpe?g|png)$/i', '.webp', $orig_url);
+	// 僅包一層 picture，瀏覽器不支援 webp 時會落回 img
+	$picture = '<picture><source srcset="' . esc_url($webp_url) . '" type="image/webp">' . $html . '</picture>';
+	return $picture;
+}
+
+function media_encoder_maybe_register_front_filters() {
+	$settings = media_encoder_get_settings();
+	if ($settings['enabled'] !== 'on') return;
+	add_filter('post_thumbnail_html', 'media_encoder_filter_image_html', 10, 3);
+	add_filter('get_avatar', function($avatar, $id_or_email, $size, $default, $alt){
+		// 嘗試將 img 包成 picture，僅處理本站媒體庫的 URL
+		if (strpos($avatar, 'src=') === false) return $avatar;
+		if (!preg_match('/src=\"([^\"]+)\"/', $avatar, $m)) return $avatar;
+		$orig = $m[1];
+		if (!preg_match('/\.(jpe?g|png)$/i', $orig)) return $avatar;
+		$webp = preg_replace('/\.(jpe?g|png)$/i', '.webp', $orig);
+		return '<picture><source srcset="' . esc_url($webp) . '" type="image/webp">' . $avatar . '</picture>';
+	}, 10, 5);
+	add_filter('the_content', function($content){
+		// 將文章內 <img> 包裝為 <picture>
+		return preg_replace_callback('/<img[^>]+src=\"([^\"]+)\"[^>]*>/i', function($m){
+			$img = $m[0]; $src = $m[1];
+			if (!preg_match('/\.(jpe?g|png)$/i', $src)) return $img;
+			$webp = preg_replace('/\.(jpe?g|png)$/i', '.webp', $src);
+			return '<picture><source srcset="' . esc_url($webp) . '" type="image/webp">' . $img . '</picture>';
+		}, $content);
+	}, 20);
+}
+add_action('init', 'media_encoder_maybe_register_front_filters');
