@@ -192,16 +192,18 @@ function media_encoder_convert_file_to_webp($src_path, $quality = 82) {
 	// 後備：GD
 	if (!function_exists('imagewebp')) return new WP_Error('no_encoder', '伺服器未啟用 WebP 編碼（缺少 Imagick 或 GD imagewebp）');
 	if (in_array($ext, array('jpg','jpeg'))) {
-		$img = imagecreatefromjpeg($src_path);
+		$img = @imagecreatefromjpeg($src_path);
 	} else {
-		$img = imagecreatefrompng($src_path);
-		imagepalettetotruecolor($img);
-		imagealphablending($img, true);
-		imagesavealpha($img, true);
+		$img = @imagecreatefrompng($src_path);
+		if ($img) {
+			if (function_exists('imagepalettetotruecolor')) { @imagepalettetotruecolor($img); }
+			@imagealphablending($img, true);
+			@imagesavealpha($img, true);
+		}
 	}
 	if (!$img) return new WP_Error('decode_failed', '影像解碼失敗');
-	$result = imagewebp($img, $dest_path, $quality);
-	imagedestroy($img);
+	$result = @imagewebp($img, $dest_path, $quality);
+	@imagedestroy($img);
 	if (!$result) return new WP_Error('encode_failed', 'WebP 編碼失敗');
 	return array('path' => $dest_path);
 }
@@ -345,13 +347,13 @@ add_action('wp_ajax_media_encoder_bulk', 'media_encoder_ajax_bulk');
 function media_encoder_filter_image_html($html, $post_id, $post_image_id) {
 	$settings = media_encoder_get_settings();
 	if ($settings['enabled'] !== 'on') return $html;
+	if (stripos($html, '<picture') !== false) return $html; // 避免重複包裝
 	$mime = get_post_mime_type($post_image_id);
 	if (!in_array($mime, array('image/jpeg','image/png','image/webp'))) return $html;
 	$src = wp_get_attachment_image_src($post_image_id, 'full');
 	if (!$src || empty($src[0])) return $html;
 	$orig_url = $src[0];
 	$webp_url = preg_replace('/\.(jpe?g|png)$/i', '.webp', $orig_url);
-	// 僅包一層 picture，瀏覽器不支援 webp 時會落回 img
 	$picture = '<picture><source srcset="' . esc_url($webp_url) . '" type="image/webp">' . $html . '</picture>';
 	return $picture;
 }
@@ -370,9 +372,12 @@ function media_encoder_maybe_register_front_filters() {
 		return '<picture><source srcset="' . esc_url($webp) . '" type="image/webp">' . $avatar . '</picture>';
 	}, 10, 5);
 	add_filter('the_content', function($content){
-		// 將文章內 <img> 包裝為 <picture>
-		return preg_replace_callback('/<img[^>]+src=\"([^\"]+)\"[^>]*>/i', function($m){
+		// 只處理同網域 JPEG/PNG 的 <img>
+		$home = home_url();
+		return preg_replace_callback('/<img[^>]+src=\"([^\"]+)\"[^>]*>/i', function($m) use ($home){
 			$img = $m[0]; $src = $m[1];
+			if (stripos($img, '<picture') !== false) return $img;
+			if (strpos($src, $home) !== 0) return $img;
 			if (!preg_match('/\.(jpe?g|png)$/i', $src)) return $img;
 			$webp = preg_replace('/\.(jpe?g|png)$/i', '.webp', $src);
 			return '<picture><source srcset="' . esc_url($webp) . '" type="image/webp">' . $img . '</picture>';
