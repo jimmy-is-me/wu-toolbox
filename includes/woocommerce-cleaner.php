@@ -12,95 +12,74 @@ class WU_WooCommerce_Cleaner {
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_init', array($this, 'admin_init'));
 
-        // WooCommerce 存在時才動作
         if (class_exists('WooCommerce')) {
-            $this->apply_cleaning();
+            if (get_option('wu_remove_wc_connect_notice', false)) {
+                $this->remove_connect_notices();
+            }
+            if (get_option('wu_remove_wc_skyverge_dashboard', false)) {
+                $this->remove_skyverge_dashboard();
+            }
+            if (get_option('wu_remove_wc_marketing_hub', false)) {
+                $this->remove_marketing_hub();
+            }
+            if (get_option('wu_remove_wc_marketplace', false)) {
+                $this->remove_marketplace();
+            }
+            if (get_option('wu_remove_wc_status', false)) {
+                $this->remove_status_menu();
+            }
+            if (get_option('wu_split_wc_settings', false)) {
+                $this->split_wc_settings();
+            }
+            if (get_option('wu_remove_wc_reports', false)) {
+                $this->remove_reports();
+            }
+            if (get_option('wu_remove_marketing_overview', false)) {
+                $this->remove_marketing_overview();
+            }
+            if (get_option('wu_remove_wc_ui_elements', false)) {
+                add_action('admin_head', array($this, 'hide_wc_ui_elements'));
+            }
         }
     }
 
-    /**
-     * 套用清理動作
-     */
-    private function apply_cleaning() {
-        // SkyVerge 儀表板 (直接把 WooCommerce > Home 移掉，預設顯示訂單)
-        add_action('admin_menu', function () {
-            remove_submenu_page('woocommerce', 'wc-admin');
-            global $submenu;
-            if (isset($submenu['woocommerce'])) {
-                foreach ($submenu['woocommerce'] as $index => $item) {
-                    if ($item[2] === 'wc-admin') {
-                        unset($submenu['woocommerce'][$index]);
-                    }
-                }
-            }
-            // 進 WooCommerce 直接跳轉 Orders
-            add_action('load-toplevel_page_woocommerce', function () {
-                wp_safe_redirect(admin_url('edit.php?post_type=shop_order'));
-                exit;
-            });
-        }, 999);
+    /** ----------------
+     * 註冊設定
+     ------------------*/
+    public function admin_init() {
+        $options = array(
+            'wu_remove_wc_connect_notice' => '移除連接商店通知',
+            'wu_remove_wc_skyverge_dashboard' => '移除 Home (SkyVerge 儀表板)',
+            'wu_remove_wc_marketing_hub' => '移除行銷中心',
+            'wu_remove_wc_marketplace' => '移除 Extensions → WooCommerce Marketplace',
+            'wu_remove_wc_status' => '移除 WooCommerce 狀態 (Status)',
+            'wu_split_wc_settings' => '將 Settings 拆分成 General, Products, Shipping, Payments, Emails 子選單',
+            'wu_remove_wc_reports' => '移除 Reports',
+            'wu_remove_marketing_overview' => '移除 Marketing → Overview',
+            'wu_remove_wc_ui_elements' => '隱藏提醒/活動面板/Marketplace 建議區塊'
+        );
 
-        // 移除行銷中心 + Marketplace
-        add_action('admin_menu', function () {
-            remove_submenu_page('woocommerce', 'wc-admin&path=/marketing');
-            remove_submenu_page('woocommerce', 'wc-admin&path=/extensions');
-        }, 999);
+        register_setting('wu_wc_cleaner_settings', 'wu_wc_cleaner_settings_options');
+        add_settings_section('wu_wc_cleaner_section', 'WooCommerce 清理設定', null, 'wu_wc_cleaner_settings');
 
-        add_filter('woocommerce_admin_features', function ($features) {
-            $remove = array(
-                'marketing', 
-                'remote-inbox-notifications', 
-                'remote-free-extensions',
-                'navigation',
-                'marketplace'
+        foreach ($options as $id => $label) {
+            add_settings_field(
+                $id, 
+                $label, 
+                function() use ($id) { 
+                    $options = get_option('wu_wc_cleaner_settings_options', array());
+                    $checked = isset($options[$id]) ? 'checked' : '';
+                    echo '<input type="checkbox" name="wu_wc_cleaner_settings_options['.$id.']" value="1" '.$checked.' />';
+                }, 
+                'wu_wc_cleaner_settings', 
+                'wu_wc_cleaner_section'
             );
-            return array_diff($features, $remove);
-        });
-
-        // 移除 Reports
-        add_action('admin_menu', function () {
-            remove_submenu_page('woocommerce', 'wc-reports');
-        }, 999);
-
-        // Status 選單移除，但資訊顯示在 WooCommerce 清理設定頁
-        add_action('admin_menu', function () {
-            remove_submenu_page('woocommerce', 'wc-status');
-        }, 999);
-
-        // Settings 子選單展開：General、Products、Shipping、Payments、Emails
-        add_action('admin_menu', function () {
-            global $submenu;
-            if (isset($submenu['woocommerce'])) {
-                foreach ($submenu['woocommerce'] as $item) {
-                    if ($item[2] === 'wc-settings') {
-                        // 自動展開子頁面
-                        add_submenu_page('woocommerce', 'General Settings', 'General', 'manage_options', 'admin.php?page=wc-settings&tab=general');
-                        add_submenu_page('woocommerce', 'Products Settings', 'Products', 'manage_options', 'admin.php?page=wc-settings&tab=products');
-                        add_submenu_page('woocommerce', 'Shipping Settings', 'Shipping', 'manage_options', 'admin.php?page=wc-settings&tab=shipping');
-                        add_submenu_page('woocommerce', 'Payments Settings', 'Payments', 'manage_options', 'admin.php?page=wc-settings&tab=checkout');
-                        add_submenu_page('woocommerce', 'Emails Settings', 'Emails', 'manage_options', 'admin.php?page=wc-settings&tab=email');
-                    }
-                }
-            }
-        }, 20);
-
-        // 移除 Marketing > Overview
-        add_action('admin_menu', function () {
-            remove_submenu_page('woocommerce-marketing', 'wc-admin&path=/marketing');
-        }, 999);
-
-        // 隱藏 Header Tasks 與 Activity Panel
-        add_action('admin_head', function () {
-            echo '<style>
-                .woocommerce-layout__header-tasks-reminder-bar,
-                #woocommerce-activity-panel { display:none !important; }
-            </style>';
-        });
+        }
     }
 
-    /**
-     * WooCommerce 清理設定選單
-     */
+    /** ----------------
+     * 後台設定頁
+     ------------------*/
     public function add_admin_menu() {
         add_submenu_page(
             'wu-toolbox',
@@ -112,50 +91,103 @@ class WU_WooCommerce_Cleaner {
         );
     }
 
-    public function admin_init() {
-        // 可選設定項目（如果你要讓它們可以勾選/取消）
-        register_setting('wu_wc_cleaner_settings', 'wu_remove_wc_status');
-    }
-
-    /**
-     * 設定頁面
-     */
     public function admin_page() {
-        $wc_installed = class_exists('WooCommerce');
-        $wc_version = $wc_installed ? WC()->version : 'N/A';
         ?>
         <div class="wrap">
             <h1>WooCommerce 清理設定</h1>
-            
-            <div class="card">
-                <h2>當前狀態</h2>
-                <p><strong>WooCommerce 狀態：</strong> 
-                    <span style="color:<?php echo $wc_installed ? '#00a32a' : '#d63638'; ?>">
-                        <?php echo $wc_installed ? '已安裝' : '未安裝'; ?>
-                    </span>
-                </p>
-                <?php if ($wc_installed): ?>
-                <p><strong>WooCommerce 版本：</strong> <?php echo esc_html($wc_version); ?></p>
-                <?php endif; ?>
-            </div>
-
-            <?php if ($wc_installed): ?>
-            <div class="card">
-                <h2>已移除的項目</h2>
-                <ul>
-                    <li>WooCommerce Home (SkyVerge 儀表板)</li>
-                    <li>行銷中心 (Marketing Hub)</li>
-                    <li>Marketplace</li>
-                    <li>Reports</li>
-                    <li>Status（資訊顯示在此頁面）</li>
-                    <li>Marketing > Overview</li>
-                    <li>Header Tasks Reminder Bar</li>
-                    <li>Activity Panel</li>
-                </ul>
-            </div>
-            <?php endif; ?>
+            <form method="post" action="options.php">
+                <?php
+                settings_fields('wu_wc_cleaner_settings');
+                do_settings_sections('wu_wc_cleaner_settings');
+                submit_button();
+                ?>
+            </form>
         </div>
         <?php
+    }
+
+    /** ----------------
+     * 功能實作
+     ------------------*/
+
+    // 1. 移除連接商店通知
+    private function remove_connect_notices() {
+        remove_action('admin_notices', array('WC_Admin_Notices', 'show_notices'));
+        add_filter('woocommerce_enable_setup_wizard', '__return_false');
+        add_action('wp_dashboard_setup', function() {
+            remove_meta_box('woocommerce_dashboard_status', 'dashboard', 'normal');
+        });
+    }
+
+    // 2. 移除 WooCommerce → Home (SkyVerge 儀表板)
+    private function remove_skyverge_dashboard() {
+        add_action('admin_menu', function() {
+            remove_submenu_page('woocommerce', 'wc-admin');
+            // 直接導向訂單
+            global $submenu;
+            if (isset($submenu['woocommerce'][0])) {
+                $submenu['woocommerce'][0][2] = 'edit.php?post_type=shop_order';
+            }
+        }, 999);
+    }
+
+    // 3. 移除行銷中心
+    private function remove_marketing_hub() {
+        add_action('admin_menu', function() {
+            remove_submenu_page('woocommerce', 'wc-admin&path=/marketing');
+            remove_menu_page('woocommerce-marketing');
+        }, 999);
+    }
+
+    // 4. 移除 Marketplace
+    private function remove_marketplace() {
+        add_action('admin_menu', function() {
+            remove_submenu_page('woocommerce', 'wc-addons');
+        }, 999);
+    }
+
+    // 5. 移除 Status
+    private function remove_status_menu() {
+        add_action('admin_menu', function() {
+            remove_submenu_page('woocommerce', 'wc-status');
+        }, 999);
+    }
+
+    // 6. 拆分 Settings
+    private function split_wc_settings() {
+        add_action('admin_menu', function() {
+            remove_submenu_page('woocommerce', 'wc-settings');
+            add_submenu_page('woocommerce', 'General Settings', 'General', 'manage_woocommerce', 'admin.php?page=wc-settings&tab=general');
+            add_submenu_page('woocommerce', 'Products Settings', 'Products', 'manage_woocommerce', 'admin.php?page=wc-settings&tab=products');
+            add_submenu_page('woocommerce', 'Shipping Settings', 'Shipping', 'manage_woocommerce', 'admin.php?page=wc-settings&tab=shipping');
+            add_submenu_page('woocommerce', 'Payments Settings', 'Payments', 'manage_woocommerce', 'admin.php?page=wc-settings&tab=checkout');
+            add_submenu_page('woocommerce', 'Emails Settings', 'Emails', 'manage_woocommerce', 'admin.php?page=wc-settings&tab=email');
+        }, 999);
+    }
+
+    // 7. 移除 Reports
+    private function remove_reports() {
+        add_action('admin_menu', function() {
+            remove_submenu_page('woocommerce', 'wc-reports');
+        }, 999);
+    }
+
+    // 8. 移除 Marketing Overview
+    private function remove_marketing_overview() {
+        add_action('admin_menu', function() {
+            remove_submenu_page('woocommerce-marketing', 'wc-admin&path=/marketing/overview');
+        }, 999);
+    }
+
+    // 9. 隱藏 UI 元素
+    public function hide_wc_ui_elements() {
+        echo '<style>
+        .woocommerce-layout__header-tasks-reminder-bar,
+        #woocommerce-activity-panel,
+        .marketplace-suggestions-container.showing-suggestion {
+            display: none !important;
+        }
+        </style>';
     }
 }
 
