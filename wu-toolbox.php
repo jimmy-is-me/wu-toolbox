@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: WU工具箱
- * Description: Wumetax 工具箱，整合多個功能模組。
- * Version: 1.0
+ * Description: Wumetax 工具箱，整合多個功能模組。包含管理列清理、評論管理、WooCommerce優化器、更新管理等強大功能。
+ * Version: 2.0
  * Author: Wumetax
  * Author URI: https://wumetax.com/
  * License: GPL-2.0+

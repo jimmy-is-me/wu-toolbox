@@ -302,6 +302,10 @@ class WU_Comments_Manager {
         // 禁用評論 REST API
         add_filter('rest_endpoints', array($this, 'disable_comments_rest_api'));
         
+        // 禁用評論相關的 WordPress API
+        add_filter('xmlrpc_methods', array($this, 'disable_xmlrpc_comments'));
+        add_action('wp_loaded', array($this, 'disable_comment_queries'));
+        
         // 移除評論相關的管理介面
         add_action('admin_init', array($this, 'remove_admin_comment_features'));
         
@@ -368,12 +372,20 @@ class WU_Comments_Manager {
      * 禁用評論 REST API
      */
     public function disable_comments_rest_api($endpoints) {
-        if (isset($endpoints['/wp/v2/comments'])) {
-            unset($endpoints['/wp/v2/comments']);
+        // 移除所有評論相關的 REST API 端點
+        $comment_endpoints = array(
+            '/wp/v2/comments',
+            '/wp/v2/comments/(?P<id>[\d]+)',
+            '/wp/v2/comments/(?P<parent>[\d]+)/replies',
+            '/wp/v2/comments/(?P<id>[\d]+)/replies'
+        );
+        
+        foreach ($comment_endpoints as $endpoint) {
+            if (isset($endpoints[$endpoint])) {
+                unset($endpoints[$endpoint]);
+            }
         }
-        if (isset($endpoints['/wp/v2/comments/(?P<id>[\d]+)'])) {
-            unset($endpoints['/wp/v2/comments/(?P<id>[\d]+)']);
-        }
+        
         return $endpoints;
     }
     
@@ -405,6 +417,60 @@ class WU_Comments_Manager {
         if (is_admin_bar_showing()) {
             remove_action('admin_bar_menu', 'wp_admin_bar_comments_menu', 60);
         }
+        
+        // 添加更強的工具列評論移除
+        add_action('wp_before_admin_bar_render', array($this, 'remove_admin_bar_comments'));
+    }
+    
+    /**
+     * 強制移除管理工具列的評論項目
+     */
+    public function remove_admin_bar_comments() {
+        global $wp_admin_bar;
+        if ($wp_admin_bar) {
+            $wp_admin_bar->remove_menu('comments');
+        }
+    }
+    
+    /**
+     * 禁用 XML-RPC 評論方法
+     */
+    public function disable_xmlrpc_comments($methods) {
+        $comment_methods = array(
+            'wp.newComment',
+            'wp.getComments',
+            'wp.getComment',
+            'wp.editComment',
+            'wp.deleteComment',
+            'wp.getCommentStatusList',
+            'wp.getCommentCount'
+        );
+        
+        foreach ($comment_methods as $method) {
+            if (isset($methods[$method])) {
+                unset($methods[$method]);
+            }
+        }
+        
+        return $methods;
+    }
+    
+    /**
+     * 禁用評論查詢
+     */
+    public function disable_comment_queries() {
+        // 移除評論查詢變數
+        global $wp;
+        if (isset($wp->public_query_vars)) {
+            $wp->public_query_vars = array_diff($wp->public_query_vars, array(
+                'withcomments',
+                'cpage',
+                'comments'
+            ));
+        }
+        
+        // 禁用評論重寫規則
+        add_filter('comments_rewrite_rules', '__return_empty_array');
     }
     
     /**

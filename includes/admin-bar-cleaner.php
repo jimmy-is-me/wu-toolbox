@@ -12,10 +12,8 @@ class WU_Admin_Bar_Cleaner {
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_init', array($this, 'admin_init'));
         
-        // 如果啟用了清理功能，則執行相關動作
-        if (get_option('wu_remove_wp_logo', false)) {
-            $this->remove_wp_logo();
-        }
+        // 載入所有啟用的功能
+        $this->load_features();
     }
     
     /**
@@ -36,8 +34,22 @@ class WU_Admin_Bar_Cleaner {
      * 初始化設定
      */
     public function admin_init() {
-        register_setting('wu_admin_bar_settings', 'wu_remove_wp_logo');
+        // 註冊所有設定
+        $settings = array(
+            'wu_remove_wp_logo',
+            'wu_hide_login_logo',
+            'wu_disable_login_language_switcher',
+            'wu_enable_login_beautify',
+            'wu_disable_dashboard_widgets',
+            'wu_custom_admin_footer_text',
+            'wu_remove_admin_footer_text'
+        );
         
+        foreach ($settings as $setting) {
+            register_setting('wu_admin_bar_settings', $setting);
+        }
+        
+        // 管理列設定區域
         add_settings_section(
             'wu_admin_bar_section',
             '管理列清理設定',
@@ -45,12 +57,79 @@ class WU_Admin_Bar_Cleaner {
             'wu_admin_bar_settings'
         );
         
+        // 登入頁面設定區域
+        add_settings_section(
+            'wu_login_section',
+            '登入頁面設定',
+            array($this, 'login_section_callback'),
+            'wu_admin_bar_settings'
+        );
+        
+        // 儀表板設定區域
+        add_settings_section(
+            'wu_dashboard_section',
+            '儀表板設定',
+            array($this, 'dashboard_section_callback'),
+            'wu_admin_bar_settings'
+        );
+        
+        // 添加管理列設定欄位
         add_settings_field(
             'wu_remove_wp_logo',
             '移除 WordPress 標誌',
             array($this, 'remove_wp_logo_callback'),
             'wu_admin_bar_settings',
             'wu_admin_bar_section'
+        );
+        
+        // 添加登入頁面設定欄位
+        add_settings_field(
+            'wu_hide_login_logo',
+            '隱藏登入頁面 WordPress 標誌',
+            array($this, 'hide_login_logo_callback'),
+            'wu_admin_bar_settings',
+            'wu_login_section'
+        );
+        
+        add_settings_field(
+            'wu_disable_login_language_switcher',
+            '停用登入語言切換器',
+            array($this, 'disable_login_language_switcher_callback'),
+            'wu_admin_bar_settings',
+            'wu_login_section'
+        );
+        
+        add_settings_field(
+            'wu_enable_login_beautify',
+            'WordPress 登入頁面美化',
+            array($this, 'enable_login_beautify_callback'),
+            'wu_admin_bar_settings',
+            'wu_login_section'
+        );
+        
+        // 添加儀表板設定欄位
+        add_settings_field(
+            'wu_disable_dashboard_widgets',
+            '停用 WordPress 儀表板小工具',
+            array($this, 'disable_dashboard_widgets_callback'),
+            'wu_admin_bar_settings',
+            'wu_dashboard_section'
+        );
+        
+        add_settings_field(
+            'wu_remove_admin_footer_text',
+            '移除管理頁尾文本',
+            array($this, 'remove_admin_footer_text_callback'),
+            'wu_admin_bar_settings',
+            'wu_dashboard_section'
+        );
+        
+        add_settings_field(
+            'wu_custom_admin_footer_text',
+            '自訂管理頁尾文本',
+            array($this, 'custom_admin_footer_text_callback'),
+            'wu_admin_bar_settings',
+            'wu_dashboard_section'
         );
     }
     
@@ -59,7 +138,20 @@ class WU_Admin_Bar_Cleaner {
      */
     public function settings_section_callback() {
         echo '<p>管理列清理功能可以幫助您移除不必要的 WordPress 預設項目，讓管理界面更加簡潔。</p>';
-        echo '<p><strong>建議：</strong>移除 WordPress 標誌可以讓管理列看起來更專業，減少不必要的品牌展示。</p>';
+    }
+    
+    /**
+     * 登入頁面設定區域說明
+     */
+    public function login_section_callback() {
+        echo '<p>自訂登入頁面的外觀和功能，提供更專業的使用者體驗。</p>';
+    }
+    
+    /**
+     * 儀表板設定區域說明
+     */
+    public function dashboard_section_callback() {
+        echo '<p>管理 WordPress 儀表板的小工具和介面元素，簡化管理體驗。</p>';
     }
     
     /**
@@ -73,6 +165,65 @@ class WU_Admin_Bar_Cleaner {
     }
     
     /**
+     * 隱藏登入頁面標誌選項回調
+     */
+    public function hide_login_logo_callback() {
+        $value = get_option('wu_hide_login_logo', false);
+        echo '<input type="checkbox" id="wu_hide_login_logo" name="wu_hide_login_logo" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_hide_login_logo">隱藏登入頁面的 WordPress 標誌</label>';
+        echo '<p class="description">從登入頁面隱藏標準 WordPress 徽標。</p>';
+    }
+    
+    /**
+     * 停用登入語言切換器選項回調
+     */
+    public function disable_login_language_switcher_callback() {
+        $value = get_option('wu_disable_login_language_switcher', false);
+        echo '<input type="checkbox" id="wu_disable_login_language_switcher" name="wu_disable_login_language_switcher" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_disable_login_language_switcher">停用 WordPress 登入語言切換器</label>';
+        echo '<p class="description">如果您的 WordPress 安裝上啟用了多種語言，此選項將停用語言選擇器，該選擇器允許使用者從登入畫面上的下拉式選單中切換語言。</p>';
+    }
+    
+    /**
+     * 登入頁面美化選項回調
+     */
+    public function enable_login_beautify_callback() {
+        $value = get_option('wu_enable_login_beautify', false);
+        echo '<input type="checkbox" id="wu_enable_login_beautify" name="wu_enable_login_beautify" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_enable_login_beautify">啟用 WordPress 登入頁面美化</label>';
+        echo '<p class="description">採用 Apple Liquid Glass 風格美化登入頁面。</p>';
+    }
+    
+    /**
+     * 停用儀表板小工具選項回調
+     */
+    public function disable_dashboard_widgets_callback() {
+        $value = get_option('wu_disable_dashboard_widgets', false);
+        echo '<input type="checkbox" id="wu_disable_dashboard_widgets" name="wu_disable_dashboard_widgets" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_disable_dashboard_widgets">停用 WordPress 儀表板小工具</label>';
+        echo '<p class="description">停用站點健康狀況、概覽、活動、快速草稿、WordPress 活動和新聞、歡迎面板等小工具。WordPress 預設安裝了許多儀表板小工具，它們通常根本不會用到，但會增加後端和前端的負載。</p>';
+    }
+    
+    /**
+     * 移除管理頁尾文本選項回調
+     */
+    public function remove_admin_footer_text_callback() {
+        $value = get_option('wu_remove_admin_footer_text', false);
+        echo '<input type="checkbox" id="wu_remove_admin_footer_text" name="wu_remove_admin_footer_text" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_remove_admin_footer_text">移除預設管理頁尾文本</label>';
+        echo '<p class="description">此選項隱藏 WordPress 管理員底部的文字：「Thank you for creating with WordPress」左下角，以及右下角的 WordPress 版本。</p>';
+    }
+    
+    /**
+     * 自訂管理頁尾文本選項回調
+     */
+    public function custom_admin_footer_text_callback() {
+        $value = get_option('wu_custom_admin_footer_text', '');
+        echo '<input type="text" id="wu_custom_admin_footer_text" name="wu_custom_admin_footer_text" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">輸入自訂的管理頁尾文本。留空則不顯示任何文本。</p>';
+    }
+    
+    /**
      * 管理頁面
      */
     public function admin_page() {
@@ -80,23 +231,94 @@ class WU_Admin_Bar_Cleaner {
             check_admin_referer('wu_admin_bar_settings-options');
             
             // 處理表單提交
-            update_option('wu_remove_wp_logo', isset($_POST['wu_remove_wp_logo']) ? 1 : 0);
+            $settings = array(
+                'wu_remove_wp_logo',
+                'wu_hide_login_logo',
+                'wu_disable_login_language_switcher',
+                'wu_enable_login_beautify',
+                'wu_disable_dashboard_widgets',
+                'wu_remove_admin_footer_text'
+            );
+            
+            foreach ($settings as $setting) {
+                update_option($setting, isset($_POST[$setting]) ? 1 : 0);
+            }
+            
+            // 處理自訂頁尾文本
+            update_option('wu_custom_admin_footer_text', sanitize_text_field($_POST['wu_custom_admin_footer_text']));
             
             echo '<div class="notice notice-success"><p>設定已儲存！請重新整理頁面以查看變更。</p></div>';
         }
         
-        $current_status = get_option('wu_remove_wp_logo', false);
+        // 獲取當前狀態
+        $remove_wp_logo = get_option('wu_remove_wp_logo', false);
+        $hide_login_logo = get_option('wu_hide_login_logo', false);
+        $disable_language_switcher = get_option('wu_disable_login_language_switcher', false);
+        $enable_login_beautify = get_option('wu_enable_login_beautify', false);
+        $disable_dashboard_widgets = get_option('wu_disable_dashboard_widgets', false);
+        $remove_admin_footer = get_option('wu_remove_admin_footer_text', false);
+        $custom_footer_text = get_option('wu_custom_admin_footer_text', '');
+        
         ?>
         <div class="wrap">
             <h1>管理列清理設定</h1>
             
             <div class="card">
                 <h2>當前狀態</h2>
-                <p><strong>WordPress 標誌狀態：</strong> 
-                    <span class="<?php echo $current_status ? 'wu-status-hidden' : 'wu-status-visible'; ?>">
-                        <?php echo $current_status ? '已隱藏' : '顯示中'; ?>
-                    </span>
-                </p>
+                <table class="wu-status-table">
+                    <tr>
+                        <td><strong>管理列 WordPress 標誌</strong></td>
+                        <td>
+                            <span class="<?php echo $remove_wp_logo ? 'wu-status-hidden' : 'wu-status-visible'; ?>">
+                                <?php echo $remove_wp_logo ? '已隱藏' : '顯示中'; ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>登入頁面標誌</strong></td>
+                        <td>
+                            <span class="<?php echo $hide_login_logo ? 'wu-status-hidden' : 'wu-status-visible'; ?>">
+                                <?php echo $hide_login_logo ? '已隱藏' : '顯示中'; ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>登入語言切換器</strong></td>
+                        <td>
+                            <span class="<?php echo $disable_language_switcher ? 'wu-status-disabled' : 'wu-status-enabled'; ?>">
+                                <?php echo $disable_language_switcher ? '已停用' : '已啟用'; ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>登入頁面美化</strong></td>
+                        <td>
+                            <span class="<?php echo $enable_login_beautify ? 'wu-status-enabled' : 'wu-status-disabled'; ?>">
+                                <?php echo $enable_login_beautify ? '已啟用' : '已停用'; ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>儀表板小工具</strong></td>
+                        <td>
+                            <span class="<?php echo $disable_dashboard_widgets ? 'wu-status-disabled' : 'wu-status-enabled'; ?>">
+                                <?php echo $disable_dashboard_widgets ? '已停用' : '已啟用'; ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>管理頁尾文本</strong></td>
+                        <td>
+                            <?php if ($remove_admin_footer): ?>
+                                <span class="wu-status-hidden">已隱藏</span>
+                            <?php elseif (!empty($custom_footer_text)): ?>
+                                <span class="wu-status-custom">自訂：<?php echo esc_html($custom_footer_text); ?></span>
+                            <?php else: ?>
+                                <span class="wu-status-visible">預設</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                </table>
             </div>
             
             <form method="post" action="">
@@ -110,34 +332,53 @@ class WU_Admin_Bar_Cleaner {
             
             <div class="card">
                 <h2>功能說明</h2>
-                <h3>什麼是管理列？</h3>
+                <h3>什麼是管理列清理？</h3>
                 <ul>
-                    <li>管理列是 WordPress 頂部的黑色工具列</li>
-                    <li>包含快速訪問連結和實用工具</li>
-                    <li>在前台和後台都會顯示（如果已登入）</li>
+                    <li>移除 WordPress 管理列中不必要的項目</li>
+                    <li>自訂登入頁面外觀和功能</li>
+                    <li>管理儀表板小工具</li>
+                    <li>讓管理介面更加簡潔專業</li>
                 </ul>
                 
-                <h3>為什麼要移除 WordPress 標誌？</h3>
+                <h3>管理列功能</h3>
                 <ul>
-                    <li><strong>專業外觀：</strong>移除品牌標識讓網站看起來更專業</li>
-                    <li><strong>簡潔界面：</strong>減少不必要的視覺元素</li>
-                    <li><strong>白標化：</strong>適合代理商或自定義品牌需求</li>
-                    <li><strong>安全考量：</strong>不透露使用 WordPress 的資訊</li>
+                    <li>移除管理列左上角的「W」圖示</li>
+                    <li>移除相關的下拉選單項目</li>
+                    <li>包括：WordPress.org、文檔、支援論壇等鏈接</li>
                 </ul>
                 
-                <h3>技術實現</h3>
+                <h3>登入頁面功能</h3>
                 <ul>
-                    <li>使用 <code>admin_bar_menu</code> 鉤子移除指定項目</li>
-                    <li>通過 <code>remove_node()</code> 方法安全移除節點</li>
-                    <li>不影響其他管理列功能的正常運作</li>
-                    <li>可隨時啟用或禁用，變更即時生效</li>
+                    <li><strong>隱藏標誌：</strong>移除登入頁面的 WordPress 標誌</li>
+                    <li><strong>語言切換器：</strong>停用多語言環境下的語言選擇器</li>
+                    <li><strong>頁面美化：</strong>採用 Apple Liquid Glass 風格設計</li>
+                    <li><strong>專業外觀：</strong>提供更專業的登入體驗</li>
                 </ul>
                 
-                <h3>影響範圍</h3>
+                <h3>儀表板功能</h3>
                 <ul>
-                    <li>移除管理列中的 WordPress 標誌（W 圖示）</li>
-                    <li>移除標誌下拉選單中的所有項目</li>
-                    <li>包括：關於 WordPress、WordPress.org、文件、支援論壇、回饋等</li>
+                    <li><strong>小工具管理：</strong>停用不必要的儀表板小工具</li>
+                    <li><strong>頁尾自訂：</strong>移除或自訂管理頁尾文本</li>
+                    <li><strong>效能提升：</strong>減少後端載入時間</li>
+                    <li><strong>界面簡化：</strong>專注於核心管理功能</li>
+                </ul>
+                
+                <h3>為什麼要使用這些功能？</h3>
+                <ul>
+                    <li><strong>專業外觀：</strong>讓管理介面看起來更加專業</li>
+                    <li><strong>品牌一致性：</strong>避免向客戶展示 WordPress 品牌</li>
+                    <li><strong>簡化介面：</strong>移除不常用的功能和選項</li>
+                    <li><strong>提高效率：</strong>減少視覺干擾，提高工作專注度</li>
+                    <li><strong>效能優化：</strong>停用不必要的功能以提高載入速度</li>
+                </ul>
+                
+                <h3>注意事項</h3>
+                <ul>
+                    <li>所有功能都可以隨時啟用或停用</li>
+                    <li>不會影響網站的正常運作和核心功能</li>
+                    <li>僅影響管理後台的外觀和功能</li>
+                    <li>建議在客戶網站中使用這些功能</li>
+                    <li>登入頁面美化可能需要瀏覽器支援現代 CSS 功能</li>
                 </ul>
             </div>
         </div>
@@ -145,12 +386,247 @@ class WU_Admin_Bar_Cleaner {
         <style>
         .wu-status-visible { color: #d63638; font-weight: bold; }
         .wu-status-hidden { color: #00a32a; font-weight: bold; }
+        .wu-status-enabled { color: #d63638; font-weight: bold; }
+        .wu-status-disabled { color: #00a32a; font-weight: bold; }
+        .wu-status-custom { color: #0073aa; font-weight: bold; }
         .card { background: #fff; border: 1px solid #ccd0d4; padding: 20px; margin: 20px 0; }
         .card h2 { margin-top: 0; }
         .card h3 { color: #23282d; }
         .card ul { margin-left: 20px; }
+        .wu-status-table { width: 100%; margin-top: 15px; border-collapse: collapse; }
+        .wu-status-table th, .wu-status-table td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+        .wu-status-table th { background-color: #f5f5f5; }
         </style>
         <?php
+    }
+    
+    /**
+     * 載入所有啟用的功能
+     */
+    private function load_features() {
+        // 移除管理列 WordPress 標誌
+        if (get_option('wu_remove_wp_logo', false)) {
+            $this->remove_wp_logo();
+        }
+        
+        // 隱藏登入頁面標誌
+        if (get_option('wu_hide_login_logo', false)) {
+            add_action('login_head', array($this, 'hide_login_logo'));
+        }
+        
+        // 停用登入語言切換器
+        if (get_option('wu_disable_login_language_switcher', false)) {
+            add_filter('login_display_language_dropdown', '__return_false');
+        }
+        
+        // 啟用登入頁面美化
+        if (get_option('wu_enable_login_beautify', false)) {
+            add_action('login_head', array($this, 'beautify_login_page'));
+        }
+        
+        // 停用儀表板小工具
+        if (get_option('wu_disable_dashboard_widgets', false)) {
+            add_action('wp_dashboard_setup', array($this, 'disable_dashboard_widgets'));
+        }
+        
+        // 處理管理頁尾文本
+        if (get_option('wu_remove_admin_footer_text', false)) {
+            add_filter('admin_footer_text', '__return_empty_string');
+            add_filter('update_footer', '__return_empty_string', 11);
+        } elseif (!empty(get_option('wu_custom_admin_footer_text', ''))) {
+            add_filter('admin_footer_text', array($this, 'custom_admin_footer_text'));
+            add_filter('update_footer', '__return_empty_string', 11);
+        }
+    }
+    
+    /**
+     * 隱藏登入頁面標誌
+     */
+    public function hide_login_logo() {
+        echo '<style>
+            .login h1 a {
+                display: none !important;
+            }
+            .login h1 {
+                display: none !important;
+            }
+        </style>';
+    }
+    
+    /**
+     * 美化登入頁面 - Apple Liquid Glass 風格
+     */
+    public function beautify_login_page() {
+        echo '<style>
+            body.login {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif !important;
+            }
+            
+            .login #loginform {
+                background: rgba(255, 255, 255, 0.1) !important;
+                backdrop-filter: blur(20px) !important;
+                -webkit-backdrop-filter: blur(20px) !important;
+                border: 1px solid rgba(255, 255, 255, 0.2) !important;
+                border-radius: 20px !important;
+                box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37) !important;
+                padding: 40px !important;
+                margin-top: 20px !important;
+            }
+            
+            .login form .input, 
+            .login input[type=text], 
+            .login input[type=password] {
+                background: rgba(255, 255, 255, 0.2) !important;
+                border: 1px solid rgba(255, 255, 255, 0.3) !important;
+                border-radius: 15px !important;
+                color: #fff !important;
+                font-size: 16px !important;
+                padding: 15px !important;
+                margin-bottom: 20px !important;
+                backdrop-filter: blur(10px) !important;
+                -webkit-backdrop-filter: blur(10px) !important;
+                transition: all 0.3s ease !important;
+            }
+            
+            .login form .input:focus, 
+            .login input[type=text]:focus, 
+            .login input[type=password]:focus {
+                background: rgba(255, 255, 255, 0.3) !important;
+                border-color: rgba(255, 255, 255, 0.5) !important;
+                box-shadow: 0 0 20px rgba(255, 255, 255, 0.3) !important;
+                outline: none !important;
+            }
+            
+            .login form .input::placeholder,
+            .login input[type=text]::placeholder,
+            .login input[type=password]::placeholder {
+                color: rgba(255, 255, 255, 0.7) !important;
+            }
+            
+            .login .button-primary {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                border: none !important;
+                border-radius: 15px !important;
+                color: #fff !important;
+                font-size: 16px !important;
+                font-weight: 600 !important;
+                padding: 15px 30px !important;
+                text-shadow: none !important;
+                box-shadow: 0 4px 15px 0 rgba(31, 38, 135, 0.4) !important;
+                transition: all 0.3s ease !important;
+                width: 100% !important;
+                margin-top: 10px !important;
+            }
+            
+            .login .button-primary:hover {
+                background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
+                transform: translateY(-2px) !important;
+                box-shadow: 0 6px 20px 0 rgba(31, 38, 135, 0.6) !important;
+            }
+            
+            .login .button-primary:focus {
+                box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3) !important;
+            }
+            
+            .login label {
+                color: rgba(255, 255, 255, 0.9) !important;
+                font-weight: 500 !important;
+                margin-bottom: 8px !important;
+                display: block !important;
+            }
+            
+            .login #backtoblog a, 
+            .login #nav a {
+                color: rgba(255, 255, 255, 0.8) !important;
+                text-decoration: none !important;
+                transition: color 0.3s ease !important;
+            }
+            
+            .login #backtoblog a:hover, 
+            .login #nav a:hover {
+                color: #fff !important;
+            }
+            
+            .login .message, 
+            .login .notice {
+                background: rgba(255, 255, 255, 0.15) !important;
+                border: 1px solid rgba(255, 255, 255, 0.3) !important;
+                border-radius: 15px !important;
+                color: #fff !important;
+                backdrop-filter: blur(10px) !important;
+                -webkit-backdrop-filter: blur(10px) !important;
+            }
+            
+            .login h1 a {
+                background-image: none !important;
+                color: #fff !important;
+                font-size: 32px !important;
+                font-weight: 300 !important;
+                text-decoration: none !important;
+                text-align: center !important;
+                display: block !important;
+                width: auto !important;
+                height: auto !important;
+            }
+            
+            .login h1 {
+                text-align: center !important;
+                margin-bottom: 30px !important;
+            }
+            
+            .login form .forgetmenot {
+                color: rgba(255, 255, 255, 0.9) !important;
+            }
+            
+            .login form .forgetmenot input[type=checkbox] {
+                margin-right: 8px !important;
+            }
+            
+            @media screen and (max-width: 768px) {
+                .login #loginform {
+                    margin: 20px auto !important;
+                    padding: 30px !important;
+                }
+                
+                .login form .input, 
+                .login input[type=text], 
+                .login input[type=password] {
+                    font-size: 16px !important;
+                    padding: 12px !important;
+                }
+            }
+        </style>';
+    }
+    
+    /**
+     * 停用儀表板小工具
+     */
+    public function disable_dashboard_widgets() {
+        // 移除預設的儀表板小工具
+        remove_meta_box('dashboard_site_health', 'dashboard', 'normal');      // 站點健康狀況
+        remove_meta_box('dashboard_right_now', 'dashboard', 'normal');        // 概覽
+        remove_meta_box('dashboard_activity', 'dashboard', 'normal');         // 活動
+        remove_meta_box('dashboard_quick_press', 'dashboard', 'side');        // 快速草稿
+        remove_meta_box('dashboard_primary', 'dashboard', 'side');            // WordPress 活動和新聞
+        remove_meta_box('welcome-panel', 'dashboard', 'normal');              // 歡迎面板
+        
+        // 移除其他可能的小工具
+        remove_meta_box('dashboard_recent_comments', 'dashboard', 'normal');  // 近期評論
+        remove_meta_box('dashboard_incoming_links', 'dashboard', 'normal');   // 引用連結
+        remove_meta_box('dashboard_plugins', 'dashboard', 'normal');          // 外掛
+        remove_meta_box('dashboard_recent_drafts', 'dashboard', 'side');      // 近期草稿
+        remove_meta_box('dashboard_secondary', 'dashboard', 'side');          // 其他 WordPress 新聞
+        
+        // 停用歡迎面板
+        remove_action('welcome_panel', 'wp_welcome_panel');
+    }
+    
+    /**
+     * 自訂管理頁尾文本
+     */
+    public function custom_admin_footer_text() {
+        return get_option('wu_custom_admin_footer_text', '');
     }
     
     /**
