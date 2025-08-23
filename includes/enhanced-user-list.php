@@ -1,0 +1,842 @@
+<?php
+/**
+ * 增強使用者列表模組
+ * 在使用者列表中添加上次登入時間、註冊日期等資訊
+ */
+
+if (!defined('ABSPATH')) exit;
+
+class WU_Enhanced_User_List {
+    
+    private $settings;
+    
+    public function __construct() {
+        $this->settings = get_option('wu_enhanced_user_list_settings', $this->get_default_settings());
+        
+        add_action('admin_menu', array($this, 'add_admin_menu'));
+        
+        // 用戶列表欄位
+        add_filter('manage_users_columns', array($this, 'add_user_columns'));
+        add_filter('manage_users_custom_column', array($this, 'show_user_column_content'), 10, 3);
+        add_filter('manage_users_sortable_columns', array($this, 'make_columns_sortable'));
+        
+        // 排序功能
+        add_action('pre_get_users', array($this, 'handle_column_sorting'));
+        
+        // 記錄用戶登入時間
+        add_action('wp_login', array($this, 'record_user_last_login'), 10, 2);
+        
+        // 添加篩選器
+        add_action('restrict_manage_users', array($this, 'add_user_filters'));
+        add_filter('pre_get_users', array($this, 'filter_users_by_login_date'));
+        
+        // 用戶資料增強
+        add_action('show_user_profile', array($this, 'show_additional_user_info'));
+        add_action('edit_user_profile', array($this, 'show_additional_user_info'));
+        
+        // 統計資訊
+        add_action('admin_notices', array($this, 'show_user_statistics'));
+    }
+    
+    private function get_default_settings() {
+        return array(
+            'enabled' => false,
+            'show_last_login' => true,
+            'show_registration_date' => true,
+            'show_user_id' => false,
+            'show_post_count' => false,
+            'show_role_since' => false,
+            'date_format' => 'Y-m-d H:i:s',
+            'show_filters' => true,
+            'show_statistics' => true,
+            'highlight_inactive_users' => 30 // 天數
+        );
+    }
+    
+    public function add_admin_menu() {
+        add_submenu_page(
+            'wu-toolbox',
+            '增強使用者列表',
+            '增強使用者列表',
+            'manage_options',
+            'wu-enhanced-user-list',
+            array($this, 'admin_page')
+        );
+    }
+    
+    public function admin_page() {
+        if (isset($_POST['submit'])) {
+            $this->save_settings();
+        }
+        
+        $this->settings = get_option('wu_enhanced_user_list_settings', $this->get_default_settings());
+        $user_stats = $this->get_user_statistics();
+        ?>
+        <div class="wrap">
+            <h1>增強使用者列表設定</h1>
+            
+            <div class="notice notice-info">
+                <h3>功能說明</h3>
+                <p><strong>增強使用者列表功能</strong>為 WordPress 後台的用戶列表添加更多有用的資訊欄位，提升管理效率。</p>
+                
+                <h4>新增欄位：</h4>
+                <ul>
+                    <li><strong>上次登入</strong>：顯示用戶最後一次登入的時間</li>
+                    <li><strong>註冊日期</strong>：以自訂格式顯示用戶註冊時間</li>
+                    <li><strong>用戶 ID</strong>：顯示用戶的數據庫 ID</li>
+                    <li><strong>文章數量</strong>：顯示用戶發表的文章數量</li>
+                    <li><strong>角色指派時間</strong>：顯示用戶獲得當前角色的時間</li>
+                </ul>
+                
+                <h4>增強功能：</h4>
+                <ul>
+                    <li>所有欄位支援排序功能</li>
+                    <li>登入日期篩選器</li>
+                    <li>用戶活動統計</li>
+                    <li>非活躍用戶高亮顯示</li>
+                </ul>
+            </div>
+            
+            <form method="post" action="">
+                <?php wp_nonce_field('wu_enhanced_user_list_settings'); ?>
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">啟用功能</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="enabled" value="1" <?php checked($this->settings['enabled']); ?>>
+                                啟用增強使用者列表功能
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">顯示欄位</th>
+                        <td>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="show_last_login" value="1" <?php checked($this->settings['show_last_login']); ?>>
+                                顯示上次登入時間
+                            </label>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="show_registration_date" value="1" <?php checked($this->settings['show_registration_date']); ?>>
+                                顯示註冊日期
+                            </label>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="show_user_id" value="1" <?php checked($this->settings['show_user_id']); ?>>
+                                顯示用戶 ID
+                            </label>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="show_post_count" value="1" <?php checked($this->settings['show_post_count']); ?>>
+                                顯示文章數量
+                            </label>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="show_role_since" value="1" <?php checked($this->settings['show_role_since']); ?>>
+                                顯示角色指派時間
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">日期格式</th>
+                        <td>
+                            <select name="date_format">
+                                <option value="Y-m-d H:i:s" <?php selected($this->settings['date_format'], 'Y-m-d H:i:s'); ?>>2024-01-15 14:30:00</option>
+                                <option value="Y-m-d" <?php selected($this->settings['date_format'], 'Y-m-d'); ?>>2024-01-15</option>
+                                <option value="d/m/Y" <?php selected($this->settings['date_format'], 'd/m/Y'); ?>>15/01/2024</option>
+                                <option value="m/d/Y" <?php selected($this->settings['date_format'], 'm/d/Y'); ?>>01/15/2024</option>
+                                <option value="F j, Y" <?php selected($this->settings['date_format'], 'F j, Y'); ?>>January 15, 2024</option>
+                            </select>
+                            <p class="description">選擇日期顯示格式</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">顯示篩選器</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="show_filters" value="1" <?php checked($this->settings['show_filters']); ?>>
+                                在用戶列表頁面顯示篩選器
+                            </label>
+                            <p class="description">允許按登入日期等條件篩選用戶</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">顯示統計資訊</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="show_statistics" value="1" <?php checked($this->settings['show_statistics']); ?>>
+                                在用戶列表頁面顯示統計資訊
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">非活躍用戶高亮</th>
+                        <td>
+                            <input type="number" name="highlight_inactive_users" value="<?php echo esc_attr($this->settings['highlight_inactive_users']); ?>" min="0" max="365" class="small-text">
+                            天未登入的用戶高亮顯示
+                            <p class="description">設為 0 停用此功能</p>
+                        </td>
+                    </tr>
+                </table>
+                
+                <?php submit_button('儲存設定'); ?>
+            </form>
+            
+            <hr>
+            
+            <h2>用戶統計資訊</h2>
+            <div style="display: flex; gap: 20px; margin: 20px 0; flex-wrap: wrap;">
+                <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; min-width: 180px;">
+                    <strong>總用戶數：</strong><br>
+                    <span style="font-size: 24px; color: #0073aa;"><?php echo number_format($user_stats['total_users']); ?></span>
+                </div>
+                <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; min-width: 180px;">
+                    <strong>今日活躍用戶：</strong><br>
+                    <span style="font-size: 24px; color: #46b450;"><?php echo number_format($user_stats['active_today']); ?></span>
+                </div>
+                <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; min-width: 180px;">
+                    <strong>本週活躍用戶：</strong><br>
+                    <span style="font-size: 24px; color: #0073aa;"><?php echo number_format($user_stats['active_week']); ?></span>
+                </div>
+                <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; min-width: 180px;">
+                    <strong>本月活躍用戶：</strong><br>
+                    <span style="font-size: 24px; color: #0073aa;"><?php echo number_format($user_stats['active_month']); ?></span>
+                </div>
+                <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; min-width: 180px;">
+                    <strong>非活躍用戶：</strong><br>
+                    <span style="font-size: 24px; color: #dc3232;"><?php echo number_format($user_stats['inactive_users']); ?></span>
+                </div>
+                <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; min-width: 180px;">
+                    <strong>從未登入：</strong><br>
+                    <span style="font-size: 24px; color: #ff8c00;"><?php echo number_format($user_stats['never_logged_in']); ?></span>
+                </div>
+            </div>
+            
+            <h2>最近註冊的用戶</h2>
+            <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+                <?php $recent_users = $this->get_recent_users(); ?>
+                <?php if (!empty($recent_users)): ?>
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th>用戶名</th>
+                            <th>顯示名稱</th>
+                            <th>電子郵件</th>
+                            <th>角色</th>
+                            <th>註冊時間</th>
+                            <th>上次登入</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($recent_users as $user): ?>
+                        <tr>
+                            <td><strong><?php echo esc_html($user->user_login); ?></strong></td>
+                            <td><?php echo esc_html($user->display_name); ?></td>
+                            <td><?php echo esc_html($user->user_email); ?></td>
+                            <td><?php echo esc_html(implode(', ', $user->roles)); ?></td>
+                            <td><?php echo esc_html(date($this->settings['date_format'], strtotime($user->user_registered))); ?></td>
+                            <td>
+                                <?php 
+                                $last_login = get_user_meta($user->ID, 'wu_last_login', true);
+                                echo $last_login ? esc_html(date($this->settings['date_format'], $last_login)) : '從未登入';
+                                ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php else: ?>
+                <p>最近沒有新用戶註冊</p>
+                <?php endif; ?>
+            </div>
+            
+            <h2>使用說明</h2>
+            <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+                <h3>新增的功能：</h3>
+                <ol>
+                    <li><strong>增強的欄位</strong>：前往「用戶」→「所有用戶」查看新增的欄位</li>
+                    <li><strong>排序功能</strong>：點擊欄位標題即可排序</li>
+                    <li><strong>篩選功能</strong>：使用頁面上方的篩選器</li>
+                    <li><strong>用戶資料</strong>：在用戶編輯頁面查看詳細資訊</li>
+                </ol>
+                
+                <h3>欄位說明：</h3>
+                <div style="display: flex; gap: 30px; margin-top: 15px;">
+                    <div style="flex: 1;">
+                        <h4>上次登入：</h4>
+                        <ul>
+                            <li>記錄用戶最後登入時間</li>
+                            <li>支援排序和篩選</li>
+                            <li>從未登入顯示「從未登入」</li>
+                        </ul>
+                        
+                        <h4>註冊日期：</h4>
+                        <ul>
+                            <li>自訂格式顯示註冊時間</li>
+                            <li>支援多種日期格式</li>
+                            <li>可按註冊時間排序</li>
+                        </ul>
+                    </div>
+                    <div style="flex: 1;">
+                        <h4>其他欄位：</h4>
+                        <ul>
+                            <li><strong>用戶 ID</strong>：數據庫中的唯一識別碼</li>
+                            <li><strong>文章數量</strong>：用戶發表的文章總數</li>
+                            <li><strong>角色指派時間</strong>：獲得當前角色的時間</li>
+                        </ul>
+                        
+                        <h4>視覺增強：</h4>
+                        <ul>
+                            <li>非活躍用戶背景色變化</li>
+                            <li>統計資訊一目了然</li>
+                            <li>清晰的篩選選項</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <style>
+        .form-table th {
+            width: 200px;
+        }
+        .wp-list-table {
+            margin-top: 10px;
+        }
+        .notice {
+            padding: 10px;
+            margin: 15px 0;
+            border-left: 4px solid;
+            background: #fff;
+        }
+        .notice-info {
+            border-left-color: #0073aa;
+        }
+        </style>
+        <?php
+    }
+    
+    private function save_settings() {
+        if (!wp_verify_nonce($_POST['_wpnonce'], 'wu_enhanced_user_list_settings')) {
+            wp_die('安全驗證失敗');
+        }
+        
+        $settings = array(
+            'enabled' => isset($_POST['enabled']),
+            'show_last_login' => isset($_POST['show_last_login']),
+            'show_registration_date' => isset($_POST['show_registration_date']),
+            'show_user_id' => isset($_POST['show_user_id']),
+            'show_post_count' => isset($_POST['show_post_count']),
+            'show_role_since' => isset($_POST['show_role_since']),
+            'date_format' => sanitize_text_field($_POST['date_format']),
+            'show_filters' => isset($_POST['show_filters']),
+            'show_statistics' => isset($_POST['show_statistics']),
+            'highlight_inactive_users' => intval($_POST['highlight_inactive_users'])
+        );
+        
+        update_option('wu_enhanced_user_list_settings', $settings);
+        $this->settings = $settings;
+        
+        echo '<div class="notice notice-success"><p>設定已儲存！</p></div>';
+    }
+    
+    public function add_user_columns($columns) {
+        if (!$this->settings['enabled']) {
+            return $columns;
+        }
+        
+        $new_columns = array();
+        
+        foreach ($columns as $key => $value) {
+            $new_columns[$key] = $value;
+            
+            // 在用戶名後添加用戶 ID
+            if ($key === 'username' && $this->settings['show_user_id']) {
+                $new_columns['wu_user_id'] = '用戶 ID';
+            }
+            
+            // 在電子郵件後添加註冊日期
+            if ($key === 'email' && $this->settings['show_registration_date']) {
+                $new_columns['wu_registration_date'] = '註冊日期';
+            }
+        }
+        
+        // 添加其他欄位
+        if ($this->settings['show_last_login']) {
+            $new_columns['wu_last_login'] = '上次登入';
+        }
+        
+        if ($this->settings['show_post_count']) {
+            $new_columns['wu_post_count'] = '文章數量';
+        }
+        
+        if ($this->settings['show_role_since']) {
+            $new_columns['wu_role_since'] = '角色指派時間';
+        }
+        
+        return $new_columns;
+    }
+    
+    public function show_user_column_content($value, $column_name, $user_id) {
+        if (!$this->settings['enabled']) {
+            return $value;
+        }
+        
+        $user = get_user_by('ID', $user_id);
+        if (!$user) {
+            return $value;
+        }
+        
+        switch ($column_name) {
+            case 'wu_user_id':
+                return $user_id;
+                
+            case 'wu_registration_date':
+                $registration_date = strtotime($user->user_registered);
+                return date($this->settings['date_format'], $registration_date);
+                
+            case 'wu_last_login':
+                $last_login = get_user_meta($user_id, 'wu_last_login', true);
+                if ($last_login) {
+                    $login_time = date($this->settings['date_format'], $last_login);
+                    $days_ago = floor((time() - $last_login) / DAY_IN_SECONDS);
+                    
+                    if ($days_ago > $this->settings['highlight_inactive_users'] && $this->settings['highlight_inactive_users'] > 0) {
+                        return '<span style="color: #dc3232;">' . $login_time . ' <small>(' . $days_ago . ' 天前)</small></span>';
+                    } else {
+                        return $login_time;
+                    }
+                } else {
+                    return '<span style="color: #ff8c00;">從未登入</span>';
+                }
+                
+            case 'wu_post_count':
+                $post_count = count_user_posts($user_id);
+                return $post_count > 0 ? '<a href="' . admin_url('edit.php?author=' . $user_id) . '">' . $post_count . '</a>' : '0';
+                
+            case 'wu_role_since':
+                $role_since = get_user_meta($user_id, 'wu_role_assigned_date', true);
+                if ($role_since) {
+                    return date($this->settings['date_format'], $role_since);
+                } else {
+                    // 如果沒有記錄，使用註冊日期
+                    return date($this->settings['date_format'], strtotime($user->user_registered));
+                }
+        }
+        
+        return $value;
+    }
+    
+    public function make_columns_sortable($columns) {
+        if (!$this->settings['enabled']) {
+            return $columns;
+        }
+        
+        $sortable_columns = array(
+            'wu_user_id' => 'wu_user_id',
+            'wu_registration_date' => 'wu_registration_date',
+            'wu_last_login' => 'wu_last_login',
+            'wu_post_count' => 'wu_post_count',
+            'wu_role_since' => 'wu_role_since'
+        );
+        
+        return array_merge($columns, $sortable_columns);
+    }
+    
+    public function handle_column_sorting($user_query) {
+        if (!is_admin() || !$this->settings['enabled']) {
+            return;
+        }
+        
+        $screen = get_current_screen();
+        if ($screen->base !== 'users') {
+            return;
+        }
+        
+        $orderby = $user_query->get('orderby');
+        $order = $user_query->get('order');
+        
+        if (empty($order)) {
+            $order = 'ASC';
+        }
+        
+        switch ($orderby) {
+            case 'wu_user_id':
+                $user_query->set('orderby', 'ID');
+                $user_query->set('order', $order);
+                break;
+                
+            case 'wu_registration_date':
+                $user_query->set('orderby', 'user_registered');
+                $user_query->set('order', $order);
+                break;
+                
+            case 'wu_last_login':
+                $user_query->set('meta_key', 'wu_last_login');
+                $user_query->set('orderby', 'meta_value_num');
+                $user_query->set('order', $order);
+                break;
+                
+            case 'wu_post_count':
+                $user_query->set('orderby', 'post_count');
+                $user_query->set('order', $order);
+                break;
+                
+            case 'wu_role_since':
+                $user_query->set('meta_key', 'wu_role_assigned_date');
+                $user_query->set('orderby', 'meta_value_num');
+                $user_query->set('order', $order);
+                break;
+        }
+    }
+    
+    public function record_user_last_login($user_login, $user) {
+        if (!$this->settings['enabled']) {
+            return;
+        }
+        
+        update_user_meta($user->ID, 'wu_last_login', time());
+    }
+    
+    public function add_user_filters() {
+        if (!$this->settings['enabled'] || !$this->settings['show_filters']) {
+            return;
+        }
+        
+        $screen = get_current_screen();
+        if ($screen->base !== 'users') {
+            return;
+        }
+        
+        ?>
+        <select name="wu_login_filter">
+            <option value="">所有登入狀態</option>
+            <option value="never_logged_in" <?php selected($_GET['wu_login_filter'] ?? '', 'never_logged_in'); ?>>從未登入</option>
+            <option value="logged_in_today" <?php selected($_GET['wu_login_filter'] ?? '', 'logged_in_today'); ?>>今日登入</option>
+            <option value="logged_in_week" <?php selected($_GET['wu_login_filter'] ?? '', 'logged_in_week'); ?>>本週登入</option>
+            <option value="logged_in_month" <?php selected($_GET['wu_login_filter'] ?? '', 'logged_in_month'); ?>>本月登入</option>
+            <option value="inactive_30" <?php selected($_GET['wu_login_filter'] ?? '', 'inactive_30'); ?>>30天未登入</option>
+            <option value="inactive_90" <?php selected($_GET['wu_login_filter'] ?? '', 'inactive_90'); ?>>90天未登入</option>
+        </select>
+        
+        <select name="wu_registration_filter">
+            <option value="">所有註冊時間</option>
+            <option value="registered_today" <?php selected($_GET['wu_registration_filter'] ?? '', 'registered_today'); ?>>今日註冊</option>
+            <option value="registered_week" <?php selected($_GET['wu_registration_filter'] ?? '', 'registered_week'); ?>>本週註冊</option>
+            <option value="registered_month" <?php selected($_GET['wu_registration_filter'] ?? '', 'registered_month'); ?>>本月註冊</option>
+            <option value="registered_year" <?php selected($_GET['wu_registration_filter'] ?? '', 'registered_year'); ?>>本年註冊</option>
+        </select>
+        <?php
+    }
+    
+    public function filter_users_by_login_date($user_query) {
+        if (!is_admin() || !$this->settings['enabled']) {
+            return;
+        }
+        
+        $screen = get_current_screen();
+        if ($screen->base !== 'users') {
+            return;
+        }
+        
+        $login_filter = $_GET['wu_login_filter'] ?? '';
+        $registration_filter = $_GET['wu_registration_filter'] ?? '';
+        
+        // 登入狀態篩選
+        if ($login_filter) {
+            switch ($login_filter) {
+                case 'never_logged_in':
+                    $user_query->set('meta_query', array(
+                        array(
+                            'key' => 'wu_last_login',
+                            'compare' => 'NOT EXISTS'
+                        )
+                    ));
+                    break;
+                    
+                case 'logged_in_today':
+                    $user_query->set('meta_query', array(
+                        array(
+                            'key' => 'wu_last_login',
+                            'value' => strtotime('today'),
+                            'compare' => '>='
+                        )
+                    ));
+                    break;
+                    
+                case 'logged_in_week':
+                    $user_query->set('meta_query', array(
+                        array(
+                            'key' => 'wu_last_login',
+                            'value' => strtotime('-1 week'),
+                            'compare' => '>='
+                        )
+                    ));
+                    break;
+                    
+                case 'logged_in_month':
+                    $user_query->set('meta_query', array(
+                        array(
+                            'key' => 'wu_last_login',
+                            'value' => strtotime('-1 month'),
+                            'compare' => '>='
+                        )
+                    ));
+                    break;
+                    
+                case 'inactive_30':
+                    $user_query->set('meta_query', array(
+                        array(
+                            'key' => 'wu_last_login',
+                            'value' => strtotime('-30 days'),
+                            'compare' => '<'
+                        )
+                    ));
+                    break;
+                    
+                case 'inactive_90':
+                    $user_query->set('meta_query', array(
+                        array(
+                            'key' => 'wu_last_login',
+                            'value' => strtotime('-90 days'),
+                            'compare' => '<'
+                        )
+                    ));
+                    break;
+            }
+        }
+        
+        // 註冊時間篩選
+        if ($registration_filter) {
+            switch ($registration_filter) {
+                case 'registered_today':
+                    $user_query->set('date_query', array(
+                        array(
+                            'after' => 'today',
+                            'column' => 'user_registered'
+                        )
+                    ));
+                    break;
+                    
+                case 'registered_week':
+                    $user_query->set('date_query', array(
+                        array(
+                            'after' => '1 week ago',
+                            'column' => 'user_registered'
+                        )
+                    ));
+                    break;
+                    
+                case 'registered_month':
+                    $user_query->set('date_query', array(
+                        array(
+                            'after' => '1 month ago',
+                            'column' => 'user_registered'
+                        )
+                    ));
+                    break;
+                    
+                case 'registered_year':
+                    $user_query->set('date_query', array(
+                        array(
+                            'after' => '1 year ago',
+                            'column' => 'user_registered'
+                        )
+                    ));
+                    break;
+            }
+        }
+    }
+    
+    public function show_additional_user_info($user) {
+        if (!$this->settings['enabled']) {
+            return;
+        }
+        
+        $last_login = get_user_meta($user->ID, 'wu_last_login', true);
+        $role_since = get_user_meta($user->ID, 'wu_role_assigned_date', true);
+        ?>
+        <h3>用戶活動資訊</h3>
+        <table class="form-table">
+            <tr>
+                <th><label>用戶 ID</label></th>
+                <td><?php echo $user->ID; ?></td>
+            </tr>
+            <tr>
+                <th><label>註冊日期</label></th>
+                <td><?php echo date($this->settings['date_format'], strtotime($user->user_registered)); ?></td>
+            </tr>
+            <tr>
+                <th><label>上次登入</label></th>
+                <td>
+                    <?php if ($last_login): ?>
+                        <?php echo date($this->settings['date_format'], $last_login); ?>
+                        <small>(<?php echo floor((time() - $last_login) / DAY_IN_SECONDS); ?> 天前)</small>
+                    <?php else: ?>
+                        從未登入
+                    <?php endif; ?>
+                </td>
+            </tr>
+            <tr>
+                <th><label>角色指派時間</label></th>
+                <td>
+                    <?php if ($role_since): ?>
+                        <?php echo date($this->settings['date_format'], $role_since); ?>
+                    <?php else: ?>
+                        未記錄（可能為註冊時指派）
+                    <?php endif; ?>
+                </td>
+            </tr>
+            <tr>
+                <th><label>發表文章數量</label></th>
+                <td>
+                    <?php 
+                    $post_count = count_user_posts($user->ID);
+                    if ($post_count > 0): ?>
+                        <a href="<?php echo admin_url('edit.php?author=' . $user->ID); ?>"><?php echo $post_count; ?> 篇文章</a>
+                    <?php else: ?>
+                        0 篇文章
+                    <?php endif; ?>
+                </td>
+            </tr>
+        </table>
+        <?php
+    }
+    
+    public function show_user_statistics() {
+        if (!$this->settings['enabled'] || !$this->settings['show_statistics']) {
+            return;
+        }
+        
+        $screen = get_current_screen();
+        if ($screen->base !== 'users') {
+            return;
+        }
+        
+        $stats = $this->get_user_statistics();
+        ?>
+        <div class="notice notice-info">
+            <p>
+                <strong>用戶統計：</strong>
+                總數：<?php echo number_format($stats['total_users']); ?> |
+                今日活躍：<?php echo number_format($stats['active_today']); ?> |
+                本週活躍：<?php echo number_format($stats['active_week']); ?> |
+                本月活躍：<?php echo number_format($stats['active_month']); ?> |
+                非活躍（30天+）：<?php echo number_format($stats['inactive_users']); ?> |
+                從未登入：<?php echo number_format($stats['never_logged_in']); ?>
+            </p>
+        </div>
+        
+        <?php if ($this->settings['highlight_inactive_users'] > 0): ?>
+        <style>
+        .users-php .wp-list-table tbody tr {
+            background: #fff;
+        }
+        .users-php .wp-list-table tbody tr.inactive-user {
+            background: #ffeaa7;
+        }
+        </style>
+        <script>
+        jQuery(document).ready(function($) {
+            // 高亮非活躍用戶
+            $('.wp-list-table tbody tr').each(function() {
+                var lastLoginCell = $(this).find('td.wu_last_login');
+                if (lastLoginCell.length && lastLoginCell.find('span[style*="color: #dc3232"]').length) {
+                    $(this).addClass('inactive-user');
+                }
+            });
+        });
+        </script>
+        <?php endif; ?>
+        <?php
+    }
+    
+    private function get_user_statistics() {
+        $stats = wp_cache_get('wu_user_statistics');
+        if ($stats !== false) {
+            return $stats;
+        }
+        
+        $stats = array(
+            'total_users' => 0,
+            'active_today' => 0,
+            'active_week' => 0,
+            'active_month' => 0,
+            'inactive_users' => 0,
+            'never_logged_in' => 0
+        );
+        
+        // 總用戶數
+        $user_count = count_users();
+        $stats['total_users'] = $user_count['total_users'];
+        
+        // 今日活躍用戶
+        $stats['active_today'] = $this->count_users_by_login_date(strtotime('today'));
+        
+        // 本週活躍用戶
+        $stats['active_week'] = $this->count_users_by_login_date(strtotime('-1 week'));
+        
+        // 本月活躍用戶
+        $stats['active_month'] = $this->count_users_by_login_date(strtotime('-1 month'));
+        
+        // 非活躍用戶（30天以上未登入）
+        $stats['inactive_users'] = $this->count_inactive_users(30);
+        
+        // 從未登入的用戶
+        $stats['never_logged_in'] = $this->count_never_logged_in_users();
+        
+        wp_cache_set('wu_user_statistics', $stats, '', 300); // 緩存5分鐘
+        
+        return $stats;
+    }
+    
+    private function count_users_by_login_date($since_timestamp) {
+        global $wpdb;
+        
+        $count = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(DISTINCT user_id) FROM {$wpdb->usermeta} 
+             WHERE meta_key = 'wu_last_login' AND meta_value >= %d",
+            $since_timestamp
+        ));
+        
+        return intval($count);
+    }
+    
+    private function count_inactive_users($days) {
+        global $wpdb;
+        
+        $cutoff_timestamp = strtotime("-{$days} days");
+        
+        $count = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(DISTINCT user_id) FROM {$wpdb->usermeta} 
+             WHERE meta_key = 'wu_last_login' AND meta_value < %d",
+            $cutoff_timestamp
+        ));
+        
+        return intval($count);
+    }
+    
+    private function count_never_logged_in_users() {
+        global $wpdb;
+        
+        // 所有用戶數 - 有登入記錄的用戶數
+        $total_users = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->users}");
+        $logged_in_users = $wpdb->get_var(
+            "SELECT COUNT(DISTINCT user_id) FROM {$wpdb->usermeta} 
+             WHERE meta_key = 'wu_last_login'"
+        );
+        
+        return intval($total_users) - intval($logged_in_users);
+    }
+    
+    private function get_recent_users($limit = 10) {
+        $users = get_users(array(
+            'orderby' => 'user_registered',
+            'order' => 'DESC',
+            'number' => $limit
+        ));
+        
+        return $users;
+    }
+}
+
+// 初始化模組
+new WU_Enhanced_User_List();
