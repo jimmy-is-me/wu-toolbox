@@ -338,6 +338,11 @@ class WU_Hide_Login_Page {
             return;
         }
         
+        // 檢查是否與404重定向功能衝突
+        if ($this->is_404_redirector_handling()) {
+            return; // 讓404重定向功能處理
+        }
+        
         $current_url = $_SERVER['REQUEST_URI'];
         
         // 檢查是否訪問被隱藏的登入頁面
@@ -353,6 +358,26 @@ class WU_Hide_Login_Page {
             wp_redirect($this->options['redirect_url']);
             exit;
         }
+    }
+    
+    /**
+     * 檢查是否404重定向功能正在處理
+     */
+    private function is_404_redirector_handling() {
+        // 檢查404重定向是否啟用
+        $redirect_404_enabled = get_option('wu_enable_404_redirect', false);
+        
+        if (!$redirect_404_enabled) {
+            return false;
+        }
+        
+        // 如果是404頁面且404重定向啟用，則不執行隱藏登入重定向
+        // 避免重定向衝突
+        if (is_404()) {
+            return true;
+        }
+        
+        return false;
     }
     
     /**

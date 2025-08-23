@@ -322,39 +322,44 @@ class WU_WooCommerce_Optimizer {
      * 顯示 WC Status 資訊
      */
     private function display_wc_status() {
-        if (!class_exists('WC_REST_System_Status_Controller')) {
-            echo '<p>無法載入系統狀態資訊。</p>';
-            return;
+        try {
+            // 直接獲取系統資訊，不依賴 REST API
+            echo '<table class="wc-status-table">';
+            echo '<tr><th colspan="2">系統資訊</th></tr>';
+            
+            // WordPress 版本
+            echo '<tr><td>WordPress 版本</td><td>' . get_bloginfo('version') . '</td></tr>';
+            
+            // PHP 版本
+            echo '<tr><td>PHP 版本</td><td>' . phpversion() . '</td></tr>';
+            
+            // 記憶體限制
+            echo '<tr><td>記憶體限制</td><td>' . ini_get('memory_limit') . '</td></tr>';
+            
+            // 最大上傳大小
+            echo '<tr><td>最大上傳大小</td><td>' . wp_max_upload_size() . ' bytes</td></tr>';
+            
+            // WooCommerce 資料庫版本
+            echo '<tr><th colspan="2">WooCommerce 資訊</th></tr>';
+            echo '<tr><td>WooCommerce 版本</td><td>' . (defined('WC_VERSION') ? WC_VERSION : 'N/A') . '</td></tr>';
+            echo '<tr><td>WooCommerce 資料庫版本</td><td>' . get_option('woocommerce_db_version', 'N/A') . '</td></tr>';
+            
+            // 主題資訊
+            $theme = wp_get_theme();
+            echo '<tr><th colspan="2">主題資訊</th></tr>';
+            echo '<tr><td>主題名稱</td><td>' . $theme->get('Name') . '</td></tr>';
+            echo '<tr><td>主題版本</td><td>' . $theme->get('Version') . '</td></tr>';
+            
+            echo '</table>';
+            
+        } catch (Exception $e) {
+            echo '<p>載入系統狀態時發生錯誤：' . esc_html($e->getMessage()) . '</p>';
+            echo '<p>顯示基本資訊：</p>';
+            echo '<table class="wc-status-table">';
+            echo '<tr><td>WordPress 版本</td><td>' . get_bloginfo('version') . '</td></tr>';
+            echo '<tr><td>WooCommerce 版本</td><td>' . (defined('WC_VERSION') ? WC_VERSION : 'N/A') . '</td></tr>';
+            echo '</table>';
         }
-        
-        $system_status = new WC_REST_System_Status_Controller();
-        $status_data = $system_status->get_item(new WP_REST_Request());
-        
-        if (is_wp_error($status_data)) {
-            echo '<p>載入系統狀態時發生錯誤。</p>';
-            return;
-        }
-        
-        $data = $status_data->get_data();
-        
-        echo '<table class="wc-status-table">';
-        echo '<tr><th colspan="2">系統資訊</th></tr>';
-        
-        if (isset($data['environment'])) {
-            $env = $data['environment'];
-            echo '<tr><td>WordPress 版本</td><td>' . (isset($env['wp_version']) ? $env['wp_version'] : 'N/A') . '</td></tr>';
-            echo '<tr><td>PHP 版本</td><td>' . (isset($env['php_version']) ? $env['php_version'] : 'N/A') . '</td></tr>';
-            echo '<tr><td>記憶體限制</td><td>' . (isset($env['php_memory_limit']) ? $env['php_memory_limit'] : 'N/A') . '</td></tr>';
-            echo '<tr><td>最大上傳大小</td><td>' . (isset($env['php_max_upload_size']) ? $env['php_max_upload_size'] : 'N/A') . '</td></tr>';
-        }
-        
-        if (isset($data['database'])) {
-            $db = $data['database'];
-            echo '<tr><th colspan="2">資料庫資訊</th></tr>';
-            echo '<tr><td>WooCommerce 資料庫版本</td><td>' . (isset($db['wc_database_version']) ? $db['wc_database_version'] : 'N/A') . '</td></tr>';
-        }
-        
-        echo '</table>';
     }
     
     /**

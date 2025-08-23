@@ -1,7 +1,7 @@
 <?php
 /**
- * 管理列清理模組
- * 功能：刪除 WordPress 管理列的「W」項目
+ * 後台設定模組
+ * 功能：後台設定、WordPress 登入頁面美化(採用 Apple Liquid Glass 風格、透明白色美化登入頁面)
  */
 
 if (!defined('ABSPATH')) exit;
@@ -22,8 +22,8 @@ class WU_Admin_Bar_Cleaner {
     public function add_admin_menu() {
         add_submenu_page(
             'wu-toolbox',
-            '管理列清理',
-            '管理列清理',
+            '後台設定',
+            '後台設定',
             'manage_options',
             'wu-admin-bar-cleaner',
             array($this, 'admin_page')
@@ -42,7 +42,13 @@ class WU_Admin_Bar_Cleaner {
             'wu_enable_login_beautify',
             'wu_disable_dashboard_widgets',
             'wu_custom_admin_footer_text',
-            'wu_remove_admin_footer_text'
+            'wu_remove_admin_footer_text',
+            'wu_hide_tools_menu',
+            'wu_hide_wordpress_address',
+            'wu_hide_site_address',
+            'wu_hide_writing_settings',
+            'wu_hide_privacy_settings',
+            'wu_custom_frontend_footer_text'
         );
         
         foreach ($settings as $setting) {
@@ -52,7 +58,7 @@ class WU_Admin_Bar_Cleaner {
         // 管理列設定區域
         add_settings_section(
             'wu_admin_bar_section',
-            '管理列清理設定',
+            '後台設定',
             array($this, 'settings_section_callback'),
             'wu_admin_bar_settings'
         );
@@ -60,7 +66,7 @@ class WU_Admin_Bar_Cleaner {
         // 登入頁面設定區域
         add_settings_section(
             'wu_login_section',
-            '登入頁面設定',
+            'WordPress 登入頁面美化(採用 Apple Liquid Glass 風格、透明白色美化登入頁面)',
             array($this, 'login_section_callback'),
             'wu_admin_bar_settings'
         );
@@ -70,6 +76,22 @@ class WU_Admin_Bar_Cleaner {
             'wu_dashboard_section',
             '儀表板設定',
             array($this, 'dashboard_section_callback'),
+            'wu_admin_bar_settings'
+        );
+        
+        // 後台隱藏設定區域
+        add_settings_section(
+            'wu_backend_section',
+            '後台隱藏設定',
+            array($this, 'backend_section_callback'),
+            'wu_admin_bar_settings'
+        );
+        
+        // 前台設定區域
+        add_settings_section(
+            'wu_frontend_section',
+            '前台設定',
+            array($this, 'frontend_section_callback'),
             'wu_admin_bar_settings'
         );
         
@@ -131,20 +153,70 @@ class WU_Admin_Bar_Cleaner {
             'wu_admin_bar_settings',
             'wu_dashboard_section'
         );
+        
+        // 添加後台隱藏設定欄位
+        add_settings_field(
+            'wu_hide_tools_menu',
+            '隱藏後台 Tools 選單',
+            array($this, 'hide_tools_menu_callback'),
+            'wu_admin_bar_settings',
+            'wu_backend_section'
+        );
+        
+        add_settings_field(
+            'wu_hide_wordpress_address',
+            '隱藏 WordPress Address (URL)',
+            array($this, 'hide_wordpress_address_callback'),
+            'wu_admin_bar_settings',
+            'wu_backend_section'
+        );
+        
+        add_settings_field(
+            'wu_hide_site_address',
+            '隱藏 Site Address (URL)',
+            array($this, 'hide_site_address_callback'),
+            'wu_admin_bar_settings',
+            'wu_backend_section'
+        );
+        
+        add_settings_field(
+            'wu_hide_writing_settings',
+            '隱藏 Writing Settings',
+            array($this, 'hide_writing_settings_callback'),
+            'wu_admin_bar_settings',
+            'wu_backend_section'
+        );
+        
+        add_settings_field(
+            'wu_hide_privacy_settings',
+            '隱藏 Privacy 設定',
+            array($this, 'hide_privacy_settings_callback'),
+            'wu_admin_bar_settings',
+            'wu_backend_section'
+        );
+        
+        // 添加前台設定欄位
+        add_settings_field(
+            'wu_custom_frontend_footer_text',
+            '自訂前台頁尾文本',
+            array($this, 'custom_frontend_footer_text_callback'),
+            'wu_admin_bar_settings',
+            'wu_frontend_section'
+        );
     }
     
     /**
      * 設定區域說明
      */
     public function settings_section_callback() {
-        echo '<p>管理列清理功能可以幫助您移除不必要的 WordPress 預設項目，讓管理界面更加簡潔。</p>';
+        echo '<p>後台設定功能可以幫助您移除不必要的 WordPress 預設項目，讓管理界面更加簡潔。</p>';
     }
     
     /**
      * 登入頁面設定區域說明
      */
     public function login_section_callback() {
-        echo '<p>自訂登入頁面的外觀和功能，提供更專業的使用者體驗。</p>';
+        echo '<p>自訂登入頁面的外觀和功能，採用 Apple Liquid Glass 風格、透明白色美化登入頁面，提供更專業的使用者體驗。</p>';
     }
     
     /**
@@ -152,6 +224,20 @@ class WU_Admin_Bar_Cleaner {
      */
     public function dashboard_section_callback() {
         echo '<p>管理 WordPress 儀表板的小工具和介面元素，簡化管理體驗。</p>';
+    }
+    
+    /**
+     * 後台隱藏設定區域說明
+     */
+    public function backend_section_callback() {
+        echo '<p>選擇性隱藏後台特定設定選項和選單，讓後台介面更加簡潔專業。</p>';
+    }
+    
+    /**
+     * 前台設定區域說明
+     */
+    public function frontend_section_callback() {
+        echo '<p>自訂前台網站的顯示內容和外觀設定。</p>';
     }
     
     /**
@@ -224,6 +310,65 @@ class WU_Admin_Bar_Cleaner {
     }
     
     /**
+     * 隱藏後台 Tools 選單選項回調
+     */
+    public function hide_tools_menu_callback() {
+        $value = get_option('wu_hide_tools_menu', false);
+        echo '<input type="checkbox" id="wu_hide_tools_menu" name="wu_hide_tools_menu" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_hide_tools_menu">隱藏後台 Tools 選單</label>';
+        echo '<p class="description">勾選此選項將隱藏後台頂部的「Tools」選單，該選單通常包含許多不常用的工具。</p>';
+    }
+    
+    /**
+     * 隱藏 WordPress Address (URL) 選項回調
+     */
+    public function hide_wordpress_address_callback() {
+        $value = get_option('wu_hide_wordpress_address', false);
+        echo '<input type="checkbox" id="wu_hide_wordpress_address" name="wu_hide_wordpress_address" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_hide_wordpress_address">隱藏 WordPress Address (URL)</label>';
+        echo '<p class="description">勾選此選項將隱藏後台「設定」頁面中的「WordPress 地址」選項。</p>';
+    }
+    
+    /**
+     * 隱藏 Site Address (URL) 選項回調
+     */
+    public function hide_site_address_callback() {
+        $value = get_option('wu_hide_site_address', false);
+        echo '<input type="checkbox" id="wu_hide_site_address" name="wu_hide_site_address" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_hide_site_address">隱藏 Site Address (URL)</label>';
+        echo '<p class="description">勾選此選項將隱藏後台「設定」頁面中的「網站地址」選項。</p>';
+    }
+    
+    /**
+     * 隱藏 Writing Settings 選項回調
+     */
+    public function hide_writing_settings_callback() {
+        $value = get_option('wu_hide_writing_settings', false);
+        echo '<input type="checkbox" id="wu_hide_writing_settings" name="wu_hide_writing_settings" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_hide_writing_settings">隱藏 Writing Settings</label>';
+        echo '<p class="description">勾選此選項將隱藏後台「設定」頁面中的「寫作設定」選項。</p>';
+    }
+    
+    /**
+     * 隱藏 Privacy 設定選項回調
+     */
+    public function hide_privacy_settings_callback() {
+        $value = get_option('wu_hide_privacy_settings', false);
+        echo '<input type="checkbox" id="wu_hide_privacy_settings" name="wu_hide_privacy_settings" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_hide_privacy_settings">隱藏 Privacy 設定</label>';
+        echo '<p class="description">勾選此選項將隱藏後台「設定」頁面中的「隱私」選項。</p>';
+    }
+    
+    /**
+     * 自訂前台頁尾文本選項回調
+     */
+    public function custom_frontend_footer_text_callback() {
+        $value = get_option('wu_custom_frontend_footer_text', '');
+        echo '<input type="text" id="wu_custom_frontend_footer_text" name="wu_custom_frontend_footer_text" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">輸入自訂的前台頁尾文本。留空則不顯示任何文本。</p>';
+    }
+    
+    /**
      * 管理頁面
      */
     public function admin_page() {
@@ -237,7 +382,12 @@ class WU_Admin_Bar_Cleaner {
                 'wu_disable_login_language_switcher',
                 'wu_enable_login_beautify',
                 'wu_disable_dashboard_widgets',
-                'wu_remove_admin_footer_text'
+                'wu_remove_admin_footer_text',
+                'wu_hide_tools_menu',
+                'wu_hide_wordpress_address',
+                'wu_hide_site_address',
+                'wu_hide_writing_settings',
+                'wu_hide_privacy_settings'
             );
             
             foreach ($settings as $setting) {
@@ -246,6 +396,7 @@ class WU_Admin_Bar_Cleaner {
             
             // 處理自訂頁尾文本
             update_option('wu_custom_admin_footer_text', sanitize_text_field($_POST['wu_custom_admin_footer_text']));
+            update_option('wu_custom_frontend_footer_text', sanitize_text_field($_POST['wu_custom_frontend_footer_text']));
             
             echo '<div class="notice notice-success"><p>設定已儲存！請重新整理頁面以查看變更。</p></div>';
         }
@@ -258,10 +409,16 @@ class WU_Admin_Bar_Cleaner {
         $disable_dashboard_widgets = get_option('wu_disable_dashboard_widgets', false);
         $remove_admin_footer = get_option('wu_remove_admin_footer_text', false);
         $custom_footer_text = get_option('wu_custom_admin_footer_text', '');
+        $hide_tools_menu = get_option('wu_hide_tools_menu', false);
+        $hide_wordpress_address = get_option('wu_hide_wordpress_address', false);
+        $hide_site_address = get_option('wu_hide_site_address', false);
+        $hide_writing_settings = get_option('wu_hide_writing_settings', false);
+        $hide_privacy_settings = get_option('wu_hide_privacy_settings', false);
+        $custom_frontend_footer_text = get_option('wu_custom_frontend_footer_text', '');
         
         ?>
         <div class="wrap">
-            <h1>管理列清理設定</h1>
+            <h1>後台設定、WordPress 登入頁面美化(採用 Apple Liquid Glass 風格、透明白色美化登入頁面)</h1>
             
             <div class="card">
                 <h2>當前狀態</h2>
@@ -318,6 +475,56 @@ class WU_Admin_Bar_Cleaner {
                             <?php endif; ?>
                         </td>
                     </tr>
+                    <tr>
+                        <td><strong>後台 Tools 選單</strong></td>
+                        <td>
+                            <span class="<?php echo $hide_tools_menu ? 'wu-status-hidden' : 'wu-status-visible'; ?>">
+                                <?php echo $hide_tools_menu ? '已隱藏' : '顯示中'; ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>後台 WordPress Address (URL)</strong></td>
+                        <td>
+                            <span class="<?php echo $hide_wordpress_address ? 'wu-status-hidden' : 'wu-status-visible'; ?>">
+                                <?php echo $hide_wordpress_address ? '已隱藏' : '顯示中'; ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>後台 Site Address (URL)</strong></td>
+                        <td>
+                            <span class="<?php echo $hide_site_address ? 'wu-status-hidden' : 'wu-status-visible'; ?>">
+                                <?php echo $hide_site_address ? '已隱藏' : '顯示中'; ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>後台 Writing Settings</strong></td>
+                        <td>
+                            <span class="<?php echo $hide_writing_settings ? 'wu-status-hidden' : 'wu-status-visible'; ?>">
+                                <?php echo $hide_writing_settings ? '已隱藏' : '顯示中'; ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>後台 Privacy 設定</strong></td>
+                        <td>
+                            <span class="<?php echo $hide_privacy_settings ? 'wu-status-hidden' : 'wu-status-visible'; ?>">
+                                <?php echo $hide_privacy_settings ? '已隱藏' : '顯示中'; ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>前台頁尾文本</strong></td>
+                        <td>
+                            <?php if (!empty($custom_frontend_footer_text)): ?>
+                                <span class="wu-status-custom">自訂：<?php echo esc_html($custom_frontend_footer_text); ?></span>
+                            <?php else: ?>
+                                <span class="wu-status-visible">預設</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
                 </table>
             </div>
             
@@ -361,6 +568,19 @@ class WU_Admin_Bar_Cleaner {
                     <li><strong>頁尾自訂：</strong>移除或自訂管理頁尾文本</li>
                     <li><strong>效能提升：</strong>減少後端載入時間</li>
                     <li><strong>界面簡化：</strong>專注於核心管理功能</li>
+                </ul>
+                
+                <h3>後台隱藏功能</h3>
+                <ul>
+                    <li><strong>隱藏 Tools 選單：</strong>隱藏後台頂部的「Tools」選單，減少不必要的選項。</li>
+                    <li><strong>隱藏地址設定：</strong>隱藏後台「設定」頁面中的「WordPress 地址」和「網站地址」選項，避免客戶修改。</li>
+                    <li><strong>隱藏寫作設定：</strong>隱藏後台「設定」頁面中的「寫作設定」選項，避免客戶修改。</li>
+                    <li><strong>隱藏隱私設定：</strong>隱藏後台「設定」頁面中的「隱私」選項，避免客戶修改。</li>
+                </ul>
+                
+                <h3>前台自訂功能</h3>
+                <ul>
+                    <li><strong>自訂頁尾文本：</strong>自訂前台網站底部顯示的文字，例如版權資訊。</li>
                 </ul>
                 
                 <h3>為什麼要使用這些功能？</h3>
@@ -436,6 +656,24 @@ class WU_Admin_Bar_Cleaner {
         } elseif (!empty(get_option('wu_custom_admin_footer_text', ''))) {
             add_filter('admin_footer_text', array($this, 'custom_admin_footer_text'));
             add_filter('update_footer', '__return_empty_string', 11);
+        }
+
+        // 隱藏後台 Tools 選單
+        if (get_option('wu_hide_tools_menu', false)) {
+            add_action('admin_menu', array($this, 'hide_tools_menu'));
+        }
+
+        // 隱藏後台設定頁面選項
+        if (get_option('wu_hide_wordpress_address', false) || 
+            get_option('wu_hide_site_address', false) || 
+            get_option('wu_hide_writing_settings', false) || 
+            get_option('wu_hide_privacy_settings', false)) {
+            add_action('admin_head', array($this, 'hide_admin_settings'));
+        }
+
+        // 處理前台頁尾文本
+        if (!empty(get_option('wu_custom_frontend_footer_text', ''))) {
+            add_action('wp_footer', array($this, 'custom_frontend_footer_text'));
         }
     }
     
@@ -627,6 +865,76 @@ class WU_Admin_Bar_Cleaner {
      */
     public function custom_admin_footer_text() {
         return get_option('wu_custom_admin_footer_text', '');
+    }
+
+        /**
+     * 隱藏後台 Tools 選單
+     */
+    public function hide_tools_menu() {
+        remove_menu_page('tools.php');
+    }
+
+    /**
+     * 隱藏後台設定頁面選項
+     */
+    public function hide_admin_settings() {
+        $css = '<style>';
+        
+        if (get_option('wu_hide_wordpress_address', false)) {
+            $css .= 'tr:has(th label[for="home"]) { display: none !important; }';
+            $css .= '#home_row { display: none !important; }';
+            $css .= 'tr.home { display: none !important; }';
+        }
+        
+        if (get_option('wu_hide_site_address', false)) {
+            $css .= 'tr:has(th label[for="siteurl"]) { display: none !important; }';
+            $css .= '#siteurl_row { display: none !important; }';
+            $css .= 'tr.siteurl { display: none !important; }';
+        }
+        
+        if (get_option('wu_hide_writing_settings', false)) {
+            $css .= '#menu-settings ul li:has(a[href="options-writing.php"]) { display: none !important; }';
+        }
+        
+        if (get_option('wu_hide_privacy_settings', false)) {
+            $css .= '#menu-settings ul li:has(a[href="options-privacy.php"]) { display: none !important; }';
+        }
+        
+        $css .= '</style>';
+        echo $css;
+        
+        // 使用 JavaScript 來更可靠地隱藏設定選項
+        echo '<script>
+        jQuery(document).ready(function($) {
+            // 隱藏 WordPress 地址和網站地址
+            if (' . (get_option('wu_hide_wordpress_address', false) ? 'true' : 'false') . ') {
+                $("label[for=\'home\']").closest("tr").hide();
+                $("#home").closest("tr").hide();
+            }
+            if (' . (get_option('wu_hide_site_address', false) ? 'true' : 'false') . ') {
+                $("label[for=\'siteurl\']").closest("tr").hide();
+                $("#siteurl").closest("tr").hide();
+            }
+            
+            // 隱藏選單項目
+            if (' . (get_option('wu_hide_writing_settings', false) ? 'true' : 'false') . ') {
+                $("#menu-settings").find("a[href=\'options-writing.php\']").parent().hide();
+            }
+            if (' . (get_option('wu_hide_privacy_settings', false) ? 'true' : 'false') . ') {
+                $("#menu-settings").find("a[href=\'options-privacy.php\']").parent().hide();
+            }
+        });
+        </script>';
+    }
+
+    /**
+     * 自訂前台頁尾文本
+     */
+    public function custom_frontend_footer_text() {
+        $text = get_option('wu_custom_frontend_footer_text', '');
+        if (!empty($text)) {
+            echo '<div style="text-align: center; padding: 20px; margin-top: 30px; border-top: 1px solid #eee;">' . esc_html($text) . '</div>';
+        }
     }
     
     /**
