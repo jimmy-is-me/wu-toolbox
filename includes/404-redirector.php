@@ -255,6 +255,11 @@ class WU_404_Redirector {
      */
     public function handle_404_redirect() {
         if (is_404()) {
+            // 檢查是否與隱藏登入頁面功能衝突
+            if ($this->is_hide_login_conflict()) {
+                return; // 不處理隱藏登入頁面相關的404錯誤
+            }
+            
             $redirect_type = get_option('wu_404_redirect_type', 'homepage');
             $redirect_url = '';
             
@@ -279,6 +284,39 @@ class WU_404_Redirector {
                 exit;
             }
         }
+    }
+    
+    /**
+     * 檢查是否與隱藏登入頁面功能衝突
+     */
+    private function is_hide_login_conflict() {
+        // 獲取隱藏登入頁面的設定
+        $hide_login_options = get_option('wu_hide_login_page_options', array());
+        
+        // 如果隱藏登入頁面功能未啟用，沒有衝突
+        if (!isset($hide_login_options['enabled']) || !$hide_login_options['enabled']) {
+            return false;
+        }
+        
+        $current_url = $_SERVER['REQUEST_URI'];
+        $custom_slug = isset($hide_login_options['custom_slug']) ? $hide_login_options['custom_slug'] : 'loginwu';
+        
+        // 檢查是否是與登入相關的URL
+        $login_related_urls = array(
+            '/wp-login.php',
+            '/wp-admin',
+            '/' . $custom_slug,
+            '/login',
+            '/admin'
+        );
+        
+        foreach ($login_related_urls as $login_url) {
+            if (strpos($current_url, $login_url) !== false) {
+                return true; // 有衝突，讓隱藏登入頁面功能處理
+            }
+        }
+        
+        return false; // 沒有衝突
     }
     
     /**
