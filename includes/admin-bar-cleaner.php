@@ -1,7 +1,7 @@
 <?php
 /**
  * 後台設定模組
- * 功能：後台設定、WordPress 登入頁面美化(採用 Apple Liquid Glass 風格、透明白色美化登入頁面)
+ * 功能：後台設定、WordPress 登入頁面美化(採用半透明風格、白底美化登入頁面)
  */
 
 if (!defined('ABSPATH')) exit;
@@ -40,6 +40,7 @@ class WU_Admin_Bar_Cleaner {
         // 註冊所有設定
         $settings = array(
             'wu_remove_wp_logo',
+            'wu_remove_new_content', // 新增
             'wu_hide_login_logo',
             'wu_disable_login_language_switcher',
             'wu_enable_login_beautify',
@@ -52,7 +53,8 @@ class WU_Admin_Bar_Cleaner {
             'wu_hide_writing_settings',
             'wu_hide_privacy_settings',
             'wu_custom_frontend_footer_text',
-            'wu_hide_wumetax_toolkit'
+            'wu_hide_wumetax_toolkit',
+            'wu_hide_admin_updates' // 新增
         );
         
         foreach ($settings as $setting) {
@@ -70,7 +72,7 @@ class WU_Admin_Bar_Cleaner {
         // 登入頁面設定區域
         add_settings_section(
             'wu_login_section',
-            'WordPress 登入頁面美化(採用 Apple Liquid Glass 風格、透明白色美化登入頁面)',
+            'WordPress 登入頁面美化(採用半透明風格、白底美化登入頁面)',
             array($this, 'login_section_callback'),
             'wu_admin_bar_settings'
         );
@@ -104,6 +106,15 @@ class WU_Admin_Bar_Cleaner {
             'wu_remove_wp_logo',
             '移除 WordPress 標誌',
             array($this, 'remove_wp_logo_callback'),
+            'wu_admin_bar_settings',
+            'wu_admin_bar_section'
+        );
+        
+        // 新增：移除新增項目
+        add_settings_field(
+            'wu_remove_new_content',
+            '移除管理列新增項目',
+            array($this, 'remove_new_content_callback'),
             'wu_admin_bar_settings',
             'wu_admin_bar_section'
         );
@@ -199,6 +210,15 @@ class WU_Admin_Bar_Cleaner {
             'wu_backend_section'
         );
         
+        // 新增：隱藏後台更新
+        add_settings_field(
+            'wu_hide_admin_updates',
+            '隱藏後台更新通知',
+            array($this, 'hide_admin_updates_callback'),
+            'wu_admin_bar_settings',
+            'wu_backend_section'
+        );
+        
         // 添加前台設定欄位
         add_settings_field(
             'wu_custom_frontend_footer_text',
@@ -228,7 +248,7 @@ class WU_Admin_Bar_Cleaner {
      * 登入頁面設定區域說明
      */
     public function login_section_callback() {
-        echo '<p>自訂登入頁面的外觀和功能，採用 Apple Liquid Glass 風格、透明白色美化登入頁面，提供更專業的使用者體驗。</p>';
+        echo '<p>自訂登入頁面的外觀和功能，採用半透明風格、白底美化登入頁面，提供更專業的使用者體驗。</p>';
     }
     
     /**
@@ -263,6 +283,16 @@ class WU_Admin_Bar_Cleaner {
     }
     
     /**
+     * 新增：移除新增項目選項回調
+     */
+    public function remove_new_content_callback() {
+        $value = get_option('wu_remove_new_content', false);
+        echo '<input type="checkbox" id="wu_remove_new_content" name="wu_remove_new_content" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_remove_new_content">移除管理列中的新增項目（+ 新增）</label>';
+        echo '<p class="description">勾選此選項將從管理列中移除「+ 新增」項目及其下拉選單，包括新增文章、頁面、媒體等選項。</p>';
+    }
+    
+    /**
      * 隱藏登入頁面標誌選項回調
      */
     public function hide_login_logo_callback() {
@@ -289,7 +319,7 @@ class WU_Admin_Bar_Cleaner {
         $value = get_option('wu_enable_login_beautify', false);
         echo '<input type="checkbox" id="wu_enable_login_beautify" name="wu_enable_login_beautify" value="1" ' . checked(1, $value, false) . ' />';
         echo '<label for="wu_enable_login_beautify">啟用 WordPress 登入頁面美化</label>';
-        echo '<p class="description">採用 Apple Liquid Glass 風格美化登入頁面。</p>';
+        echo '<p class="description">採用半透明風格、白底美化登入頁面。</p>';
     }
     
     /**
@@ -373,6 +403,16 @@ class WU_Admin_Bar_Cleaner {
     }
     
     /**
+     * 新增：隱藏後台更新通知選項回調
+     */
+    public function hide_admin_updates_callback() {
+        $value = get_option('wu_hide_admin_updates', false);
+        echo '<input type="checkbox" id="wu_hide_admin_updates" name="wu_hide_admin_updates" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_hide_admin_updates">隱藏後台更新通知</label>';
+        echo '<p class="description">勾選此選項將隱藏 WordPress 核心、外掛和佈景主題的更新通知，讓後台界面更加簡潔。</p>';
+    }
+    
+    /**
      * 自訂前台頁尾文本選項回調
      */
     public function custom_frontend_footer_text_callback() {
@@ -398,6 +438,7 @@ class WU_Admin_Bar_Cleaner {
         // 處理表單提交
         $settings = array(
             'wu_remove_wp_logo',
+            'wu_remove_new_content', // 新增
             'wu_hide_login_logo',
             'wu_disable_login_language_switcher',
             'wu_enable_login_beautify',
@@ -408,7 +449,8 @@ class WU_Admin_Bar_Cleaner {
             'wu_hide_site_address',
             'wu_hide_writing_settings',
             'wu_hide_privacy_settings',
-            'wu_hide_wumetax_toolkit'
+            'wu_hide_wumetax_toolkit',
+            'wu_hide_admin_updates' // 新增
         );
         
         foreach ($settings as $setting) {
@@ -444,6 +486,7 @@ class WU_Admin_Bar_Cleaner {
             // 處理表單提交
             $settings = array(
                 'wu_remove_wp_logo',
+                'wu_remove_new_content', // 新增
                 'wu_hide_login_logo',
                 'wu_disable_login_language_switcher',
                 'wu_enable_login_beautify',
@@ -454,7 +497,8 @@ class WU_Admin_Bar_Cleaner {
                 'wu_hide_site_address',
                 'wu_hide_writing_settings',
                 'wu_hide_privacy_settings',
-                'wu_hide_wumetax_toolkit'
+                'wu_hide_wumetax_toolkit',
+                'wu_hide_admin_updates' // 新增
             );
             
             foreach ($settings as $setting) {
@@ -470,6 +514,7 @@ class WU_Admin_Bar_Cleaner {
         
         // 獲取當前狀態
         $remove_wp_logo = get_option('wu_remove_wp_logo', false);
+        $remove_new_content = get_option('wu_remove_new_content', false); // 新增
         $hide_login_logo = get_option('wu_hide_login_logo', false);
         $disable_language_switcher = get_option('wu_disable_login_language_switcher', false);
         $enable_login_beautify = get_option('wu_enable_login_beautify', false);
@@ -483,10 +528,11 @@ class WU_Admin_Bar_Cleaner {
         $hide_privacy_settings = get_option('wu_hide_privacy_settings', false);
         $custom_frontend_footer_text = get_option('wu_custom_frontend_footer_text', '');
         $hide_wumetax_toolkit = get_option('wu_hide_wumetax_toolkit', false);
+        $hide_admin_updates = get_option('wu_hide_admin_updates', false); // 新增
         
         ?>
         <div class="wrap">
-            <h1>後台設定、WordPress 登入頁面美化(採用 Apple Liquid Glass 風格、透明白色美化登入頁面)</h1>
+            <h1>後台設定、WordPress 登入頁面美化(採用半透明風格、白底美化登入頁面)</h1>
             
             <div class="card">
                 <h2>當前狀態</h2>
@@ -496,6 +542,14 @@ class WU_Admin_Bar_Cleaner {
                         <td>
                             <span class="<?php echo $remove_wp_logo ? 'wu-status-hidden' : 'wu-status-visible'; ?>">
                                 <?php echo $remove_wp_logo ? '已隱藏' : '顯示中'; ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>管理列新增項目</strong></td>
+                        <td>
+                            <span class="<?php echo $remove_new_content ? 'wu-status-hidden' : 'wu-status-visible'; ?>">
+                                <?php echo $remove_new_content ? '已隱藏' : '顯示中'; ?>
                             </span>
                         </td>
                     </tr>
@@ -584,6 +638,14 @@ class WU_Admin_Bar_Cleaner {
                         </td>
                     </tr>
                     <tr>
+                        <td><strong>後台更新通知</strong></td>
+                        <td>
+                            <span class="<?php echo $hide_admin_updates ? 'wu-status-hidden' : 'wu-status-visible'; ?>">
+                                <?php echo $hide_admin_updates ? '已隱藏' : '顯示中'; ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
                         <td><strong>前台頁尾文本</strong></td>
                         <td>
                             <?php if (!empty($custom_frontend_footer_text)): ?>
@@ -662,6 +724,7 @@ class WU_Admin_Bar_Cleaner {
                 <h3>管理列功能</h3>
                 <ul>
                     <li>移除管理列左上角的「W」圖示</li>
+                    <li>移除管理列左上角的「+ 新增」項目</li>
                     <li>移除相關的下拉選單項目</li>
                     <li>包括：WordPress.org、文檔、支援論壇等鏈接</li>
                 </ul>
@@ -670,7 +733,7 @@ class WU_Admin_Bar_Cleaner {
                 <ul>
                     <li><strong>隱藏標誌：</strong>移除登入頁面的 WordPress 標誌</li>
                     <li><strong>語言切換器：</strong>停用多語言環境下的語言選擇器</li>
-                    <li><strong>頁面美化：</strong>採用 Apple Liquid Glass 風格設計</li>
+                    <li><strong>頁面美化：</strong>採用半透明風格、白底設計</li>
                     <li><strong>專業外觀：</strong>提供更專業的登入體驗</li>
                 </ul>
                 
@@ -688,6 +751,7 @@ class WU_Admin_Bar_Cleaner {
                     <li><strong>隱藏地址設定：</strong>隱藏後台「設定」頁面中的「WordPress 地址」和「網站地址」選項，避免客戶修改。</li>
                     <li><strong>隱藏寫作設定：</strong>隱藏後台「設定」頁面中的「寫作設定」選項，避免客戶修改。</li>
                     <li><strong>隱藏隱私設定：</strong>隱藏後台「設定」頁面中的「隱私」選項，避免客戶修改。</li>
+                    <li><strong>隱藏更新通知：</strong>隱藏 WordPress 核心、外掛和佈景主題的更新通知。</li>
                 </ul>
                 
                 <h3>前台自訂功能</h3>
@@ -741,6 +805,11 @@ class WU_Admin_Bar_Cleaner {
             $this->remove_wp_logo();
         }
         
+        // 新增：移除管理列新增項目
+        if (get_option('wu_remove_new_content', false)) {
+            $this->remove_new_content();
+        }
+        
         // 隱藏登入頁面標誌
         if (get_option('wu_hide_login_logo', false)) {
             add_action('login_head', array($this, 'hide_login_logo'));
@@ -792,6 +861,11 @@ class WU_Admin_Bar_Cleaner {
         if (get_option('wu_hide_wumetax_toolkit', false)) {
             add_action('admin_menu', array($this, 'hide_wumetax_toolkit_menu'), 999);
         }
+        
+        // 新增：隱藏後台更新通知
+        if (get_option('wu_hide_admin_updates', false)) {
+            $this->hide_admin_updates();
+        }
     }
     
     /**
@@ -809,22 +883,22 @@ class WU_Admin_Bar_Cleaner {
     }
     
     /**
-     * 美化登入頁面 - Apple Liquid Glass 風格
+     * 修改：美化登入頁面 - 半透明風格、白底
      */
     public function beautify_login_page() {
         echo '<style>
             body.login {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%) !important;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif !important;
             }
             
             .login #loginform {
-                background: rgba(255, 255, 255, 0.1) !important;
-                backdrop-filter: blur(20px) !important;
-                -webkit-backdrop-filter: blur(20px) !important;
-                border: 1px solid rgba(255, 255, 255, 0.2) !important;
-                border-radius: 20px !important;
-                box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37) !important;
+                background: rgba(255, 255, 255, 0.9) !important;
+                backdrop-filter: blur(10px) !important;
+                -webkit-backdrop-filter: blur(10px) !important;
+                border: 1px solid rgba(255, 255, 255, 0.5) !important;
+                border-radius: 15px !important;
+                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1) !important;
                 padding: 40px !important;
                 margin-top: 20px !important;
             }
@@ -832,60 +906,58 @@ class WU_Admin_Bar_Cleaner {
             .login form .input, 
             .login input[type=text], 
             .login input[type=password] {
-                background: rgba(255, 255, 255, 0.2) !important;
-                border: 1px solid rgba(255, 255, 255, 0.3) !important;
-                border-radius: 15px !important;
-                color: #fff !important;
+                background: rgba(255, 255, 255, 0.8) !important;
+                border: 1px solid #ddd !important;
+                border-radius: 8px !important;
+                color: #333 !important;
                 font-size: 16px !important;
                 padding: 15px !important;
                 margin-bottom: 20px !important;
-                backdrop-filter: blur(10px) !important;
-                -webkit-backdrop-filter: blur(10px) !important;
                 transition: all 0.3s ease !important;
             }
             
             .login form .input:focus, 
             .login input[type=text]:focus, 
             .login input[type=password]:focus {
-                background: rgba(255, 255, 255, 0.3) !important;
-                border-color: rgba(255, 255, 255, 0.5) !important;
-                box-shadow: 0 0 20px rgba(255, 255, 255, 0.3) !important;
+                background: rgba(255, 255, 255, 1) !important;
+                border-color: #0073aa !important;
+                box-shadow: 0 0 10px rgba(0, 115, 170, 0.3) !important;
                 outline: none !important;
             }
             
             .login form .input::placeholder,
             .login input[type=text]::placeholder,
             .login input[type=password]::placeholder {
-                color: rgba(255, 255, 255, 0.7) !important;
+                color: #999 !important;
             }
             
             .login .button-primary {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                background: linear-gradient(135deg, #0073aa 0%, #005177 100%) !important;
                 border: none !important;
-                border-radius: 15px !important;
+                border-radius: 8px !important;
                 color: #fff !important;
                 font-size: 16px !important;
                 font-weight: 600 !important;
                 padding: 15px 30px !important;
                 text-shadow: none !important;
-                box-shadow: 0 4px 15px 0 rgba(31, 38, 135, 0.4) !important;
+                box-shadow: 0 4px 15px 0 rgba(0, 115, 170, 0.3) !important;
                 transition: all 0.3s ease !important;
                 width: 100% !important;
                 margin-top: 10px !important;
             }
             
             .login .button-primary:hover {
-                background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
+                background: linear-gradient(135deg, #005177 0%, #0073aa 100%) !important;
                 transform: translateY(-2px) !important;
-                box-shadow: 0 6px 20px 0 rgba(31, 38, 135, 0.6) !important;
+                box-shadow: 0 6px 20px 0 rgba(0, 115, 170, 0.4) !important;
             }
             
             .login .button-primary:focus {
-                box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3) !important;
+                box-shadow: 0 0 0 3px rgba(0, 115, 170, 0.3) !important;
             }
             
             .login label {
-                color: rgba(255, 255, 255, 0.9) !important;
+                color: #333 !important;
                 font-weight: 500 !important;
                 margin-bottom: 8px !important;
                 display: block !important;
@@ -893,29 +965,29 @@ class WU_Admin_Bar_Cleaner {
             
             .login #backtoblog a, 
             .login #nav a {
-                color: rgba(255, 255, 255, 0.8) !important;
+                color: #666 !important;
                 text-decoration: none !important;
                 transition: color 0.3s ease !important;
             }
             
             .login #backtoblog a:hover, 
             .login #nav a:hover {
-                color: #fff !important;
+                color: #0073aa !important;
             }
             
             .login .message, 
             .login .notice {
-                background: rgba(255, 255, 255, 0.15) !important;
-                border: 1px solid rgba(255, 255, 255, 0.3) !important;
-                border-radius: 15px !important;
-                color: #fff !important;
-                backdrop-filter: blur(10px) !important;
-                -webkit-backdrop-filter: blur(10px) !important;
+                background: rgba(255, 255, 255, 0.9) !important;
+                border: 1px solid #ddd !important;
+                border-radius: 8px !important;
+                color: #333 !important;
+                backdrop-filter: blur(5px) !important;
+                -webkit-backdrop-filter: blur(5px) !important;
             }
             
             .login h1 a {
                 background-image: none !important;
-                color: #fff !important;
+                color: #333 !important;
                 font-size: 32px !important;
                 font-weight: 300 !important;
                 text-decoration: none !important;
@@ -931,7 +1003,7 @@ class WU_Admin_Bar_Cleaner {
             }
             
             .login form .forgetmenot {
-                color: rgba(255, 255, 255, 0.9) !important;
+                color: #333 !important;
             }
             
             .login form .forgetmenot input[type=checkbox] {
@@ -984,7 +1056,7 @@ class WU_Admin_Bar_Cleaner {
         return get_option('wu_custom_admin_footer_text', '');
     }
 
-        /**
+    /**
      * 隱藏後台 Tools 選單
      */
     public function hide_tools_menu() {
@@ -1082,6 +1154,36 @@ class WU_Admin_Bar_Cleaner {
     }
     
     /**
+     * 新增：移除新增項目
+     */
+    private function remove_new_content() {
+        add_action('admin_bar_menu', array($this, 'remove_new_content_from_admin_bar'), 999);
+    }
+    
+    /**
+     * 新增：隱藏後台更新通知
+     */
+    private function hide_admin_updates() {
+        // 隱藏核心更新
+        add_filter('pre_site_transient_update_core', '__return_null');
+        
+        // 隱藏外掛更新
+        add_filter('pre_site_transient_update_plugins', '__return_null');
+        
+        // 隱藏佈景主題更新
+        add_filter('pre_site_transient_update_themes', '__return_null');
+        
+        // 移除更新通知
+        add_action('admin_menu', array($this, 'remove_update_notifications'));
+        
+        // 隱藏管理列的更新通知
+        add_action('wp_before_admin_bar_render', array($this, 'remove_admin_bar_updates'));
+        
+        // 移除更新相關的 CSS
+        add_action('admin_head', array($this, 'hide_update_nag'));
+    }
+    
+    /**
      * 從管理列中移除 WordPress 標誌
      */
     public function remove_wp_logo_from_admin_bar($wp_admin_bar) {
@@ -1095,6 +1197,55 @@ class WU_Admin_Bar_Cleaner {
         $wp_admin_bar->remove_node('documentation');
         $wp_admin_bar->remove_node('support-forums');
         $wp_admin_bar->remove_node('feedback');
+    }
+    
+    /**
+     * 新增：從管理列中移除新增項目
+     */
+    public function remove_new_content_from_admin_bar($wp_admin_bar) {
+        // 移除新增項目
+        $wp_admin_bar->remove_node('new-content');
+        
+        // 移除相關的子項目
+        $wp_admin_bar->remove_node('new-post');
+        $wp_admin_bar->remove_node('new-media');
+        $wp_admin_bar->remove_node('new-page');
+        $wp_admin_bar->remove_node('new-user');
+    }
+    
+    /**
+     * 新增：移除更新通知
+     */
+    public function remove_update_notifications() {
+        remove_action('admin_notices', 'update_nag', 3);
+        remove_action('network_admin_notices', 'update_nag', 3);
+        remove_action('admin_notices', 'maintenance_nag');
+        remove_action('network_admin_notices', 'maintenance_nag');
+    }
+    
+    /**
+     * 新增：從管理列移除更新通知
+     */
+    public function remove_admin_bar_updates() {
+        global $wp_admin_bar;
+        $wp_admin_bar->remove_menu('updates');
+    }
+    
+    /**
+     * 新增：隱藏更新提示的 CSS
+     */
+    public function hide_update_nag() {
+        echo '<style>
+            .update-nag, 
+            .updated, 
+            .error, 
+            .notice.notice-warning.is-dismissible,
+            .notice-warning,
+            #update-nag,
+            .update-message {
+                display: none !important;
+            }
+        </style>';
     }
 }
 
