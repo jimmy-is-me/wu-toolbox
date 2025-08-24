@@ -38,7 +38,7 @@ class WU_Content_Duplicator {
     
     public function add_admin_menu() {
         add_submenu_page(
-            'wu-toolbox',
+            'wumetax-toolkit',
             '內容重複',
             '內容重複',
             'manage_options',

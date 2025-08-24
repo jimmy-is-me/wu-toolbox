@@ -4,11 +4,11 @@ if (!defined('ABSPATH')) exit;
 /* === 媒體編碼器：選單 === */
 function media_encoder_menu() {
     add_submenu_page(
-        'wu-toolbox',
+        'wumetax-toolkit',
         '媒體編碼器',
         '媒體編碼器',
         'manage_options',
-        'media-encoder',
+        'wumetax-media-encoder',
         'media_encoder_settings_page'
     );
 }

@@ -21,11 +21,11 @@ class WU_Admin_Bar_Cleaner {
      */
     public function add_admin_menu() {
         add_submenu_page(
-            'wu-toolbox',
+            'wumetax-toolkit',
             '後台設定',
             '後台設定',
             'manage_options',
-            'wu-admin-bar-cleaner',
+            'wumetax-admin-bar-cleaner',
             array($this, 'admin_page')
         );
     }

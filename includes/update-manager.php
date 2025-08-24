@@ -21,7 +21,7 @@ class WU_Update_Manager {
      */
     public function add_admin_menu() {
         add_submenu_page(
-            'wu-toolbox',
+            'wumetax-toolkit',
             '更新管理',
             '更新管理',
             'manage_options',

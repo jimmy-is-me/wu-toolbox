@@ -31,7 +31,7 @@ class WU_Enhanced_Downloader {
      */
     public function add_admin_menu() {
         add_submenu_page(
-            'wu-toolbox',
+            'wumetax-toolkit',
             '增強下載器',
             '增強下載器',
             'manage_options',

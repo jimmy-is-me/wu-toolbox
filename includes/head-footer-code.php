@@ -59,11 +59,11 @@ class WU_Head_Footer_Code {
     
     public function add_admin_menu() {
         add_submenu_page(
-            'wu-toolbox',
+            'wumetax-toolkit',
             'Head & Footer Code',
             'Head & Footer Code',
             'manage_options',
-            'wu-head-footer-code',
+            'wumetax-head-footer-code',
             array($this, 'admin_page')
         );
     }
@@ -78,6 +78,13 @@ class WU_Head_Footer_Code {
         }
         
         $this->settings = get_option('wu_head_footer_code_settings', $this->get_default_settings());
+        
+        // 載入 CodeMirror 語法高亮
+        wp_enqueue_script('wp-codemirror');
+        wp_enqueue_style('wp-codemirror');
+        wp_enqueue_script('csslint');
+        wp_enqueue_script('jshint');
+        wp_enqueue_script('jsonlint');
         ?>
         <div class="wrap">
             <h1>Head & Footer Code 設定</h1>
@@ -308,6 +315,39 @@ class WU_Head_Footer_Code {
                     <input type="submit" name="preview" value="預覽代碼" class="button button-secondary" style="margin-left: 10px;">
                 </p>
             </form>
+            
+            <script>
+            jQuery(document).ready(function($) {
+                // 初始化所有代碼編輯器
+                var codeAreas = [
+                    'head_code', 'body_open_code', 'footer_code', 'homepage_only_code', 
+                    'posts_only_code', 'pages_only_code', 'mobile_head_code', 'mobile_footer_code',
+                    'desktop_head_code', 'desktop_footer_code', 'admin_head_code', 'admin_footer_code',
+                    'login_head_code', 'login_footer_code'
+                ];
+                
+                codeAreas.forEach(function(areaId) {
+                    var textarea = document.getElementById(areaId);
+                    if (textarea) {
+                        var editor = wp.codeEditor.initialize(textarea, {
+                            codemirror: {
+                                mode: 'xml',
+                                lineNumbers: true,
+                                lineWrapping: true,
+                                theme: 'default',
+                                indentUnit: 2,
+                                tabSize: 2,
+                                extraKeys: {
+                                    "Tab": function(cm) {
+                                        cm.replaceSelection("  ", "end");
+                                    }
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+            </script>
             
             <hr>
             

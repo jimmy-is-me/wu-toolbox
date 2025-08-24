@@ -23,7 +23,7 @@ class WU_RSS_Disabler {
      */
     public function add_admin_menu() {
         add_submenu_page(
-            'wu-toolbox',
+            'wumetax-toolkit',
             'RSS 禁用管理',
             'RSS 禁用管理',
             'manage_options',

@@ -26,7 +26,7 @@ class WU_Comments_Manager {
      */
     public function add_admin_menu() {
         add_submenu_page(
-            'wu-toolbox',
+            'wumetax-toolkit',
             '評論管理',
             '評論管理',
             'manage_options',

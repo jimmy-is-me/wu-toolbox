@@ -58,7 +58,7 @@ class WU_User_Exporter {
     
     public function add_admin_menu() {
         add_submenu_page(
-            'wu-toolbox',
+            'wumetax-toolkit',
             '用戶匯出',
             '用戶匯出',
             'manage_options',

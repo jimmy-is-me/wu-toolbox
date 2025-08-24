@@ -35,7 +35,7 @@ class WU_Transients_Manager {
     
     public function add_admin_menu() {
         add_submenu_page(
-            'wu-toolbox',
+            'wumetax-toolkit',
             'Transients 管理',
             'Transients 管理',
             'manage_options',
