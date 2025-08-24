@@ -81,7 +81,7 @@ class WU_Audit_Logger {
 
     public function add_submenu_page() {
         add_submenu_page(
-            'wu-toolbox',
+            'wumetax-toolkit',
             '後台紀錄追蹤',
             '後台紀錄追蹤',
             'manage_options',

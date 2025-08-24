@@ -5,7 +5,7 @@ if (!defined('ABSPATH')) exit;
 /* === 維護模式子選單 === */
 function moving_mode_menu() {
     add_submenu_page(
-        'wu-toolbox',        // 父選單 slug
+        'wumetax-toolkit',        // 父選單 slug
         '維護模式',          // 頁面標題
         '維護模式',          // 選單標題
         'manage_options',    // 權限

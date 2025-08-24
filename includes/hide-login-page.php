@@ -33,7 +33,7 @@ class WU_Hide_Login_Page {
      */
     public function add_submenu_page() {
         add_submenu_page(
-            'wu-toolbox',
+            'wumetax-toolkit',
             '隱藏登入頁面',
             '隱藏登入頁面',
             'manage_options',

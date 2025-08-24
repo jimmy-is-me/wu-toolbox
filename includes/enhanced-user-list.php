@@ -36,6 +36,47 @@ class WU_Enhanced_User_List {
         
         // 統計資訊
         add_action('admin_notices', array($this, 'show_user_statistics'));
+        
+        // 隱藏用戶設定選項
+        if ($this->settings['enabled']) {
+            $this->hide_user_profile_options();
+        }
+    }
+    
+    /**
+     * 隱藏用戶設定選項
+     */
+    private function hide_user_profile_options() {
+        // 隱藏 Personal Options 中的選項
+        if ($this->settings['hide_admin_color_scheme']) {
+            add_action('admin_head', array($this, 'hide_admin_color_scheme'));
+        }
+        
+        if ($this->settings['hide_syntax_highlighting']) {
+            add_action('admin_head', array($this, 'hide_syntax_highlighting'));
+        }
+        
+        if ($this->settings['hide_keyboard_shortcuts']) {
+            add_action('admin_head', array($this, 'hide_keyboard_shortcuts'));
+        }
+        
+        if ($this->settings['hide_toolbar']) {
+            add_action('admin_head', array($this, 'hide_toolbar'));
+        }
+        
+        if ($this->settings['hide_language']) {
+            add_action('admin_head', array($this, 'hide_language'));
+        }
+        
+        // 隱藏 About the user 中的選項
+        if ($this->settings['hide_biographical_info']) {
+            add_action('admin_head', array($this, 'hide_biographical_info'));
+        }
+        
+        // 隱藏 Application Passwords
+        if ($this->settings['hide_application_passwords']) {
+            add_action('admin_head', array($this, 'hide_application_passwords'));
+        }
     }
     
     private function get_default_settings() {
@@ -49,17 +90,25 @@ class WU_Enhanced_User_List {
             'date_format' => 'Y-m-d H:i:s',
             'show_filters' => true,
             'show_statistics' => true,
-            'highlight_inactive_users' => 30 // 天數
+            'highlight_inactive_users' => 30, // 天數
+            // 新增隱藏選項
+            'hide_admin_color_scheme' => false,
+            'hide_syntax_highlighting' => false,
+            'hide_keyboard_shortcuts' => false,
+            'hide_toolbar' => false,
+            'hide_language' => false,
+            'hide_biographical_info' => false,
+            'hide_application_passwords' => false
         );
     }
     
     public function add_admin_menu() {
         add_submenu_page(
-            'wu-toolbox',
+            'wumetax-toolkit',
             '增強使用者列表',
             '增強使用者列表',
             'manage_options',
-            'wu-enhanced-user-list',
+            'wumetax-enhanced-user-list',
             array($this, 'admin_page')
         );
     }
@@ -173,6 +222,55 @@ class WU_Enhanced_User_List {
                             <input type="number" name="highlight_inactive_users" value="<?php echo esc_attr($this->settings['highlight_inactive_users']); ?>" min="0" max="365" class="small-text">
                             天未登入的用戶高亮顯示
                             <p class="description">設為 0 停用此功能</p>
+                        </td>
+                    </tr>
+                </table>
+                
+                <h2>隱藏用戶設定選項</h2>
+                <p class="description">選擇要隱藏的用戶個人設定選項，讓用戶介面更簡潔。</p>
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">Personal Options</th>
+                        <td>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="hide_admin_color_scheme" value="1" <?php checked($this->settings['hide_admin_color_scheme']); ?>>
+                                隱藏 Admin Color Scheme（後台顏色方案）
+                            </label>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="hide_syntax_highlighting" value="1" <?php checked($this->settings['hide_syntax_highlighting']); ?>>
+                                隱藏 Syntax Highlighting（語法高亮）
+                            </label>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="hide_keyboard_shortcuts" value="1" <?php checked($this->settings['hide_keyboard_shortcuts']); ?>>
+                                隱藏 Keyboard Shortcuts（鍵盤快捷鍵）
+                            </label>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="hide_toolbar" value="1" <?php checked($this->settings['hide_toolbar']); ?>>
+                                隱藏 Toolbar（工具列）
+                            </label>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="hide_language" value="1" <?php checked($this->settings['hide_language']); ?>>
+                                隱藏 Language（語言設定）
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">About the user</th>
+                        <td>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="hide_biographical_info" value="1" <?php checked($this->settings['hide_biographical_info']); ?>>
+                                隱藏 Biographical Info（個人簡介）
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Application Passwords</th>
+                        <td>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="hide_application_passwords" value="1" <?php checked($this->settings['hide_application_passwords']); ?>>
+                                隱藏 Application Passwords（應用程式密碼）
+                            </label>
                         </td>
                     </tr>
                 </table>
@@ -329,7 +427,15 @@ class WU_Enhanced_User_List {
             'date_format' => sanitize_text_field($_POST['date_format']),
             'show_filters' => isset($_POST['show_filters']),
             'show_statistics' => isset($_POST['show_statistics']),
-            'highlight_inactive_users' => intval($_POST['highlight_inactive_users'])
+            'highlight_inactive_users' => intval($_POST['highlight_inactive_users']),
+            // 新增隱藏選項
+            'hide_admin_color_scheme' => isset($_POST['hide_admin_color_scheme']),
+            'hide_syntax_highlighting' => isset($_POST['hide_syntax_highlighting']),
+            'hide_keyboard_shortcuts' => isset($_POST['hide_keyboard_shortcuts']),
+            'hide_toolbar' => isset($_POST['hide_toolbar']),
+            'hide_language' => isset($_POST['hide_language']),
+            'hide_biographical_info' => isset($_POST['hide_biographical_info']),
+            'hide_application_passwords' => isset($_POST['hide_application_passwords'])
         );
         
         update_option('wu_enhanced_user_list_settings', $settings);
@@ -835,6 +941,90 @@ class WU_Enhanced_User_List {
         ));
         
         return $users;
+    }
+    
+    /**
+     * 隱藏 Admin Color Scheme 選項
+     */
+    public function hide_admin_color_scheme() {
+        if (is_admin() && (isset($_GET['user_id']) || isset($_GET['profile-page']))) {
+            echo '<style>
+            .user-admin-color-wrap,
+            .user-admin-color-wrap + br { display: none !important; }
+            </style>';
+        }
+    }
+    
+    /**
+     * 隱藏 Syntax Highlighting 選項
+     */
+    public function hide_syntax_highlighting() {
+        if (is_admin() && (isset($_GET['user_id']) || isset($_GET['profile-page']))) {
+            echo '<style>
+            .user-syntax-highlighting-wrap,
+            .user-syntax-highlighting-wrap + br { display: none !important; }
+            </style>';
+        }
+    }
+    
+    /**
+     * 隱藏 Keyboard Shortcuts 選項
+     */
+    public function hide_keyboard_shortcuts() {
+        if (is_admin() && (isset($_GET['user_id']) || isset($_GET['profile-page']))) {
+            echo '<style>
+            .user-comment-shortcuts-wrap,
+            .user-comment-shortcuts-wrap + br { display: none !important; }
+            </style>';
+        }
+    }
+    
+    /**
+     * 隱藏 Toolbar 選項
+     */
+    public function hide_toolbar() {
+        if (is_admin() && (isset($_GET['user_id']) || isset($_GET['profile-page']))) {
+            echo '<style>
+            .user-admin-bar-front-wrap,
+            .user-admin-bar-front-wrap + br { display: none !important; }
+            </style>';
+        }
+    }
+    
+    /**
+     * 隱藏 Language 選項
+     */
+    public function hide_language() {
+        if (is_admin() && (isset($_GET['user_id']) || isset($_GET['profile-page']))) {
+            echo '<style>
+            .user-locale-wrap,
+            .user-locale-wrap + br { display: none !important; }
+            </style>';
+        }
+    }
+    
+    /**
+     * 隱藏 Biographical Info 選項
+     */
+    public function hide_biographical_info() {
+        if (is_admin() && (isset($_GET['user_id']) || isset($_GET['profile-page']))) {
+            echo '<style>
+            .user-description-wrap,
+            .user-description-wrap + br { display: none !important; }
+            </style>';
+        }
+    }
+    
+    /**
+     * 隱藏 Application Passwords 選項
+     */
+    public function hide_application_passwords() {
+        if (is_admin() && (isset($_GET['user_id']) || isset($_GET['profile-page']))) {
+            echo '<style>
+            .application-passwords,
+            .application-passwords + br { display: none !important; }
+            </style>';
+        }
     }
 }
 

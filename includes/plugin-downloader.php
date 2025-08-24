@@ -4,11 +4,11 @@ if (!defined('ABSPATH')) exit;
 /* === 後台子選單 === */
 function plugin_downloader_menu() {
     add_submenu_page(
-        'wu-toolbox',        // 父選單 slug
+        'wumetax-toolkit',        // 父選單 slug
         '常用外掛管理',
         '常用外掛管理',
         'manage_options',
-        'wu-toolbox',        // 與父選單相同的 slug
+        'wumetax-toolkit',        // 與父選單相同的 slug
         'plugin_manager_settings_page'
     );
 }
@@ -607,7 +607,7 @@ function plugin_manager_settings_page() {
         
         <div class="tablenav top">
             <div class="alignleft actions">
-                <select onchange="location.href='<?php echo admin_url('admin.php?page=wu-toolbox'); ?>&category=' + this.value;">
+                <select onchange="location.href='<?php echo admin_url('admin.php?page=wumetax-toolkit'); ?>&category=' + this.value;">
                     <option value="">所有分類</option>
                     <?php foreach ($categories as $category): ?>
                         <option value="<?php echo esc_attr($category); ?>" <?php selected($current_category, $category); ?>>
@@ -626,7 +626,7 @@ function plugin_manager_settings_page() {
             <thead>
                 <tr>
                     <th class="manage-column column-primary sortable <?php echo $order_dir; ?>">
-                        <a href="<?php echo admin_url('admin.php?page=wu-toolbox&order=name&dir=' . ($order_dir === 'asc' ? 'desc' : 'asc') . ($current_category ? '&category=' . urlencode($current_category) : '')); ?>">
+                        <a href="<?php echo admin_url('admin.php?page=wumetax-toolkit&order=name&dir=' . ($order_dir === 'asc' ? 'desc' : 'asc') . ($current_category ? '&category=' . urlencode($current_category) : '')); ?>">
                             外掛名稱
                             <span class="sorting-indicator"></span>
                         </a>
@@ -694,7 +694,7 @@ function plugin_manager_settings_page() {
                     <td class="plugin-actions">
                         <?php
                         $nonce = wp_create_nonce('plugin_action_' . $plugin['slug']);
-                        $base_url = admin_url('admin.php?page=wu-toolbox&plugin=' . $plugin['slug'] . '&_wpnonce=' . $nonce . '&action=');
+                        $base_url = admin_url('admin.php?page=wumetax-toolkit&plugin=' . $plugin['slug'] . '&_wpnonce=' . $nonce . '&action=');
                         
                         if ($status === 'not_installed'): ?>
                             <a href="<?php echo $base_url . 'install'; ?>" class="button button-primary">安裝</a>

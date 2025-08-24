@@ -23,11 +23,11 @@ class WU_System_Monitor {
      */
     public function add_admin_menu() {
         add_submenu_page(
-            'wu-toolbox',
+            'wumetax-toolkit',
             '系統監控',
             '系統監控',
             'manage_options',
-            'wu-system-monitor',
+            'wumetax-system-monitor',
             array($this, 'admin_page')
         );
     }
@@ -303,9 +303,44 @@ class WU_System_Monitor {
      * 啟用系統監控
      */
     private function enable_system_monitor() {
+        // 在管理頁面添加系統狀態顯示
+        add_action('admin_notices', array($this, 'show_system_status_notice'));
+        
+        // 在頁腳顯示記憶體資訊（如果啟用）
         if (get_option('wu_show_memory_footer', true)) {
             add_filter('admin_footer_text', array($this, 'add_memory_info_to_footer'));
         }
+    }
+    
+    /**
+     * 顯示系統狀態通知
+     */
+    public function show_system_status_notice() {
+        $memory_info = $this->get_memory_info();
+        $system_info = $this->get_system_info();
+        
+        $status_class = $memory_info['status_class'];
+        $status_text = $status_class === 'normal' ? '正常' : ($status_class === 'warning' ? '警告' : '嚴重');
+        
+        echo '<div class="notice notice-info is-dismissible">';
+        echo '<h4 style="margin-top: 0;">🖥️ 系統監控狀態</h4>';
+        echo '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 10px 0;">';
+        echo '<div><strong>記憶體使用率：</strong><span class="memory-usage ' . $status_class . '">' . $memory_info['percentage'] . '%</span> (' . $memory_info['used_formatted'] . ' / ' . $memory_info['total_formatted'] . ')</div>';
+        echo '<div><strong>PHP 版本：</strong>' . $system_info['php_version'] . '</div>';
+        echo '<div><strong>WordPress 版本：</strong>' . $system_info['wp_version'] . '</div>';
+        echo '<div><strong>已安裝外掛：</strong>' . $system_info['plugin_count'] . ' 個</div>';
+        echo '</div>';
+        echo '<div class="memory-bar" style="width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; margin: 5px 0; overflow: hidden;">';
+        echo '<div class="memory-progress ' . $status_class . '" style="width: ' . $memory_info['percentage'] . '%; height: 100%; transition: width 0.3s ease; background: ' . ($status_class === 'normal' ? '#00a32a' : ($status_class === 'warning' ? '#f56e28' : '#d63638')) . ';"></div>';
+        echo '</div>';
+        echo '</div>';
+        
+        // 添加樣式
+        echo '<style>
+        .memory-usage.normal { color: #00a32a; font-weight: bold; }
+        .memory-usage.warning { color: #f56e28; font-weight: bold; }
+        .memory-usage.critical { color: #d63638; font-weight: bold; }
+        </style>';
     }
     
     /**

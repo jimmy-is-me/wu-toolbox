@@ -23,7 +23,7 @@ class WU_XMLRPC_Security {
      */
     public function add_admin_menu() {
         add_submenu_page(
-            'wu-toolbox',
+            'wumetax-toolkit',
             'XML-RPC 安全',
             'XML-RPC 安全',
             'manage_options',
