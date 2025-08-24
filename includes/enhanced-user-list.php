@@ -40,6 +40,8 @@ class WU_Enhanced_User_List {
         // 隱藏用戶設定選項
         if ($this->settings['enabled']) {
             $this->hide_user_profile_options();
+            // 添加更強力的隱藏功能
+            add_action('admin_head', array($this, 'hide_profile_sections'));
         }
     }
     
@@ -947,10 +949,13 @@ class WU_Enhanced_User_List {
      * 隱藏 Admin Color Scheme 選項
      */
     public function hide_admin_color_scheme() {
-        if (is_admin() && (isset($_GET['user_id']) || isset($_GET['profile-page']))) {
+        global $pagenow;
+        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
             echo '<style>
             .user-admin-color-wrap,
-            .user-admin-color-wrap + br { display: none !important; }
+            .user-admin-color-wrap + br,
+            tr.user-admin-color-wrap,
+            tr.user-admin-color-wrap + tr { display: none !important; }
             </style>';
         }
     }
@@ -959,10 +964,13 @@ class WU_Enhanced_User_List {
      * 隱藏 Syntax Highlighting 選項
      */
     public function hide_syntax_highlighting() {
-        if (is_admin() && (isset($_GET['user_id']) || isset($_GET['profile-page']))) {
+        global $pagenow;
+        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
             echo '<style>
             .user-syntax-highlighting-wrap,
-            .user-syntax-highlighting-wrap + br { display: none !important; }
+            .user-syntax-highlighting-wrap + br,
+            tr.user-syntax-highlighting-wrap,
+            tr.user-syntax-highlighting-wrap + tr { display: none !important; }
             </style>';
         }
     }
@@ -971,10 +979,13 @@ class WU_Enhanced_User_List {
      * 隱藏 Keyboard Shortcuts 選項
      */
     public function hide_keyboard_shortcuts() {
-        if (is_admin() && (isset($_GET['user_id']) || isset($_GET['profile-page']))) {
+        global $pagenow;
+        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
             echo '<style>
             .user-comment-shortcuts-wrap,
-            .user-comment-shortcuts-wrap + br { display: none !important; }
+            .user-comment-shortcuts-wrap + br,
+            tr.user-comment-shortcuts-wrap,
+            tr.user-comment-shortcuts-wrap + tr { display: none !important; }
             </style>';
         }
     }
@@ -983,10 +994,13 @@ class WU_Enhanced_User_List {
      * 隱藏 Toolbar 選項
      */
     public function hide_toolbar() {
-        if (is_admin() && (isset($_GET['user_id']) || isset($_GET['profile-page']))) {
+        global $pagenow;
+        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
             echo '<style>
             .user-admin-bar-front-wrap,
-            .user-admin-bar-front-wrap + br { display: none !important; }
+            .user-admin-bar-front-wrap + br,
+            tr.user-admin-bar-front-wrap,
+            tr.user-admin-bar-front-wrap + tr { display: none !important; }
             </style>';
         }
     }
@@ -995,10 +1009,13 @@ class WU_Enhanced_User_List {
      * 隱藏 Language 選項
      */
     public function hide_language() {
-        if (is_admin() && (isset($_GET['user_id']) || isset($_GET['profile-page']))) {
+        global $pagenow;
+        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
             echo '<style>
             .user-locale-wrap,
-            .user-locale-wrap + br { display: none !important; }
+            .user-locale-wrap + br,
+            tr.user-locale-wrap,
+            tr.user-locale-wrap + tr { display: none !important; }
             </style>';
         }
     }
@@ -1007,10 +1024,13 @@ class WU_Enhanced_User_List {
      * 隱藏 Biographical Info 選項
      */
     public function hide_biographical_info() {
-        if (is_admin() && (isset($_GET['user_id']) || isset($_GET['profile-page']))) {
+        global $pagenow;
+        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
             echo '<style>
             .user-description-wrap,
-            .user-description-wrap + br { display: none !important; }
+            .user-description-wrap + br,
+            tr.user-description-wrap,
+            tr.user-description-wrap + tr { display: none !important; }
             </style>';
         }
     }
@@ -1019,11 +1039,69 @@ class WU_Enhanced_User_List {
      * 隱藏 Application Passwords 選項
      */
     public function hide_application_passwords() {
-        if (is_admin() && (isset($_GET['user_id']) || isset($_GET['profile-page']))) {
+        global $pagenow;
+        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
             echo '<style>
             .application-passwords,
-            .application-passwords + br { display: none !important; }
+            .application-passwords + br,
+            .application-passwords-section,
+            .user-application-passwords-wrap,
+            tr.application-passwords,
+            tr.application-passwords + tr { display: none !important; }
             </style>';
+        }
+    }
+    
+    /**
+     * 隱藏整個 profile 頁面區塊
+     */
+    public function hide_profile_sections() {
+        global $pagenow;
+        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
+            echo '<style>
+            /* 隱藏 Personal Options 整個區塊 */
+            h2:contains("Personal Options"),
+            .form-table tr:has(.user-admin-color-wrap),
+            .form-table tr:has(.user-syntax-highlighting-wrap), 
+            .form-table tr:has(.user-comment-shortcuts-wrap),
+            .form-table tr:has(.user-admin-bar-front-wrap),
+            .form-table tr:has(.user-locale-wrap) { display: none !important; }
+            
+            /* 隱藏 About the user 整個區塊 */
+            h2:contains("About the user"),
+            .form-table tr:has(.user-description-wrap) { display: none !important; }
+            
+            /* 隱藏 Application Passwords 整個區塊 */
+            h2:contains("Application Passwords"),
+            .application-passwords-section,
+            .application-passwords { display: none !important; }
+            </style>';
+            
+            // 使用 JavaScript 進行更可靠的隱藏
+            echo '<script>
+            jQuery(document).ready(function($) {
+                // 隱藏包含特定文字的標題及其後續內容
+                $("h2").each(function() {
+                    var text = $(this).text().trim();
+                    if (text === "Personal Options" || text === "個人選項") {
+                        $(this).hide();
+                        $(this).next("table").hide();
+                    }
+                    if (text === "About the user" || text === "關於使用者") {
+                        $(this).hide(); 
+                        $(this).next("table").hide();
+                    }
+                    if (text === "Application Passwords" || text === "應用程式密碼") {
+                        $(this).hide();
+                        $(this).nextUntil("h2").hide();
+                    }
+                });
+                
+                // 額外隱藏特定的表格行
+                $(".user-admin-color-wrap, .user-syntax-highlighting-wrap, .user-comment-shortcuts-wrap, .user-admin-bar-front-wrap, .user-locale-wrap, .user-description-wrap").closest("tr").hide();
+                $(".application-passwords").hide();
+            });
+            </script>';
         }
     }
 }

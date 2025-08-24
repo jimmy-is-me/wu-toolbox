@@ -1,6 +1,6 @@
 # WU工具箱 (WU Toolbox)
 
-![Version](https://img.shields.io/badge/version-2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-3.0-blue.svg)
 ![License](https://img.shields.io/badge/license-GPL--2.0-green.svg)
 ![WordPress](https://img.shields.io/badge/WordPress-5.0%2B-blue.svg)
 
@@ -30,7 +30,7 @@
 - **評論管理器**：批量管理和清理評論
 - **版本管理器**：控制文章修訂版本數量
 - **內容複製器**：快速複製文章和頁面
-- **媒體編碼器**：批量處理媒體文件
+- **媒體編碼器**：JPEG/PNG → WebP 自動轉換，包含智能回退機制和縮圖生成
 
 ### 系統管理
 - **更新管理器**：控制 WordPress 核心、主題和外掛更新
@@ -86,6 +86,17 @@
 - 適當的權限檢查
 
 ## 🔄 更新日誌
+
+### 版本 3.0
+- **新增 WebP 自動回退功能**：媒體編碼器現在支援智能圖片回退，當請求 PNG/JPG 但只有 WebP 存在時自動重新導向
+- **管理員權限控制**：新增向其他管理員隱藏 WumetaxToolkit 外掛的功能
+- **即時設定儲存**：所有功能設定現在支援即時儲存，無需重新整理頁面
+- **登入頁面美化優化**：改進 Apple Liquid Glass 風格，已停用狀態現在顯示紅色標記
+- **自動外掛導向**：啟用外掛後自動導向常用外掛管理頁面
+- **設定提醒優化**：自訂管理頁尾文本現在包含重要使用說明
+- **WordPress 更新控制增強**：核心更新控制現在會自動影響主題和外掛更新
+- **使用者介面改進**：增強的使用者列表現在正確隱藏 profile.php 中的個人選項
+- **代碼輸入框美化**：隱藏登入頁面的代碼輸入框採用 Termius 黑色風格
 
 ### 版本 2.0
 - 重新設計後台設定介面

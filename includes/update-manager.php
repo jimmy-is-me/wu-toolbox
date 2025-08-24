@@ -106,7 +106,8 @@ class WU_Update_Manager {
         $value = get_option('wu_disable_core_updates', false);
         echo '<input type="checkbox" id="wu_disable_core_updates" name="wu_disable_core_updates" value="1" ' . checked(1, $value, false) . ' />';
         echo '<label for="wu_disable_core_updates">停用所有 WordPress 核心更新</label>';
-        echo '<p class="description">此選項可讓您停用所有 WordPress 核心更新，包括自動更新。WordPress 將不會檢查核心更新，也不會通知用戶更新可用。<br><strong>警告：</strong>停用核心更新可能會造成安全風險，請謹慎使用！</p>';
+        echo '<p class="description">此選項可讓您停用所有 WordPress 核心更新，包括自動更新。WordPress 將不會檢查核心更新，也不會通知用戶更新可用。</p>';
+        echo '<p class="description" style="color: #d63638; font-weight: bold;">⚠️ 重要提醒：停用此項目將自動禁用主題及外掛更新功能，以確保系統穩定性。同時可能會造成安全風險，請謹慎使用！</p>';
     }
     
     /**
@@ -117,9 +118,18 @@ class WU_Update_Manager {
             check_admin_referer('wu_update_settings-options');
             
             // 處理表單提交
-            update_option('wu_disable_theme_auto_updates', isset($_POST['wu_disable_theme_auto_updates']) ? 1 : 0);
-            update_option('wu_disable_plugin_auto_updates', isset($_POST['wu_disable_plugin_auto_updates']) ? 1 : 0);
-            update_option('wu_disable_core_updates', isset($_POST['wu_disable_core_updates']) ? 1 : 0);
+            $disable_core = isset($_POST['wu_disable_core_updates']) ? 1 : 0;
+            
+            // 如果停用核心更新，自動停用主題和外掛更新
+            if ($disable_core) {
+                update_option('wu_disable_theme_auto_updates', 1);
+                update_option('wu_disable_plugin_auto_updates', 1);
+                update_option('wu_disable_core_updates', 1);
+            } else {
+                update_option('wu_disable_theme_auto_updates', isset($_POST['wu_disable_theme_auto_updates']) ? 1 : 0);
+                update_option('wu_disable_plugin_auto_updates', isset($_POST['wu_disable_plugin_auto_updates']) ? 1 : 0);
+                update_option('wu_disable_core_updates', 0);
+            }
             
             echo '<div class="notice notice-success"><p>設定已儲存！</p></div>';
         }

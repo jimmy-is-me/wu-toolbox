@@ -21,6 +21,7 @@ function media_encoder_get_settings() {
         'quality' => intval(get_option('media_encoder_quality', 82)),
         'replace_original' => 'on', // 強制啟用以節省主機容量
         'enable_logging' => get_option('media_encoder_enable_logging', 'off'),
+        'enable_webp_fallback' => get_option('media_encoder_enable_webp_fallback', 'on'), // 啟用WebP回退功能
     );
 }
 
@@ -46,6 +47,7 @@ function media_encoder_save_settings() {
     update_option('media_encoder_quality', $quality);
     // 移除 replace_original 選項儲存，因為強制啟用
     update_option('media_encoder_enable_logging', isset($_POST['media_encoder_enable_logging']) ? 'on' : 'off');
+    update_option('media_encoder_enable_webp_fallback', isset($_POST['media_encoder_enable_webp_fallback']) ? 'on' : 'off');
     
     echo '<div class="updated"><p>媒體編碼器設定已更新 ✅</p></div>';
 }
@@ -59,6 +61,9 @@ function media_encoder_settings_page() {
     <div class="wrap">
         <h1>媒體編碼器（JPEG/PNG → WebP）</h1>
         <p>自動將上傳的圖像轉換為 WebP，以獲得更佳效能與更小檔案。系統會自動替換原圖以節省主機容量。</p>
+        <div style="background:#fff3cd;border:1px solid #ffc107;padding:10px;border-radius:4px;margin:10px 0;">
+            <strong>⚠️ 重要說明：</strong>當您將所有圖片轉換為 WebP 後，原本網站中引用 PNG 或 JPG 的地方可能無法顯示圖片。請啟用 WebP 自動回退功能，讓網站能自動將圖片請求重新導向到 WebP 版本，同時也會自動生成所需的縮圖。
+        </div>
 
         <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start;">
             <form method="post" style="flex:1;min-width:320px;max-width:560px;">
@@ -78,6 +83,12 @@ function media_encoder_settings_page() {
                 <div style="background:#e7f3ff;border:1px solid #0073aa;padding:10px;border-radius:4px;margin:10px 0;">
                     <strong>📁 檔案處理模式：</strong>自動替換原圖為 WebP 格式以節省主機容量
                 </div>
+                <p>
+                    <label>
+                        <input type="checkbox" name="media_encoder_enable_webp_fallback" <?php checked($settings['enable_webp_fallback'], 'on'); ?>> 啟用 WebP 自動回退功能
+                    </label><br>
+                    <small>啟用後，當網站請求 PNG/JPG 圖片但只有 WebP 存在時，自動重新導向到 WebP 版本並生成所需縮圖。</small>
+                </p>
                 <p>
                     <label>
                         <input type="checkbox" name="media_encoder_enable_logging" <?php checked($settings['enable_logging'], 'on'); ?>> 啟用錯誤日誌記錄
@@ -947,3 +958,137 @@ function media_encoder_ajax_bulk() {
     ));
 }
 add_action('wp_ajax_media_encoder_bulk', 'media_encoder_ajax_bulk');
+
+/* === WebP 自動回退功能 === */
+class Media_Encoder_WebP_Fallback {
+    private $settings;
+    
+    public function __construct() {
+        $this->settings = media_encoder_get_settings();
+        
+        if ($this->settings['enable_webp_fallback'] === 'on') {
+            add_action('init', array($this, 'handle_image_fallback'));
+        }
+    }
+    
+    public function handle_image_fallback() {
+        // 只在前台處理
+        if (is_admin()) return;
+        
+        // 檢查是否為圖片請求
+        $request_uri = $_SERVER['REQUEST_URI'];
+        if (!preg_match('/\.(jpe?g|png)(\?.*)?$/i', $request_uri)) return;
+        
+        // 獲取相對路徑
+        $parsed_url = parse_url($request_uri);
+        $path = $parsed_url['path'];
+        
+        // 檢查是否為 uploads 目錄中的圖片
+        $upload_dir = wp_upload_dir();
+        $upload_base_url = $upload_dir['baseurl'];
+        $site_url = site_url();
+        
+        // 移除 site_url 部分，獲取相對路徑
+        if (strpos($path, $upload_base_url) !== false) {
+            $relative_path = str_replace($upload_base_url, '', $path);
+        } else {
+            // 嘗試從根目錄開始的路徑
+            $uploads_path = str_replace($site_url, '', $upload_base_url);
+            if (strpos($path, $uploads_path) === 0) {
+                $relative_path = str_replace($uploads_path, '', $path);
+            } else {
+                return;
+            }
+        }
+        
+        // 構建文件路徑
+        $original_file = $upload_dir['basedir'] . $relative_path;
+        $webp_file = preg_replace('/\.(jpe?g|png)$/i', '.webp', $original_file);
+        
+        // 如果原文件不存在但 WebP 存在，重新導向到 WebP
+        if (!file_exists($original_file) && file_exists($webp_file)) {
+            $webp_url = preg_replace('/\.(jpe?g|png)$/i', '.webp', $request_uri);
+            
+            // 檢查是否需要生成縮圖
+            $this->maybe_generate_thumbnail($original_file, $webp_file, $relative_path);
+            
+            wp_redirect($webp_url, 301);
+            exit;
+        }
+    }
+    
+    private function maybe_generate_thumbnail($original_file, $webp_file, $relative_path) {
+        // 檢查是否為縮圖請求
+        if (!preg_match('/-(\d+)x(\d+)\.(jpe?g|png)$/i', $original_file, $matches)) {
+            return;
+        }
+        
+        $width = intval($matches[1]);
+        $height = intval($matches[2]);
+        
+        // 找到主圖片
+        $main_image = preg_replace('/-\d+x\d+\.(jpe?g|png)$/i', '.webp', $original_file);
+        
+        if (!file_exists($main_image)) {
+            // 嘗試其他可能的主圖片格式
+            $main_image_jpg = preg_replace('/-\d+x\d+\.(jpe?g|png)$/i', '.jpg', $original_file);
+            $main_image_jpeg = preg_replace('/-\d+x\d+\.(jpe?g|png)$/i', '.jpeg', $original_file);
+            $main_image_png = preg_replace('/-\d+x\d+\.(jpe?g|png)$/i', '.png', $original_file);
+            
+            foreach (array($main_image_jpg, $main_image_jpeg, $main_image_png) as $possible_main) {
+                if (file_exists($possible_main)) {
+                    // 將主圖片轉換為 WebP
+                    $result = media_encoder_convert_file_to_webp($possible_main, $this->settings['quality']);
+                    if (!is_wp_error($result)) {
+                        $main_image = $result['path'];
+                        @unlink($possible_main); // 刪除原圖片
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (file_exists($main_image)) {
+            // 生成 WebP 縮圖
+            $this->generate_webp_thumbnail($main_image, $webp_file, $width, $height);
+        }
+    }
+    
+    private function generate_webp_thumbnail($source_webp, $dest_webp, $width, $height) {
+        if (!file_exists($source_webp) || file_exists($dest_webp)) {
+            return;
+        }
+        
+        // 使用 WordPress 的圖片編輯器
+        $image_editor = wp_get_image_editor($source_webp);
+        
+        if (is_wp_error($image_editor)) {
+            return;
+        }
+        
+        // 調整尺寸
+        $resize_result = $image_editor->resize($width, $height, true);
+        
+        if (is_wp_error($resize_result)) {
+            return;
+        }
+        
+        // 設定為 WebP 格式
+        $image_editor->set_mime_type('image/webp');
+        
+        // 儲存縮圖
+        $save_result = $image_editor->save($dest_webp);
+        
+        if (is_wp_error($save_result)) {
+            media_encoder_log_error('WebP 縮圖生成失敗', array(
+                'source' => $source_webp,
+                'dest' => $dest_webp,
+                'size' => $width . 'x' . $height,
+                'error' => $save_result->get_error_message()
+            ));
+        }
+    }
+}
+
+// 初始化 WebP 回退功能
+new Media_Encoder_WebP_Fallback();

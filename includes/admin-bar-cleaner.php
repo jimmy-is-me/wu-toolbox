@@ -12,6 +12,9 @@ class WU_Admin_Bar_Cleaner {
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_init', array($this, 'admin_init'));
         
+        // AJAX 處理
+        add_action('wp_ajax_wu_admin_bar_save', array($this, 'ajax_save_settings'));
+        
         // 載入所有啟用的功能
         $this->load_features();
     }
@@ -48,7 +51,8 @@ class WU_Admin_Bar_Cleaner {
             'wu_hide_site_address',
             'wu_hide_writing_settings',
             'wu_hide_privacy_settings',
-            'wu_custom_frontend_footer_text'
+            'wu_custom_frontend_footer_text',
+            'wu_hide_wumetax_toolkit'
         );
         
         foreach ($settings as $setting) {
@@ -203,6 +207,14 @@ class WU_Admin_Bar_Cleaner {
             'wu_admin_bar_settings',
             'wu_frontend_section'
         );
+        
+        add_settings_field(
+            'wu_hide_wumetax_toolkit',
+            '向其他管理員隱藏 WumetaxToolkit',
+            array($this, 'hide_wumetax_toolkit_callback'),
+            'wu_admin_bar_settings',
+            'wu_backend_section'
+        );
     }
     
     /**
@@ -307,6 +319,7 @@ class WU_Admin_Bar_Cleaner {
         $value = get_option('wu_custom_admin_footer_text', '');
         echo '<input type="text" id="wu_custom_admin_footer_text" name="wu_custom_admin_footer_text" value="' . esc_attr($value) . '" class="regular-text" />';
         echo '<p class="description">輸入自訂的管理頁尾文本。留空則不顯示任何文本。</p>';
+        echo '<p class="description" style="color: #d63638; font-weight: bold;">⚠️ 重要提醒：啟用此功能後，請勿同時勾選「移除管理頁尾文本」選項，否則自訂文本將無法顯示。</p>';
     }
     
     /**
@@ -369,6 +382,59 @@ class WU_Admin_Bar_Cleaner {
     }
     
     /**
+     * AJAX 儲存設定
+     */
+    public function ajax_save_settings() {
+        // 驗證權限
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+        
+        // 驗證 nonce
+        if (!wp_verify_nonce($_POST['wu_admin_bar_nonce'], 'wu_admin_bar_settings-options')) {
+            wp_die('Security check failed');
+        }
+        
+        // 處理表單提交
+        $settings = array(
+            'wu_remove_wp_logo',
+            'wu_hide_login_logo',
+            'wu_disable_login_language_switcher',
+            'wu_enable_login_beautify',
+            'wu_disable_dashboard_widgets',
+            'wu_remove_admin_footer_text',
+            'wu_hide_tools_menu',
+            'wu_hide_wordpress_address',
+            'wu_hide_site_address',
+            'wu_hide_writing_settings',
+            'wu_hide_privacy_settings',
+            'wu_hide_wumetax_toolkit'
+        );
+        
+        foreach ($settings as $setting) {
+            update_option($setting, isset($_POST[$setting]) ? 1 : 0);
+        }
+        
+        // 處理自訂頁尾文本
+        update_option('wu_custom_admin_footer_text', sanitize_text_field($_POST['wu_custom_admin_footer_text']));
+        update_option('wu_custom_frontend_footer_text', sanitize_text_field($_POST['wu_custom_frontend_footer_text']));
+        
+        wp_send_json_success(array('message' => '設定已儲存！變更已立即生效。'));
+    }
+    
+    /**
+     * 向其他管理員隱藏 WumetaxToolkit 選項回調
+     */
+    public function hide_wumetax_toolkit_callback() {
+        $value = get_option('wu_hide_wumetax_toolkit', false);
+        $current_user = wp_get_current_user();
+        echo '<input type="checkbox" id="wu_hide_wumetax_toolkit" name="wu_hide_wumetax_toolkit" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_hide_wumetax_toolkit">向其他管理員隱藏 WumetaxToolkit 外掛選單</label>';
+        echo '<p class="description">啟用後，只有當前管理員能看到 WumetaxToolkit 選單。</p>';
+        echo '<p class="description"><strong>當前管理員資訊：</strong> ID: ' . $current_user->ID . ' | 電子郵件: ' . esc_html($current_user->user_email) . '</p>';
+    }
+    
+    /**
      * 管理頁面
      */
     public function admin_page() {
@@ -387,7 +453,8 @@ class WU_Admin_Bar_Cleaner {
                 'wu_hide_wordpress_address',
                 'wu_hide_site_address',
                 'wu_hide_writing_settings',
-                'wu_hide_privacy_settings'
+                'wu_hide_privacy_settings',
+                'wu_hide_wumetax_toolkit'
             );
             
             foreach ($settings as $setting) {
@@ -398,7 +465,7 @@ class WU_Admin_Bar_Cleaner {
             update_option('wu_custom_admin_footer_text', sanitize_text_field($_POST['wu_custom_admin_footer_text']));
             update_option('wu_custom_frontend_footer_text', sanitize_text_field($_POST['wu_custom_frontend_footer_text']));
             
-            echo '<div class="notice notice-success"><p>設定已儲存！請重新整理頁面以查看變更。</p></div>';
+            echo '<div class="notice notice-success"><p>設定已儲存！變更已立即生效。</p></div>';
         }
         
         // 獲取當前狀態
@@ -415,6 +482,7 @@ class WU_Admin_Bar_Cleaner {
         $hide_writing_settings = get_option('wu_hide_writing_settings', false);
         $hide_privacy_settings = get_option('wu_hide_privacy_settings', false);
         $custom_frontend_footer_text = get_option('wu_custom_frontend_footer_text', '');
+        $hide_wumetax_toolkit = get_option('wu_hide_wumetax_toolkit', false);
         
         ?>
         <div class="wrap">
@@ -525,6 +593,14 @@ class WU_Admin_Bar_Cleaner {
                             <?php endif; ?>
                         </td>
                     </tr>
+                    <tr>
+                        <td><strong>WumetaxToolkit 選單隱藏</strong></td>
+                        <td>
+                            <span class="<?php echo $hide_wumetax_toolkit ? 'wu-status-enabled' : 'wu-status-disabled'; ?>">
+                                <?php echo $hide_wumetax_toolkit ? '已啟用（僅當前管理員可見）' : '已停用（所有管理員可見）'; ?>
+                            </span>
+                        </td>
+                    </tr>
                 </table>
             </div>
             
@@ -536,6 +612,42 @@ class WU_Admin_Bar_Cleaner {
                 submit_button();
                 ?>
             </form>
+            
+            <script>
+            jQuery(document).ready(function($) {
+                // 為表單添加 ID
+                $('form').attr('id', 'wu-admin-bar-form');
+                
+                // 自動儲存功能
+                $('input[type="checkbox"], input[type="text"]').on('change input', function() {
+                    // 防抖動：延遲執行，避免連續觸發
+                    clearTimeout(window.wuSaveTimeout);
+                    window.wuSaveTimeout = setTimeout(function() {
+                        var formData = $('#wu-admin-bar-form').serialize();
+                        formData += '&action=wu_admin_bar_save';
+                        
+                        $.post(ajaxurl, formData, function(response) {
+                            if (response.success) {
+                                // 移除舊的通知
+                                $('.notice').remove();
+                                // 顯示新的成功訊息
+                                $('.wrap h1').after('<div class="notice notice-success is-dismissible"><p>' + response.data.message + '</p></div>');
+                                // 3秒後自動隱藏
+                                setTimeout(function() {
+                                    $('.notice').fadeOut();
+                                }, 3000);
+                            }
+                        }).fail(function() {
+                            $('.notice').remove();
+                            $('.wrap h1').after('<div class="notice notice-error is-dismissible"><p>儲存失敗，請重試。</p></div>');
+                            setTimeout(function() {
+                                $('.notice').fadeOut();
+                            }, 3000);
+                        });
+                    }, 800); // 800ms 延遲
+                });
+            });
+            </script>
             
             <div class="card">
                 <h2>功能說明</h2>
@@ -606,8 +718,8 @@ class WU_Admin_Bar_Cleaner {
         <style>
         .wu-status-visible { color: #d63638; font-weight: bold; }
         .wu-status-hidden { color: #00a32a; font-weight: bold; }
-        .wu-status-enabled { color: #d63638; font-weight: bold; }
-        .wu-status-disabled { color: #00a32a; font-weight: bold; }
+        .wu-status-enabled { color: #00a32a; font-weight: bold; }
+        .wu-status-disabled { color: #d63638; font-weight: bold; }
         .wu-status-custom { color: #0073aa; font-weight: bold; }
         .card { background: #fff; border: 1px solid #ccd0d4; padding: 20px; margin: 20px 0; }
         .card h2 { margin-top: 0; }
@@ -674,6 +786,11 @@ class WU_Admin_Bar_Cleaner {
         // 處理前台頁尾文本
         if (!empty(get_option('wu_custom_frontend_footer_text', ''))) {
             add_action('wp_footer', array($this, 'custom_frontend_footer_text'));
+        }
+        
+        // 隱藏 WumetaxToolkit 選單（僅對其他管理員）
+        if (get_option('wu_hide_wumetax_toolkit', false)) {
+            add_action('admin_menu', array($this, 'hide_wumetax_toolkit_menu'), 999);
         }
     }
     
@@ -934,6 +1051,26 @@ class WU_Admin_Bar_Cleaner {
         $text = get_option('wu_custom_frontend_footer_text', '');
         if (!empty($text)) {
             echo '<div style="text-align: center; padding: 20px; margin-top: 30px; border-top: 1px solid #eee;">' . esc_html($text) . '</div>';
+        }
+    }
+    
+    /**
+     * 隱藏 WumetaxToolkit 選單（僅對其他管理員）
+     */
+    public function hide_wumetax_toolkit_menu() {
+        // 獲取設定此功能的管理員 ID
+        $setting_admin_id = get_option('wu_hide_wumetax_toolkit_admin_id', 0);
+        $current_user_id = get_current_user_id();
+        
+        // 如果還沒設定管理員 ID，則設定為當前用戶
+        if (!$setting_admin_id) {
+            update_option('wu_hide_wumetax_toolkit_admin_id', $current_user_id);
+            $setting_admin_id = $current_user_id;
+        }
+        
+        // 如果當前用戶不是設定此功能的管理員，則隱藏選單
+        if ($current_user_id != $setting_admin_id) {
+            remove_menu_page('wumetax-toolkit');
         }
     }
     
