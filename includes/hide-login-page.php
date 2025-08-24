@@ -125,6 +125,38 @@ class WU_Hide_Login_Page {
                 <?php endif; ?>
             </div>
         </div>
+        
+        <style>
+        .wu-termius-input {
+            background-color: #1e1e1e !important;
+            color: #00ff41 !important;
+            border: 1px solid #333 !important;
+            border-radius: 4px !important;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+            font-size: 14px !important;
+            padding: 12px 16px !important;
+            line-height: 1.4 !important;
+            transition: all 0.2s ease !important;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+        }
+        
+        .wu-termius-input:focus {
+            background-color: #2a2a2a !important;
+            border-color: #00ff41 !important;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3), inset 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+            outline: none !important;
+        }
+        
+        .wu-termius-input::placeholder {
+            color: #666 !important;
+        }
+        
+        .wu-termius-input::selection {
+            background-color: #00ff41 !important;
+            color: #1e1e1e !important;
+        }
+        </style>
+        
         <?php
     }
     
@@ -154,7 +186,7 @@ class WU_Hide_Login_Page {
     public function custom_slug_callback() {
         $custom_slug = isset($this->options['custom_slug']) ? $this->options['custom_slug'] : 'loginwu';
         ?>
-        <input type="text" name="<?php echo $this->option_name; ?>[custom_slug]" value="<?php echo esc_attr($custom_slug); ?>" class="regular-text" />
+        <input type="text" name="<?php echo $this->option_name; ?>[custom_slug]" value="<?php echo esc_attr($custom_slug); ?>" class="regular-text wu-termius-input" />
         <p class="description">自定義登入頁面的網址結尾，預設為 "loginwu"。新的登入網址將是：<?php echo home_url('/'); ?><strong><?php echo esc_html($custom_slug); ?></strong>/</p>
         <?php
     }
