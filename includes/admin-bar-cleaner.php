@@ -72,7 +72,7 @@ class WU_Admin_Bar_Cleaner {
         // 登入頁面設定區域
         add_settings_section(
             'wu_login_section',
-            'WordPress 登入頁面美化(採用半透明風格、白底美化登入頁面)',
+            'WordPress 登入頁面美化',
             array($this, 'login_section_callback'),
             'wu_admin_bar_settings'
         );
