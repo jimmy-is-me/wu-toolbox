@@ -317,7 +317,7 @@ class WU_Admin_Bar_Cleaner {
         $value = get_option('wu_enable_login_beautify', false);
         echo '<input type="checkbox" id="wu_enable_login_beautify" name="wu_enable_login_beautify" value="1" ' . checked(1, $value, false) . ' />';
         echo '<label for="wu_enable_login_beautify">啟用 WordPress 登入頁面美化</label>';
-        echo '<p class="description">採用半透明風格、白底美化登入頁面，登入欄位更細緻。</p>';
+        echo '<p class="description">採用半透明風格、白底美化登入頁面，登入欄位高度細化設計。</p>';
     }
     
     /**
@@ -731,7 +731,7 @@ class WU_Admin_Bar_Cleaner {
                 <ul>
                     <li><strong>隱藏標誌：</strong>移除登入頁面的 WordPress 標誌</li>
                     <li><strong>語言切換器：</strong>停用多語言環境下的語言選擇器</li>
-                    <li><strong>頁面美化：</strong>採用半透明風格、白底設計、細緻欄位</li>
+                    <li><strong>頁面美化：</strong>採用半透明風格、白底設計、細化欄位高度</li>
                     <li><strong>專業外觀：</strong>提供更專業的登入體驗</li>
                 </ul>
                 
@@ -881,7 +881,7 @@ class WU_Admin_Bar_Cleaner {
     }
     
     /**
-     * 修改：美化登入頁面 - 半透明風格、白底、細緻欄位
+     * 修改：美化登入頁面 - 半透明風格、白底、細欄位
      */
     public function beautify_login_page() {
         echo '<style>
@@ -1280,4 +1280,3 @@ class WU_Admin_Bar_Cleaner {
 
 // 初始化模組
 new WU_Admin_Bar_Cleaner();
-?>
