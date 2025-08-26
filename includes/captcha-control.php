@@ -16,7 +16,7 @@ class WU_Captcha_Control {
         add_action('admin_menu', array($this, 'add_admin_menu'), 52);
         add_action('init', array($this, 'init_captcha'));
         
-        // 優化 session 處理
+        // 優化 session 處理 - 參考第一個檔案的方式
         add_action('init', array($this, 'maybe_start_session'), 1);
         
         // 載入驗證碼功能
@@ -29,15 +29,19 @@ class WU_Captcha_Control {
     }
     
     public function maybe_start_session() {
-        // 改善 session 啟動邏輯
-        if (!session_id() && !headers_sent() && !is_admin()) {
-            @session_start();
+        // 參考第一個檔案的 session 處理方式
+        if (!session_id() && !headers_sent()) {
+            if (!is_admin() || (defined('DOING_AJAX') && DOING_AJAX)) {
+                @session_start();
+            }
         }
         
         // 確保 WooCommerce 頁面也能正常啟動 session
-        if (class_exists('WooCommerce') && (is_account_page() || is_checkout() || is_cart())) {
-            if (!session_id() && !headers_sent()) {
-                @session_start();
+        if (class_exists('WooCommerce') && !is_admin()) {
+            if (is_account_page() || is_checkout() || is_cart()) {
+                if (!session_id() && !headers_sent()) {
+                    @session_start();
+                }
             }
         }
     }
@@ -45,8 +49,9 @@ class WU_Captcha_Control {
     private function get_default_settings() {
         return array(
             'enabled' => false,
-            'captcha_type' => 'mixed',
-            'captcha_length' => 6,
+            'captcha_type' => 'alphanumeric',
+            'captcha_length' => 4,
+            'captcha_letters' => 'capital',
             'case_sensitive' => false,
             'enable_login' => true,
             'enable_register' => true,
@@ -54,14 +59,14 @@ class WU_Captcha_Control {
             'enable_woocommerce' => true,
             'image_width' => 120,
             'image_height' => 40,
-            'font_size' => 28,
-            'text_color' => '#333333',
+            'font_size' => 20,
+            'text_color' => '#142864',
             'background_color' => '#ffffff',
             'noise_level' => 'low',
             'session_timeout' => 600,
-            // 新增重定向設定
-            'login_redirect_type' => 'homepage', // homepage, admin, custom
-            'logout_redirect_type' => 'homepage', // homepage, admin, custom
+            // 重定向設定
+            'login_redirect_type' => 'homepage',
+            'logout_redirect_type' => 'homepage',
             'custom_login_redirect' => '',
             'custom_logout_redirect' => ''
         );
@@ -81,7 +86,7 @@ class WU_Captcha_Control {
     }
     
     public function redirect_after_login($redirect_to, $request, $user) {
-        // 如果是 AJAX 請求或管理員直接進入後台，不重定向
+        // 參考第一個檔案的重定向邏輯
         if (wp_doing_ajax() || (isset($_REQUEST['action']) && $_REQUEST['action'] === 'login')) {
             return $redirect_to;
         }
@@ -116,7 +121,6 @@ class WU_Captcha_Control {
     }
     
     public function redirect_after_logout() {
-        // 避免在 AJAX 或管理頁面中重定向
         if (wp_doing_ajax() || is_admin()) {
             return;
         }
@@ -205,18 +209,28 @@ class WU_Captcha_Control {
                             <fieldset>
                                 <legend class="screen-reader-text"><span>驗證碼類型</span></legend>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="radio" name="captcha_type" value="mixed" <?php checked($this->settings['captcha_type'], 'mixed'); ?>>
-                                    英數字元混合 (A-Z, 0-9)
+                                    <input type="radio" name="captcha_type" value="alphanumeric" <?php checked($this->settings['captcha_type'], 'alphanumeric'); ?>>
+                                    英數字元混合
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="radio" name="captcha_type" value="letters" <?php checked($this->settings['captcha_type'], 'letters'); ?>>
-                                    僅英文字母 (A-Z)
+                                    <input type="radio" name="captcha_type" value="alphabets" <?php checked($this->settings['captcha_type'], 'alphabets'); ?>>
+                                    僅英文字母
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
                                     <input type="radio" name="captcha_type" value="numbers" <?php checked($this->settings['captcha_type'], 'numbers'); ?>>
-                                    僅數字 (0-9)
+                                    僅數字
                                 </label>
                             </fieldset>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">字母大小寫</th>
+                        <td>
+                            <select name="captcha_letters">
+                                <option value="capital" <?php selected($this->settings['captcha_letters'], 'capital'); ?>>僅大寫字母</option>
+                                <option value="small" <?php selected($this->settings['captcha_letters'], 'small'); ?>>僅小寫字母</option>
+                                <option value="capitalsmall" <?php selected($this->settings['captcha_letters'], 'capitalsmall'); ?>>大小寫混合</option>
+                            </select>
                         </td>
                     </tr>
                     <tr>
@@ -224,21 +238,12 @@ class WU_Captcha_Control {
                         <td>
                             <select name="captcha_length">
                                 <?php
-                                for ($i = 4; $i <= 8; $i++) {
+                                for ($i = 3; $i <= 6; $i++) {
                                     echo '<option value="' . $i . '" ' . selected($this->settings['captcha_length'], $i, false) . '>' . $i . ' 位數</option>';
                                 }
                                 ?>
                             </select>
-                            <p class="description">建議使用 6 位數以平衡安全性和使用性</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">大小寫敏感</th>
-                        <td>
-                            <label>
-                                <input type="checkbox" name="case_sensitive" value="1" <?php checked($this->settings['case_sensitive']); ?>>
-                                區分大小寫（啟用後使用者必須輸入正確的大小寫）
-                            </label>
+                            <p class="description">建議使用 4-5 位數以平衡安全性和使用性</p>
                         </td>
                     </tr>
                 </table>
@@ -348,7 +353,7 @@ class WU_Captcha_Control {
                         <th scope="row">字體大小</th>
                         <td>
                             <input type="number" name="font_size" value="<?php echo $this->settings['font_size']; ?>" min="10" max="32" style="width: 60px;"> px
-                            <p class="description">預設為 28px，提供更好的可讀性</p>
+                            <p class="description">預設為 20px，提供良好的可讀性</p>
                         </td>
                     </tr>
                     <tr>
@@ -403,13 +408,13 @@ class WU_Captcha_Control {
                 <?php if ($this->settings['enabled']): ?>
                     <p>預覽驗證碼：</p>
                     <div style="margin: 10px 0;">
-                        <img id="preview-captcha" src="<?php echo admin_url('admin-ajax.php?action=wu_generate_captcha&preview=1'); ?>" alt="驗證碼預覽" style="border: 1px solid #ddd;">
+                        <img id="preview-captcha" src="<?php echo admin_url('admin-ajax.php?action=wu_generate_captcha&preview=1&_wpnonce=' . wp_create_nonce('wu_preview_captcha')); ?>" alt="驗證碼預覽" style="border: 1px solid #ddd;">
                         <button type="button" onclick="refreshPreviewCaptcha()" class="button" style="margin-left: 10px;">重新產生</button>
                     </div>
                     <script>
                     function refreshPreviewCaptcha() {
                         var img = document.getElementById('preview-captcha');
-                        img.src = '<?php echo admin_url('admin-ajax.php?action=wu_generate_captcha&preview=1'); ?>&t=' + new Date().getTime();
+                        img.src = '<?php echo admin_url('admin-ajax.php?action=wu_generate_captcha&preview=1&_wpnonce=' . wp_create_nonce('wu_preview_captcha')); ?>&t=' + new Date().getTime();
                     }
                     </script>
                 <?php else: ?>
@@ -459,31 +464,32 @@ class WU_Captcha_Control {
         // 處理自訂重定向 URL
         $custom_login_redirect = !empty($_POST['custom_login_redirect_url']) 
             ? sanitize_url($_POST['custom_login_redirect_url']) 
-            : sanitize_url($_POST['custom_login_redirect']);
+            : sanitize_url($_POST['custom_login_redirect'] ?? '');
             
         $custom_logout_redirect = !empty($_POST['custom_logout_redirect_url']) 
             ? sanitize_url($_POST['custom_logout_redirect_url']) 
-            : sanitize_url($_POST['custom_logout_redirect']);
+            : sanitize_url($_POST['custom_logout_redirect'] ?? '');
         
         $settings = array(
             'enabled' => isset($_POST['enabled']),
-            'captcha_type' => sanitize_text_field($_POST['captcha_type']),
-            'captcha_length' => intval($_POST['captcha_length']),
+            'captcha_type' => sanitize_text_field($_POST['captcha_type'] ?? 'alphanumeric'),
+            'captcha_letters' => sanitize_text_field($_POST['captcha_letters'] ?? 'capital'),
+            'captcha_length' => intval($_POST['captcha_length'] ?? 4),
             'case_sensitive' => isset($_POST['case_sensitive']),
             'enable_login' => isset($_POST['enable_login']),
             'enable_register' => isset($_POST['enable_register']),
             'enable_lost_password' => isset($_POST['enable_lost_password']),
             'enable_woocommerce' => isset($_POST['enable_woocommerce']),
-            'image_width' => intval($_POST['image_width']),
-            'image_height' => intval($_POST['image_height']),
-            'font_size' => intval($_POST['font_size']),
-            'text_color' => sanitize_hex_color($_POST['text_color']),
-            'background_color' => sanitize_hex_color($_POST['background_color']),
-            'noise_level' => sanitize_text_field($_POST['noise_level']),
-            'session_timeout' => intval($_POST['session_timeout']),
+            'image_width' => intval($_POST['image_width'] ?? 120),
+            'image_height' => intval($_POST['image_height'] ?? 40),
+            'font_size' => intval($_POST['font_size'] ?? 20),
+            'text_color' => sanitize_hex_color($_POST['text_color'] ?? '#142864'),
+            'background_color' => sanitize_hex_color($_POST['background_color'] ?? '#ffffff'),
+            'noise_level' => sanitize_text_field($_POST['noise_level'] ?? 'low'),
+            'session_timeout' => intval($_POST['session_timeout'] ?? 600),
             // 重定向設定
-            'login_redirect_type' => sanitize_text_field($_POST['login_redirect_type']),
-            'logout_redirect_type' => sanitize_text_field($_POST['logout_redirect_type']),
+            'login_redirect_type' => sanitize_text_field($_POST['login_redirect_type'] ?? 'homepage'),
+            'logout_redirect_type' => sanitize_text_field($_POST['logout_redirect_type'] ?? 'homepage'),
             'custom_login_redirect' => $custom_login_redirect,
             'custom_logout_redirect' => $custom_logout_redirect
         );
@@ -521,9 +527,8 @@ class WU_Captcha_Control {
             add_action('lostpassword_post', array($this, 'validate_lost_password_captcha'));
         }
         
-        // WooCommerce 整合 - 改善處理邏輯
+        // WooCommerce 整合
         if ($this->settings['enable_woocommerce'] && class_exists('WooCommerce')) {
-            // 延遲到 WooCommerce 完全載入後
             add_action('woocommerce_loaded', array($this, 'init_woocommerce_hooks'));
         }
         
@@ -555,6 +560,7 @@ class WU_Captcha_Control {
                         type: "GET",
                         data: {
                             action: "wu_refresh_captcha",
+                            _wpnonce: "' . wp_create_nonce('wu_refresh_captcha') . '",
                             t: new Date().getTime()
                         },
                         success: function(response) {
@@ -592,15 +598,15 @@ class WU_Captcha_Control {
         $this->force_start_session();
         
         $captcha_code = $this->generate_captcha_code();
-        $_SESSION['wu_captcha_code'] = $this->settings['case_sensitive'] ? $captcha_code : strtolower($captcha_code);
+        $_SESSION['wu_captcha_code'] = $captcha_code;
         $_SESSION['wu_captcha_time'] = time();
         
         $unique_id = 'wu_captcha_' . wp_rand(1000, 9999);
         ?>
         <p class="wu-captcha-field">
-            <label for="<?php echo $unique_id; ?>">驗證碼 <span class="required">*</span></label>
+            <label for="<?php echo $unique_id; ?>"><b>驗證碼</b> <span class="required">*</span></label>
             <div style="margin: 5px 0;">
-                <img src="<?php echo admin_url('admin-ajax.php?action=wu_generate_captcha&code=' . urlencode($captcha_code) . '&t=' . time()); ?>" 
+                <img src="<?php echo admin_url('admin-ajax.php?action=wu_generate_captcha&code=' . urlencode($captcha_code) . '&t=' . time() . '&_wpnonce=' . wp_create_nonce('wu_generate_captcha')); ?>" 
                      alt="驗證碼" 
                      style="border: 1px solid #ddd; vertical-align: middle; display: block; margin-bottom: 5px;">
                 <button type="button" onclick="refreshWuCaptcha(this)" 
@@ -625,7 +631,6 @@ class WU_Captcha_Control {
             if (!headers_sent()) {
                 @session_start();
             } else {
-                // 如果 headers 已經發送，嘗試使用其他方式處理
                 if (!isset($_SESSION)) {
                     $_SESSION = array();
                 }
@@ -634,43 +639,84 @@ class WU_Captcha_Control {
     }
     
     public function ajax_refresh_captcha() {
+        // 安全驗證
+        if (!wp_verify_nonce($_REQUEST['_wpnonce'] ?? '', 'wu_refresh_captcha')) {
+            wp_send_json_error('安全驗證失敗');
+        }
+        
         $this->force_start_session();
         
         $captcha_code = $this->generate_captcha_code();
-        $_SESSION['wu_captcha_code'] = $this->settings['case_sensitive'] ? $captcha_code : strtolower($captcha_code);
+        $_SESSION['wu_captcha_code'] = $captcha_code;
         $_SESSION['wu_captcha_time'] = time();
         
         wp_send_json_success(array(
-            'image_url' => admin_url('admin-ajax.php?action=wu_generate_captcha&code=' . urlencode($captcha_code))
+            'image_url' => admin_url('admin-ajax.php?action=wu_generate_captcha&code=' . urlencode($captcha_code) . '&_wpnonce=' . wp_create_nonce('wu_generate_captcha'))
         ));
     }
     
     private function generate_captcha_code() {
+        // 參考第一個檔案的字符生成邏輯
         $length = $this->settings['captcha_length'];
         
-        switch ($this->settings['captcha_type']) {
-            case 'letters':
-                $characters = 'ABCDEFGHIJKLMNPQRSTUVWXYZ';
-                break;
-            case 'numbers':
-                $characters = '23456789';
-                break;
-            case 'mixed':
-            default:
-                $characters = 'ABCDEFGHIJKLMNPQRSTUVWXYZ23456789';
-                break;
+        if (!empty($this->settings['captcha_type']) && $this->settings['captcha_type'] == 'alphanumeric') {
+            switch ($this->settings['captcha_letters']) {
+                case 'capital':
+                    $possible_letters = '23456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                    break;
+                case 'small':
+                    $possible_letters = '23456789bcdfghjkmnpqrstvwxyz';
+                    break;
+                case 'capitalsmall':
+                    $possible_letters = '23456789bcdfghjkmnpqrstvwxyzABCEFGHJKMNPRSTVWXYZ';
+                    break;
+                default:
+                    $possible_letters = '23456789bcdfghjkmnpqrstvwxyz';
+                    break;
+            }
+        } elseif (!empty($this->settings['captcha_type']) && $this->settings['captcha_type'] == 'alphabets') {
+            switch ($this->settings['captcha_letters']) {
+                case 'capital':
+                    $possible_letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                    break;
+                case 'small':
+                    $possible_letters = 'bcdfghjkmnpqrstvwxyz';
+                    break;
+                case 'capitalsmall':
+                    $possible_letters = 'bcdfghjkmnpqrstvwxyzABCEFGHJKMNPRSTVWXYZ';
+                    break;
+                default:
+                    $possible_letters = 'abcdefghijklmnopqrstuvwxyz';
+                    break;
+            }
+        } elseif (!empty($this->settings['captcha_type']) && $this->settings['captcha_type'] == 'numbers') {
+            $possible_letters = '0123456789';
+        } else {
+            $possible_letters = '0123456789';
         }
         
         $code = '';
-        $max = strlen($characters) - 1;
-        for ($i = 0; $i < $length; $i++) {
-            $code .= $characters[wp_rand(0, $max)];
+        $i = 0;
+        while ($i < $length) {
+            $code .= substr($possible_letters, wp_rand(0, strlen($possible_letters) - 1), 1);
+            $i++;
         }
         
         return $code;
     }
     
     public function generate_captcha_image() {
+        // 安全驗證
+        if (isset($_GET['preview']) && $_GET['preview'] == '1') {
+            if (!wp_verify_nonce($_REQUEST['_wpnonce'] ?? '', 'wu_preview_captcha')) {
+                wp_die('安全驗證失敗');
+            }
+        } else {
+            if (!wp_verify_nonce($_REQUEST['_wpnonce'] ?? '', 'wu_generate_captcha')) {
+                wp_die('安全驗證失敗');
+            }
+        }
+        
         if (!function_exists('imagecreate')) {
             header('Content-Type: text/plain');
             echo 'GD Library not available';
@@ -679,41 +725,51 @@ class WU_Captcha_Control {
         
         $code = isset($_GET['code']) ? sanitize_text_field($_GET['code']) : $this->generate_captcha_code();
         
-        $width = $this->settings['image_width'];
-        $height = $this->settings['image_height'];
+        // 參考第一個檔案的圖像生成邏輯
+        $image_width = $this->settings['image_width'];
+        $image_height = $this->settings['image_height'];
         
-        $image = imagecreate($width, $height);
+        $random_dots = 0;
+        $random_lines = 20;
+        $captcha_text_color = $this->settings['text_color'];
+        $captcha_noice_color = $this->settings['text_color'];
         
-        $bg_color = imagecolorallocate($image, 
-            hexdec(substr($this->settings['background_color'], 1, 2)),
-            hexdec(substr($this->settings['background_color'], 3, 2)),
-            hexdec(substr($this->settings['background_color'], 5, 2))
-        );
+        $font_size = $image_height * 0.5;
+        $image = @imagecreate($image_width, $image_height);
         
-        $text_color = imagecolorallocate($image,
-            hexdec(substr($this->settings['text_color'], 1, 2)),
-            hexdec(substr($this->settings['text_color'], 3, 2)),
-            hexdec(substr($this->settings['text_color'], 5, 2))
-        );
+        // 設置背景、文字和噪點顏色
+        $bg_rgb = $this->hex_to_rgb($this->settings['background_color']);
+        imagecolorallocate($image, $bg_rgb['red'], $bg_rgb['green'], $bg_rgb['blue']);
         
-        $this->add_noise($image, $width, $height, $text_color);
+        $text_rgb = $this->hex_to_rgb($captcha_text_color);
+        $text_color = imagecolorallocate($image, $text_rgb['red'], $text_rgb['green'], $text_rgb['blue']);
         
-        $font_size = $this->settings['font_size'];
+        $noise_rgb = $this->hex_to_rgb($captcha_noice_color);
+        $image_noise_color = imagecolorallocate($image, $noise_rgb['red'], $noise_rgb['green'], $noise_rgb['blue']);
+        
+        // 根據噪點等級調整噪點數量
+        $noise_multiplier = array('low' => 5, 'medium' => 15, 'high' => 30);
+        $random_dots = $noise_multiplier[$this->settings['noise_level']];
+        
+        // 生成隨機點
+        for ($i = 0; $i < $random_dots; $i++) {
+            imagefilledellipse($image, wp_rand(0, $image_width), wp_rand(0, $image_height), 2, 3, $image_noise_color);
+        }
+        
+        // 生成隨機線條
+        for ($i = 0; $i < $random_lines; $i++) {
+            imageline($image, wp_rand(0, $image_width), wp_rand(0, $image_height), wp_rand(0, $image_width), wp_rand(0, $image_height), $image_noise_color);
+        }
+        
+        // 添加文字
         $text_length = strlen($code);
-        $char_width = $font_size * 0.8;
-        $total_text_width = $text_length * $char_width;
-        $start_x = max(10, ($width - $total_text_width) / 2);
+        $char_width = $image_width / ($text_length + 1);
         
         for ($i = 0; $i < $text_length; $i++) {
-            $x = $start_x + ($i * $char_width) + wp_rand(-3, 3);
-            $y = ($height + $font_size) / 2 + wp_rand(-2, 2);
-            $angle = wp_rand(-8, 8);
+            $x = ($i + 0.5) * $char_width + wp_rand(-3, 3);
+            $y = ($image_height + $font_size) / 2 + wp_rand(-2, 2);
             
-            if (function_exists('imagettftext') && $this->get_font_file()) {
-                imagettftext($image, $font_size, $angle, $x, $y, $text_color, $this->get_font_file(), $code[$i]);
-            } else {
-                imagestring($image, 5, $x, $y - $font_size/2, $code[$i], $text_color);
-            }
+            imagestring($image, 5, (int)$x, (int)($y - $font_size/2), $code[$i], $text_color);
         }
         
         header('Content-Type: image/png');
@@ -726,62 +782,42 @@ class WU_Captcha_Control {
         exit;
     }
     
-    private function add_noise($image, $width, $height, $color) {
-        $noise_level = $this->settings['noise_level'];
-        $multiplier = array('low' => 5, 'medium' => 15, 'high' => 30);
-        $noise_count = $multiplier[$noise_level];
+    private function hex_to_rgb($hex) {
+        // 參考第一個檔案的顏色轉換函數
+        $hex = str_replace('#', '', $hex);
+        $int = hexdec($hex);
         
-        $light_color = imagecolorallocate($image, 
-            min(255, hexdec(substr($this->settings['text_color'], 1, 2)) + 60),
-            min(255, hexdec(substr($this->settings['text_color'], 3, 2)) + 60),
-            min(255, hexdec(substr($this->settings['text_color'], 5, 2)) + 60)
+        return array(
+            "red" => 0xFF & ($int >> 0x10),
+            "green" => 0xFF & ($int >> 0x8),
+            "blue" => 0xFF & $int
         );
-        
-        for ($i = 0; $i < $noise_count; $i++) {
-            imagesetpixel($image, wp_rand(0, $width-1), wp_rand(0, $height-1), $light_color);
-        }
-        
-        $line_count = max(1, intval($noise_count / 8));
-        for ($i = 0; $i < $line_count; $i++) {
-            imageline($image, wp_rand(0, $width-1), wp_rand(0, $height-1), 
-                     wp_rand(0, $width-1), wp_rand(0, $height-1), $light_color);
-        }
-    }
-    
-    private function get_font_file() {
-        return null;
     }
     
     private function validate_captcha() {
         $this->force_start_session();
         
-        // 檢查是否有驗證碼輸入
-        if (!isset($_POST['wu_captcha']) || empty(trim($_POST['wu_captcha']))) {
+        // 參考第一個檔案的驗證邏輯
+        if (empty($_REQUEST['wu_captcha'])) {
             return new WP_Error('wu_captcha_empty', '請輸入驗證碼');
         }
         
-        // 檢查 Session 中是否有驗證碼
         if (!isset($_SESSION['wu_captcha_code']) || !isset($_SESSION['wu_captcha_time'])) {
             return new WP_Error('wu_captcha_missing', '驗證碼已過期，請重新整理頁面');
         }
         
-        // 檢查驗證碼是否過期 - 放寬時間限制
+        // 檢查驗證碼是否過期
         $current_time = time();
         $captcha_time = intval($_SESSION['wu_captcha_time']);
         $timeout = intval($this->settings['session_timeout']);
         
-        // 對於 WooCommerce，給予額外的時間緩衝
-        if (class_exists('WooCommerce') && (is_account_page() || is_checkout())) {
-            $timeout = $timeout + 300; // 額外 5 分鐘
-        }
-        
         if (($current_time - $captcha_time) > $timeout) {
             unset($_SESSION['wu_captcha_code'], $_SESSION['wu_captcha_time']);
-            return new WP_Error('wu_captcha_expired', '驗證碼已過期（有效時間：' . ($timeout/60) . ' 分鐘），請重新產生');
+            return new WP_Error('wu_captcha_expired', '驗證碼已過期，請重新產生');
         }
         
         // 驗證驗證碼
-        $input_code = $this->settings['case_sensitive'] ? trim($_POST['wu_captcha']) : strtolower(trim($_POST['wu_captcha']));
+        $input_code = trim($_REQUEST['wu_captcha']);
         $session_code = $_SESSION['wu_captcha_code'];
         
         // 清除 Session 中的驗證碼（一次性使用）
@@ -795,7 +831,7 @@ class WU_Captcha_Control {
     }
     
     public function validate_login_captcha($user, $username, $password) {
-        // 避免在 AJAX 或管理請求中進行驗證
+        // 參考第一個檔案的登入驗證邏輯
         if (wp_doing_ajax() || is_admin()) {
             return $user;
         }
@@ -827,6 +863,11 @@ class WU_Captcha_Control {
     }
     
     public function validate_lost_password_captcha() {
+        // 參考第一個檔案的忘記密碼驗證邏輯
+        if (isset($_REQUEST['user_login']) && "" == $_REQUEST['user_login']) {
+            return;
+        }
+        
         $validation = $this->validate_captcha();
         if (is_wp_error($validation)) {
             wp_die($validation->get_error_message(), '驗證失敗', array('back_link' => true));
