@@ -380,6 +380,7 @@ class WU_Admin_Bar_Cleaner {
     public function user_roles_management_callback() {
         $disabled_roles = get_option('wu_disabled_user_roles', array());
         
+        // 移除 subscriber，不在選項中顯示
         $roles = array(
             'contributor' => array(
                 'name' => '投稿者',
@@ -399,11 +400,7 @@ class WU_Admin_Bar_Cleaner {
             ),
             'customer' => array(
                 'name' => '顧客',
-                'description' => 'WooCommerce 顾客角色'
-            ),
-            'subscriber' => array(
-                'name' => '使用者',
-                'description' => '只能管理自己的個人資料'
+                'description' => 'WooCommerce 顧客角色'
             )
         );
         
@@ -803,7 +800,7 @@ class WU_Admin_Bar_Cleaner {
                 <ul>
                     <li><strong>登入頁面美化升級：</strong>採用現代化透明玻璃質感設計，漸層背景，流暢動畫效果</li>
                     <li><strong>儀表板小工具一鍵管理：</strong>簡化操作，一鍵停用所有儀表板小工具</li>
-                    <li><strong>使用者角色管理：</strong>可選擇停用特定使用者角色，包括投稿者、作者、編輯、商店管理員、顧客、使用者</li>
+                    <li><strong>使用者角色管理：</strong>可選擇停用特定使用者角色，包括投稿者、作者、編輯、商店管理員、顧客</li>
                 </ul>
                 
                 <h3>管理列功能</h3>
@@ -832,7 +829,7 @@ class WU_Admin_Bar_Cleaner {
                 
                 <h3>使用者角色管理</h3>
                 <ul>
-                    <li><strong>角色停用：</strong>可選擇停用投稿者、作者、編輯、商店管理員、顧客、使用者角色</li>
+                    <li><strong>角色停用：</strong>可選擇停用投稿者、作者、編輯、商店管理員、顧客角色</li>
                     <li><strong>簡化管理：</strong>減少不必要的使用者角色選項</li>
                     <li><strong>安全提升：</strong>限制特定角色的建立和指派</li>
                 </ul>
