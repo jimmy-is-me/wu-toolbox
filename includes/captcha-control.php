@@ -23,6 +23,9 @@ class WU_Captcha_Control {
         if ($this->settings['enabled']) {
             $this->init_captcha_hooks();
         }
+        
+        // 登入/登出重定向處理
+        $this->init_redirect_hooks();
     }
     
     public function maybe_start_session() {
@@ -43,12 +46,49 @@ class WU_Captcha_Control {
             'enable_woocommerce' => true,
             'image_width' => 120,
             'image_height' => 40,
-            'font_size' => 16,
+            'font_size' => 28, // 修改預設字體大小為28px
             'text_color' => '#333333',
             'background_color' => '#ffffff',
-            'noise_level' => 'medium', // low, medium, high
+            'noise_level' => 'low', // 修改預設噪點為低
             'session_timeout' => 600 // 10 minutes
         );
+    }
+    
+    private function init_redirect_hooks() {
+        // 登入後重定向到首頁
+        add_filter('login_redirect', array($this, 'redirect_after_login'), 10, 3);
+        
+        // 登出後重定向到首頁
+        add_action('wp_logout', array($this, 'redirect_after_logout'));
+        
+        // WooCommerce 登入後重定向
+        if (class_exists('WooCommerce')) {
+            add_filter('woocommerce_login_redirect', array($this, 'woocommerce_login_redirect'), 10, 2);
+        }
+    }
+    
+    public function redirect_after_login($redirect_to, $request, $user) {
+        // 如果沒有特定的重定向要求，導向首頁
+        if (empty($redirect_to) || $redirect_to === admin_url()) {
+            return home_url();
+        }
+        
+        // 如果是管理員且要求訪問後台，允許
+        if (isset($user->ID) && user_can($user->ID, 'manage_options') && strpos($redirect_to, admin_url()) === 0) {
+            return $redirect_to;
+        }
+        
+        // 其他情況導向首頁
+        return home_url();
+    }
+    
+    public function redirect_after_logout() {
+        wp_safe_redirect(home_url());
+        exit;
+    }
+    
+    public function woocommerce_login_redirect($redirect, $user) {
+        return home_url();
     }
     
     public function add_admin_menu() {
@@ -83,6 +123,7 @@ class WU_Captcha_Control {
                     <li><strong>廣泛支援</strong>：支援登入、註冊、忘記密碼表單</li>
                     <li><strong>WooCommerce 整合</strong>：自動支援 WooCommerce 表單</li>
                     <li><strong>自訂外觀</strong>：可調整顏色、大小、噪點等</li>
+                    <li><strong>智慧重定向</strong>：登入/登出後自動導向首頁</li>
                 </ul>
                 
                 <h4>安全優勢：</h4>
@@ -204,7 +245,8 @@ class WU_Captcha_Control {
                     <tr>
                         <th scope="row">字體大小</th>
                         <td>
-                            <input type="number" name="font_size" value="<?php echo $this->settings['font_size']; ?>" min="10" max="24" style="width: 60px;"> px
+                            <input type="number" name="font_size" value="<?php echo $this->settings['font_size']; ?>" min="10" max="32" style="width: 60px;"> px
+                            <p class="description">預設為 28px，提供更好的可讀性</p>
                         </td>
                     </tr>
                     <tr>
@@ -224,11 +266,11 @@ class WU_Captcha_Control {
                         <th scope="row">噪點程度</th>
                         <td>
                             <select name="noise_level">
-                                <option value="low" <?php selected($this->settings['noise_level'], 'low'); ?>>低</option>
+                                <option value="low" <?php selected($this->settings['noise_level'], 'low'); ?>>低（預設）</option>
                                 <option value="medium" <?php selected($this->settings['noise_level'], 'medium'); ?>>中</option>
                                 <option value="high" <?php selected($this->settings['noise_level'], 'high'); ?>>高</option>
                             </select>
-                            <p class="description">增加噪點可提高安全性，但可能影響可讀性</p>
+                            <p class="description">預設為低噪點，確保最佳可讀性</p>
                         </td>
                     </tr>
                 </table>
@@ -289,6 +331,7 @@ class WU_Captcha_Control {
                     <li>設定工作階段逾時防止重複使用</li>
                     <li>支援大小寫敏感提高安全性</li>
                     <li>視覺噪點干擾機器人識別</li>
+                    <li>登入/登出後自動導向首頁</li>
                 </ul>
                 
                 <h3>注意事項：</h3>
@@ -297,6 +340,7 @@ class WU_Captcha_Control {
                     <li>驗證碼無法顯示時會提供文字替代方案</li>
                     <li>建議定期測試表單功能確保正常運作</li>
                     <li>可在測試模式下檢查各表單的顯示效果</li>
+                    <li>管理員登入後台不受重定向影響</li>
                 </ul>
             </div>
         </div>
@@ -541,23 +585,26 @@ class WU_Captcha_Control {
         // 添加噪點
         $this->add_noise($image, $width, $height, $text_color);
         
-        // 添加文字
+        // 添加文字 - 針對較大字體進行優化
         $font_size = $this->settings['font_size'];
         $text_length = strlen($code);
-        $char_width = $font_size * 0.7;
+        
+        // 根據字體大小調整字符間距
+        $char_width = $font_size * 0.8;
         $total_text_width = $text_length * $char_width;
-        $start_x = ($width - $total_text_width) / 2;
+        $start_x = max(10, ($width - $total_text_width) / 2);
         
         for ($i = 0; $i < $text_length; $i++) {
-            $x = $start_x + ($i * $char_width) + wp_rand(-5, 5);
-            $y = ($height + $font_size) / 2 + wp_rand(-3, 3);
+            $x = $start_x + ($i * $char_width) + wp_rand(-3, 3);
+            $y = ($height + $font_size) / 2 + wp_rand(-2, 2);
             
-            // 添加隨機角度
-            $angle = wp_rand(-15, 15);
+            // 減少角度變化，提高可讀性
+            $angle = wp_rand(-8, 8);
             
             if (function_exists('imagettftext') && $this->get_font_file()) {
                 imagettftext($image, $font_size, $angle, $x, $y, $text_color, $this->get_font_file(), $code[$i]);
             } else {
+                // 使用更大的內建字體
                 imagestring($image, 5, $x, $y - $font_size/2, $code[$i], $text_color);
             }
         }
@@ -576,24 +623,31 @@ class WU_Captcha_Control {
     private function add_noise($image, $width, $height, $color) {
         $noise_level = $this->settings['noise_level'];
         
+        // 降低噪點數量，提高可讀性
         $multiplier = array(
-            'low' => 10,
-            'medium' => 25,
-            'high' => 50
+            'low' => 5,
+            'medium' => 15,
+            'high' => 30
         );
         
         $noise_count = $multiplier[$noise_level];
         
-        // 添加點
+        // 添加點 - 使用較淡的顏色
+        $light_color = imagecolorallocate($image, 
+            min(255, hexdec(substr($this->settings['text_color'], 1, 2)) + 60),
+            min(255, hexdec(substr($this->settings['text_color'], 3, 2)) + 60),
+            min(255, hexdec(substr($this->settings['text_color'], 5, 2)) + 60)
+        );
+        
         for ($i = 0; $i < $noise_count; $i++) {
-            imagesetpixel($image, wp_rand(0, $width-1), wp_rand(0, $height-1), $color);
+            imagesetpixel($image, wp_rand(0, $width-1), wp_rand(0, $height-1), $light_color);
         }
         
-        // 添加線條
-        $line_count = intval($noise_count / 5);
+        // 減少線條數量
+        $line_count = max(1, intval($noise_count / 8));
         for ($i = 0; $i < $line_count; $i++) {
             imageline($image, wp_rand(0, $width-1), wp_rand(0, $height-1), 
-                     wp_rand(0, $width-1), wp_rand(0, $height-1), $color);
+                     wp_rand(0, $width-1), wp_rand(0, $height-1), $light_color);
         }
     }
     
