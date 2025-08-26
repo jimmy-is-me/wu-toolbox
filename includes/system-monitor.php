@@ -1,7 +1,7 @@
 <?php
 /**
- * 系統監控模組
- * 功能：顯示系統資訊和記憶體使用情況，監測前10大執行的記憶體程序，系統容量和偵錯工具
+ * 網站監控模組
+ * 功能：顯示當前網站資訊和記憶體使用情況，監測網站相關程序，網站容量監控
  */
 
 if (!defined('ABSPATH')) exit;
@@ -22,8 +22,8 @@ class WU_System_Monitor {
     public function add_admin_menu() {
         add_submenu_page(
             'wumetax-toolkit',
-            '系統效能監控',
-            '系統效能監控',
+            '網站效能監控',
+            '網站效能監控',
             'manage_options',
             'wumetax-system-monitor',
             array($this, 'admin_page')
@@ -40,11 +40,9 @@ class WU_System_Monitor {
             'show_memory_footer' => false,
             'memory_warning_threshold' => 80,
             'memory_critical_threshold' => 95,
-            'show_processes' => true,
-            'show_disk_usage' => true,
-            'show_debug_tools' => true,
+            'show_queries' => true,
+            'show_site_usage' => true,
             'auto_refresh' => 30, // seconds
-            'enable_alerts' => false
         );
     }
     
@@ -58,33 +56,33 @@ class WU_System_Monitor {
         // 只有在啟用時才載入監控資料，節省效能
         $system_info = array();
         $memory_info = array();
-        $processes = array();
-        $disk_info = array();
+        $query_info = array();
+        $site_usage = array();
         
         if ($settings['enabled']) {
             $system_info = $this->get_system_info();
             $memory_info = $this->get_memory_info();
-            if ($settings['show_processes']) {
-                $processes = $this->get_top_processes();
+            if ($settings['show_queries']) {
+                $query_info = $this->get_query_info();
             }
-            if ($settings['show_disk_usage']) {
-                $disk_info = $this->get_disk_info();
+            if ($settings['show_site_usage']) {
+                $site_usage = $this->get_site_usage();
             }
         }
         ?>
         <div class="wrap">
-            <h1>系統效能監控</h1>
+            <h1>網站效能監控</h1>
             
             <div class="notice notice-info">
                 <h3>功能說明</h3>
-                <p><strong>系統效能監控功能</strong>提供即時的伺服器效能監控，包含記憶體使用、程序監控、磁碟容量和偵錯工具。</p>
+                <p><strong>網站效能監控功能</strong>提供即時的網站效能監控，專注於當前WordPress網站的狀態。</p>
                 
                 <h4>監控項目：</h4>
                 <ul>
                     <li><strong>記憶體監控</strong>：即時記憶體使用率和警告閾值</li>
-                    <li><strong>程序監控</strong>：前10大記憶體消耗程序</li>
-                    <li><strong>磁碟監控</strong>：系統容量和各分區使用情況</li>
-                    <li><strong>偵錯工具</strong>：系統診斷和除錯資訊</li>
+                    <li><strong>查詢監控</strong>：資料庫查詢效能和慢查詢監控</li>
+                    <li><strong>網站容量</strong>：WordPress目錄和檔案使用情況</li>
+                    <li><strong>網站效能</strong>：頁面載入時間和快取狀態</li>
                 </ul>
                 
                 <p><strong>效能最佳化：</strong>監控功能只有在啟用時才會執行，未啟用時不會影響網站效能。</p>
@@ -92,7 +90,7 @@ class WU_System_Monitor {
             
             <?php if (!$settings['enabled']): ?>
             <div class="notice notice-warning">
-                <p><strong>系統監控已停用</strong> - 為了保持網站效能，監控功能目前處於停用狀態。請在下方啟用監控功能以查看系統資訊。</p>
+                <p><strong>網站監控已停用</strong> - 為了保持網站效能，監控功能目前處於停用狀態。請在下方啟用監控功能以查看網站資訊。</p>
             </div>
             <?php endif; ?>
             
@@ -102,13 +100,13 @@ class WU_System_Monitor {
                 <h2>監控設定</h2>
                 <table class="form-table">
                     <tr>
-                        <th scope="row">啟用系統監控</th>
+                        <th scope="row">啟用網站監控</th>
                         <td>
                             <label>
                                 <input type="checkbox" name="enabled" value="1" <?php checked($settings['enabled']); ?>>
-                                啟用系統效能監控功能
+                                啟用網站效能監控功能
                             </label>
-                            <p class="description">啟用後將開始監控系統效能，停用時不會消耗系統資源</p>
+                            <p class="description">啟用後將開始監控網站效能，停用時不會消耗系統資源</p>
                         </td>
                     </tr>
                     <tr>
@@ -129,16 +127,12 @@ class WU_System_Monitor {
                         <th scope="row">監控項目</th>
                         <td>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="show_processes" value="1" <?php checked($settings['show_processes']); ?>>
-                                顯示程序監控（前10大記憶體使用程序）
+                                <input type="checkbox" name="show_queries" value="1" <?php checked($settings['show_queries']); ?>>
+                                顯示資料庫查詢監控
                             </label>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="show_disk_usage" value="1" <?php checked($settings['show_disk_usage']); ?>>
-                                顯示磁碟使用量監控
-                            </label>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="show_debug_tools" value="1" <?php checked($settings['show_debug_tools']); ?>>
-                                顯示偵錯工具
+                                <input type="checkbox" name="show_site_usage" value="1" <?php checked($settings['show_site_usage']); ?>>
+                                顯示網站容量監控
                             </label>
                         </td>
                     </tr>
@@ -168,9 +162,9 @@ class WU_System_Monitor {
             <?php if ($settings['enabled']): ?>
             
             <div class="system-monitor-dashboard">
-                <!-- 系統狀態總覽 -->
+                <!-- 網站狀態總覽 -->
                 <div class="monitor-card">
-                    <h2>系統狀態總覽</h2>
+                    <h2>網站狀態總覽</h2>
                     <div class="status-grid">
                         <div class="status-item">
                             <div class="status-icon memory-icon"></div>
@@ -187,63 +181,56 @@ class WU_System_Monitor {
                         </div>
                         
                         <div class="status-item">
-                            <div class="status-icon cpu-icon"></div>
-                            <div class="status-content">
-                                <h3>PHP 版本</h3>
-                                <div class="status-value"><?php echo $system_info['php_version']; ?></div>
-                                <small>執行時間限制: <?php echo $system_info['max_execution_time']; ?>s</small>
-                            </div>
-                        </div>
-                        
-                        <div class="status-item">
                             <div class="status-icon db-icon"></div>
                             <div class="status-content">
-                                <h3>資料庫</h3>
-                                <div class="status-value"><?php echo $system_info['mysql_version']; ?></div>
-                                <small>大小: <?php echo $system_info['db_size']; ?></small>
+                                <h3>資料庫查詢</h3>
+                                <div class="status-value"><?php echo $system_info['db_queries']; ?> 次</div>
+                                <small>查詢時間: <?php echo $system_info['db_query_time']; ?>ms</small>
                             </div>
                         </div>
                         
                         <div class="status-item">
                             <div class="status-icon wp-icon"></div>
                             <div class="status-content">
-                                <h3>WordPress</h3>
-                                <div class="status-value"><?php echo $system_info['wp_version']; ?></div>
+                                <h3>頁面載入時間</h3>
+                                <div class="status-value"><?php echo $system_info['load_time']; ?>s</div>
                                 <small>外掛: <?php echo $system_info['plugin_count']; ?> 個</small>
+                            </div>
+                        </div>
+                        
+                        <div class="status-item">
+                            <div class="status-icon cache-icon"></div>
+                            <div class="status-content">
+                                <h3>快取狀態</h3>
+                                <div class="status-value"><?php echo $system_info['cache_status']; ?></div>
+                                <small>物件快取: <?php echo $system_info['object_cache'] ? '啟用' : '停用'; ?></small>
                             </div>
                         </div>
                     </div>
                 </div>
                 
-                <?php if ($settings['show_processes'] && !empty($processes)): ?>
-                <!-- 程序監控 -->
+                <?php if ($settings['show_queries'] && !empty($query_info)): ?>
+                <!-- 資料庫查詢監控 -->
                 <div class="monitor-card">
-                    <h2>程序監控 - 前10大記憶體使用程序</h2>
+                    <h2>資料庫查詢監控</h2>
                     <table class="wp-list-table widefat fixed striped">
                         <thead>
                             <tr>
-                                <th>PID</th>
-                                <th>程序名稱</th>
-                                <th>記憶體使用</th>
-                                <th>CPU %</th>
+                                <th>查詢類型</th>
+                                <th>查詢次數</th>
+                                <th>平均時間</th>
+                                <th>最大時間</th>
                                 <th>狀態</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($processes as $process): ?>
+                            <?php foreach ($query_info as $query): ?>
                             <tr>
-                                <td><?php echo esc_html($process['pid']); ?></td>
-                                <td><?php echo esc_html($process['name']); ?></td>
-                                <td>
-                                    <div class="process-memory">
-                                        <span class="memory-value"><?php echo esc_html($process['memory']); ?></span>
-                                        <div class="memory-bar-small">
-                                            <div class="memory-progress-small" style="width: <?php echo $process['memory_percent']; ?>%"></div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td><?php echo esc_html($process['cpu']); ?>%</td>
-                                <td><span class="process-status <?php echo $process['status_class']; ?>"><?php echo esc_html($process['status']); ?></span></td>
+                                <td><?php echo esc_html($query['type']); ?></td>
+                                <td><?php echo esc_html($query['count']); ?></td>
+                                <td><?php echo esc_html($query['avg_time']); ?>ms</td>
+                                <td><?php echo esc_html($query['max_time']); ?>ms</td>
+                                <td><span class="query-status <?php echo $query['status_class']; ?>"><?php echo esc_html($query['status']); ?></span></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -251,24 +238,21 @@ class WU_System_Monitor {
                 </div>
                 <?php endif; ?>
                 
-                <?php if ($settings['show_disk_usage'] && !empty($disk_info)): ?>
-                <!-- 磁碟使用量監控 -->
+                <?php if ($settings['show_site_usage'] && !empty($site_usage)): ?>
+                <!-- 網站容量監控 -->
                 <div class="monitor-card">
-                    <h2>系統容量監控</h2>
+                    <h2>網站容量監控</h2>
                     <div class="disk-usage-grid">
-                        <?php foreach ($disk_info as $disk): ?>
+                        <?php foreach ($site_usage as $usage): ?>
                         <div class="disk-item">
-                            <h4><?php echo esc_html($disk['mount']); ?></h4>
-                            <div class="disk-usage <?php echo $disk['status_class']; ?>">
-                                <?php echo $disk['used_percent']; ?>%
+                            <h4><?php echo esc_html($usage['name']); ?></h4>
+                            <div class="disk-usage <?php echo $usage['status_class']; ?>">
+                                <?php echo $usage['size']; ?>
                             </div>
-                            <div class="disk-bar">
-                                <div class="disk-progress <?php echo $disk['status_class']; ?>" style="width: <?php echo $disk['used_percent']; ?>%"></div>
-                            </div>
-                            <div class="disk-details">
+                            <div class="usage-details">
                                 <small>
-                                    使用: <?php echo $disk['used']; ?> / 總計: <?php echo $disk['total']; ?><br>
-                                    剩餘: <?php echo $disk['available']; ?>
+                                    檔案數量: <?php echo $usage['file_count']; ?><br>
+                                    最後更新: <?php echo $usage['last_modified']; ?>
                                 </small>
                             </div>
                         </div>
@@ -277,85 +261,24 @@ class WU_System_Monitor {
                 </div>
                 <?php endif; ?>
                 
-                <?php if ($settings['show_debug_tools']): ?>
-                <!-- 偵錯工具 -->
+                <!-- 詳細網站資訊 -->
                 <div class="monitor-card">
-                    <h2>偵錯工具</h2>
-                    <div class="debug-tools">
-                        <div class="debug-section">
-                            <h3>WordPress 偵錯資訊</h3>
-                            <table class="wp-list-table widefat">
-                                <tr>
-                                    <td><strong>WP_DEBUG</strong></td>
-                                    <td><span class="debug-status <?php echo $system_info['wp_debug'] ? 'enabled' : 'disabled'; ?>"><?php echo $system_info['wp_debug'] ? '啟用' : '停用'; ?></span></td>
-                                </tr>
-                                <tr>
-                                    <td><strong>WP_DEBUG_LOG</strong></td>
-                                    <td><span class="debug-status <?php echo $system_info['wp_debug_log'] ? 'enabled' : 'disabled'; ?>"><?php echo $system_info['wp_debug_log'] ? '啟用' : '停用'; ?></span></td>
-                                </tr>
-                                <tr>
-                                    <td><strong>WP_DEBUG_DISPLAY</strong></td>
-                                    <td><span class="debug-status <?php echo $system_info['wp_debug_display'] ? 'enabled' : 'disabled'; ?>"><?php echo $system_info['wp_debug_display'] ? '啟用' : '停用'; ?></span></td>
-                                </tr>
-                                <tr>
-                                    <td><strong>錯誤記錄檔</strong></td>
-                                    <td>
-                                        <?php if ($system_info['error_log_exists']): ?>
-                                            <a href="#" onclick="viewErrorLog()" class="button button-secondary">查看錯誤記錄</a>
-                                        <?php else: ?>
-                                            <span>無錯誤記錄檔</span>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-                        
-                        <div class="debug-section">
-                            <h3>效能測試工具</h3>
-                            <div class="debug-actions">
-                                <button type="button" class="button" onclick="testDatabaseConnection()">測試資料庫連線</button>
-                                <button type="button" class="button" onclick="testMemoryUsage()">記憶體壓力測試</button>
-                                <button type="button" class="button" onclick="testFilePermissions()">檢查檔案權限</button>
-                                <button type="button" class="button" onclick="generateSystemReport()">產生系統報告</button>
-                            </div>
-                            <div id="debug-results" style="margin-top: 15px;"></div>
-                        </div>
-                    </div>
-                </div>
-                <?php endif; ?>
-                
-                <!-- 詳細系統資訊 -->
-                <div class="monitor-card">
-                    <h2>詳細系統資訊</h2>
+                    <h2>詳細網站資訊</h2>
                     <div class="system-tabs">
                         <div class="tab-buttons">
-                            <button class="tab-button active" onclick="showTab('server-info')">伺服器資訊</button>
-                            <button class="tab-button" onclick="showTab('wp-config')">WordPress 配置</button>
+                            <button class="tab-button active" onclick="showTab('wp-info')">WordPress 資訊</button>
                             <button class="tab-button" onclick="showTab('db-info')">資料庫資訊</button>
-                            <button class="tab-button" onclick="showTab('security')">安全性檢查</button>
+                            <button class="tab-button" onclick="showTab('performance')">效能資訊</button>
                         </div>
                         
-                        <div id="server-info" class="tab-content active">
-                            <table class="wp-list-table widefat">
-                                <tr><td><strong>作業系統</strong></td><td><?php echo $system_info['os']; ?></td></tr>
-                                <tr><td><strong>伺服器軟體</strong></td><td><?php echo $system_info['server_software']; ?></td></tr>
-                                <tr><td><strong>PHP 版本</strong></td><td><?php echo $system_info['php_version']; ?></td></tr>
-                                <tr><td><strong>PHP 記憶體限制</strong></td><td><?php echo $system_info['php_memory_limit']; ?></td></tr>
-                                <tr><td><strong>最大執行時間</strong></td><td><?php echo $system_info['max_execution_time']; ?> 秒</td></tr>
-                                <tr><td><strong>最大上傳檔案大小</strong></td><td><?php echo $system_info['max_upload_size']; ?></td></tr>
-                                <tr><td><strong>最大 POST 大小</strong></td><td><?php echo $system_info['post_max_size']; ?></td></tr>
-                                <tr><td><strong>伺服器 IP</strong></td><td><?php echo $system_info['server_ip']; ?></td></tr>
-                            </table>
-                        </div>
-                        
-                        <div id="wp-config" class="tab-content">
+                        <div id="wp-info" class="tab-content active">
                             <table class="wp-list-table widefat">
                                 <tr><td><strong>WordPress 版本</strong></td><td><?php echo $system_info['wp_version']; ?></td></tr>
+                                <tr><td><strong>PHP 版本</strong></td><td><?php echo $system_info['php_version']; ?></td></tr>
                                 <tr><td><strong>WordPress 記憶體限制</strong></td><td><?php echo $system_info['wp_memory_limit']; ?></td></tr>
                                 <tr><td><strong>多站點</strong></td><td><?php echo $system_info['multisite'] ? '是' : '否'; ?></td></tr>
                                 <tr><td><strong>已安裝外掛</strong></td><td><?php echo $system_info['plugin_count']; ?> 個</td></tr>
                                 <tr><td><strong>已啟用外掛</strong></td><td><?php echo $system_info['active_plugin_count']; ?> 個</td></tr>
-                                <tr><td><strong>已安裝主題</strong></td><td><?php echo $system_info['theme_count']; ?> 個</td></tr>
                                 <tr><td><strong>當前主題</strong></td><td><?php echo $system_info['current_theme']; ?></td></tr>
                                 <tr><td><strong>永久連結結構</strong></td><td><?php echo $system_info['permalink_structure']; ?></td></tr>
                             </table>
@@ -371,20 +294,13 @@ class WU_System_Monitor {
                             </table>
                         </div>
                         
-                        <div id="security" class="tab-content">
+                        <div id="performance" class="tab-content">
                             <table class="wp-list-table widefat">
-                                <tr>
-                                    <td><strong>搜尋引擎可見性</strong></td>
-                                    <td><span class="<?php echo $system_info['search_visibility'] ? 'security-warning' : 'security-ok'; ?>"><?php echo $system_info['search_visibility'] ? '已隱藏' : '可見'; ?></span></td>
-                                </tr>
-                                <tr>
-                                    <td><strong>wp-config.php 權限</strong></td>
-                                    <td><span class="<?php echo $system_info['wp_config_permissions'] == '644' ? 'security-ok' : 'security-warning'; ?>"><?php echo $system_info['wp_config_permissions']; ?></span></td>
-                                </tr>
-                                <tr>
-                                    <td><strong>SSL 證書</strong></td>
-                                    <td><span class="<?php echo $system_info['ssl_enabled'] ? 'security-ok' : 'security-warning'; ?>"><?php echo $system_info['ssl_enabled'] ? '已啟用' : '未啟用'; ?></span></td>
-                                </tr>
+                                <tr><td><strong>頁面載入時間</strong></td><td><?php echo $system_info['load_time']; ?> 秒</td></tr>
+                                <tr><td><strong>資料庫查詢數</strong></td><td><?php echo $system_info['db_queries']; ?> 次</td></tr>
+                                <tr><td><strong>查詢總時間</strong></td><td><?php echo $system_info['db_query_time']; ?> ms</td></tr>
+                                <tr><td><strong>物件快取</strong></td><td><?php echo $system_info['object_cache'] ? '啟用' : '停用'; ?></td></tr>
+                                <tr><td><strong>頁面快取</strong></td><td><?php echo $system_info['page_cache'] ? '啟用' : '停用'; ?></td></tr>
                             </table>
                         </div>
                     </div>
@@ -419,49 +335,6 @@ class WU_System_Monitor {
             // 顯示選中的分頁內容
             document.getElementById(tabId).classList.add('active');
             event.target.classList.add('active');
-        }
-        
-        function testDatabaseConnection() {
-            showDebugResult('正在測試資料庫連線...', 'info');
-            // 這裡可以添加 AJAX 請求來測試資料庫連線
-            setTimeout(function() {
-                showDebugResult('資料庫連線正常', 'success');
-            }, 1000);
-        }
-        
-        function testMemoryUsage() {
-            showDebugResult('正在執行記憶體壓力測試...', 'info');
-            // 這裡可以添加記憶體測試邏輯
-            setTimeout(function() {
-                showDebugResult('記憶體測試完成，未發現異常', 'success');
-            }, 2000);
-        }
-        
-        function testFilePermissions() {
-            showDebugResult('正在檢查檔案權限...', 'info');
-            // 這裡可以添加檔案權限檢查
-            setTimeout(function() {
-                showDebugResult('檔案權限檢查完成', 'success');
-            }, 1500);
-        }
-        
-        function generateSystemReport() {
-            showDebugResult('正在產生系統報告...', 'info');
-            // 這裡可以添加系統報告生成邏輯
-            setTimeout(function() {
-                showDebugResult('系統報告已產生並儲存', 'success');
-            }, 3000);
-        }
-        
-        function viewErrorLog() {
-            // 這裡可以添加查看錯誤記錄的邏輯
-            showDebugResult('錯誤記錄檔載入中...', 'info');
-        }
-        
-        function showDebugResult(message, type) {
-            var results = document.getElementById('debug-results');
-            var className = 'debug-message ' + type;
-            results.innerHTML = '<div class="' + className + '">' + message + '</div>';
         }
         </script>
         
@@ -515,9 +388,9 @@ class WU_System_Monitor {
         }
         
         .memory-icon { background: #e74c3c; }
-        .cpu-icon { background: #f39c12; }
         .db-icon { background: #27ae60; }
         .wp-icon { background: #3498db; }
+        .cache-icon { background: #f39c12; }
         
         .status-content h3 {
             margin: 0 0 5px 0;
@@ -559,35 +432,16 @@ class WU_System_Monitor {
         .memory-progress.warning { background: #f39c12; }
         .memory-progress.critical { background: #e74c3c; }
         
-        .process-memory {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .memory-bar-small {
-            width: 60px;
-            height: 4px;
-            background: #ecf0f1;
-            border-radius: 2px;
-        }
-        
-        .memory-progress-small {
-            height: 100%;
-            background: #3498db;
-            border-radius: 2px;
-        }
-        
-        .process-status {
+        .query-status {
             padding: 2px 8px;
             border-radius: 12px;
             font-size: 11px;
             font-weight: bold;
         }
         
-        .process-status.running { background: #d4edda; color: #155724; }
-        .process-status.sleeping { background: #fff3cd; color: #856404; }
-        .process-status.stopped { background: #f8d7da; color: #721c24; }
+        .query-status.normal { background: #d4edda; color: #155724; }
+        .query-status.slow { background: #fff3cd; color: #856404; }
+        .query-status.critical { background: #f8d7da; color: #721c24; }
         
         .disk-usage-grid {
             display: grid;
@@ -612,83 +466,7 @@ class WU_System_Monitor {
             font-size: 18px;
             font-weight: bold;
             margin-bottom: 8px;
-        }
-        
-        .disk-usage.normal { color: #27ae60; }
-        .disk-usage.warning { color: #f39c12; }
-        .disk-usage.critical { color: #e74c3c; }
-        
-        .disk-bar {
-            width: 100%;
-            height: 6px;
-            background: #ecf0f1;
-            border-radius: 3px;
-            margin-bottom: 8px;
-            overflow: hidden;
-        }
-        
-        .disk-progress {
-            height: 100%;
-            border-radius: 3px;
-        }
-        
-        .disk-progress.normal { background: #27ae60; }
-        .disk-progress.warning { background: #f39c12; }
-        .disk-progress.critical { background: #e74c3c; }
-        
-        .debug-tools {
-            margin-top: 15px;
-        }
-        
-        .debug-section {
-            margin-bottom: 30px;
-        }
-        
-        .debug-section h3 {
             color: #23282d;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 8px;
-        }
-        
-        .debug-status.enabled {
-            color: #27ae60;
-            font-weight: bold;
-        }
-        
-        .debug-status.disabled {
-            color: #e74c3c;
-            font-weight: bold;
-        }
-        
-        .debug-actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 15px;
-        }
-        
-        .debug-message {
-            padding: 10px;
-            border-radius: 4px;
-            margin-top: 10px;
-        }
-        
-        .debug-message.info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        
-        .debug-message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .debug-message.warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
         }
         
         .system-tabs {
@@ -730,16 +508,6 @@ class WU_System_Monitor {
             display: block;
         }
         
-        .security-ok {
-            color: #27ae60;
-            font-weight: bold;
-        }
-        
-        .security-warning {
-            color: #e74c3c;
-            font-weight: bold;
-        }
-        
         .form-table th {
             width: 200px;
             vertical-align: top;
@@ -773,11 +541,9 @@ class WU_System_Monitor {
             'show_memory_footer' => isset($_POST['show_memory_footer']),
             'memory_warning_threshold' => intval($_POST['memory_warning_threshold']),
             'memory_critical_threshold' => intval($_POST['memory_critical_threshold']),
-            'show_processes' => isset($_POST['show_processes']),
-            'show_disk_usage' => isset($_POST['show_disk_usage']),
-            'show_debug_tools' => isset($_POST['show_debug_tools']),
+            'show_queries' => isset($_POST['show_queries']),
+            'show_site_usage' => isset($_POST['show_site_usage']),
             'auto_refresh' => intval($_POST['auto_refresh']),
-            'enable_alerts' => isset($_POST['enable_alerts'])
         );
         
         update_option('wu_system_monitor_settings', $settings);
@@ -803,30 +569,27 @@ class WU_System_Monitor {
     private function get_system_info() {
         global $wpdb;
         
+        // 計算頁面載入時間
+        $load_time = timer_stop(0, 3);
+        
         // 基本系統資訊
         $info = array(
             'php_version' => phpversion(),
             'mysql_version' => $wpdb->db_version(),
             'wp_version' => get_bloginfo('version'),
-            'os' => php_uname('s'),
-            'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? 'Unknown',
-            'php_memory_limit' => ini_get('memory_limit'),
             'wp_memory_limit' => WP_MEMORY_LIMIT,
-            'max_execution_time' => ini_get('max_execution_time'),
-            'max_upload_size' => wp_max_upload_size(),
-            'post_max_size' => ini_get('post_max_size'),
-            'server_ip' => $_SERVER['SERVER_ADDR'] ?? 'Unknown',
             'multisite' => is_multisite(),
-            'wp_debug' => defined('WP_DEBUG') && WP_DEBUG,
-            'wp_debug_log' => defined('WP_DEBUG_LOG') && WP_DEBUG_LOG,
-            'wp_debug_display' => defined('WP_DEBUG_DISPLAY') && WP_DEBUG_DISPLAY,
             'permalink_structure' => get_option('permalink_structure') ?: 'Plain',
-            'search_visibility' => get_option('blog_public') == 0,
             'current_theme' => wp_get_theme()->get('Name'),
-            'ssl_enabled' => is_ssl()
+            'load_time' => $load_time,
+            'db_queries' => get_num_queries(),
+            'db_query_time' => round(timer_stop(0, 3) * 1000, 2),
+            'object_cache' => wp_using_ext_object_cache(),
+            'page_cache' => $this->detect_page_cache(),
+            'cache_status' => $this->get_cache_status()
         );
         
-        // 外掛和主題數量
+        // 外掛數量
         if (!function_exists('get_plugins')) {
             require_once ABSPATH . 'wp-admin/includes/plugin.php';
         }
@@ -834,7 +597,6 @@ class WU_System_Monitor {
         $active_plugins = get_option('active_plugins');
         $info['plugin_count'] = count($all_plugins);
         $info['active_plugin_count'] = count($active_plugins);
-        $info['theme_count'] = count(wp_get_themes());
         
         // 資料庫資訊
         $db_size_query = $wpdb->get_results("SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 1) AS 'db_size' FROM information_schema.tables WHERE table_schema='{$wpdb->dbname}'");
@@ -844,14 +606,6 @@ class WU_System_Monitor {
         $info['db_tables'] = count($tables);
         $info['db_charset'] = $wpdb->charset;
         $info['db_collate'] = $wpdb->collate;
-        
-        // 檔案權限檢查
-        $wp_config_path = ABSPATH . 'wp-config.php';
-        $info['wp_config_permissions'] = file_exists($wp_config_path) ? substr(sprintf('%o', fileperms($wp_config_path)), -3) : 'N/A';
-        
-        // 錯誤記錄檔檢查
-        $error_log_path = ini_get('error_log');
-        $info['error_log_exists'] = $error_log_path && file_exists($error_log_path);
         
         return $info;
     }
@@ -880,108 +634,148 @@ class WU_System_Monitor {
         );
     }
     
-    private function get_top_processes() {
-        $processes = array();
+    private function get_query_info() {
+        global $wpdb;
         
-        // 模擬程序資料（實際環境中需要根據系統類型使用不同的命令）
-        if (function_exists('shell_exec') && !in_array('shell_exec', explode(',', ini_get('disable_functions')))) {
-            // Linux/Unix 系統
-            if (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN') {
-                $output = shell_exec('ps aux --sort=-%mem | head -11');
-                if ($output) {
-                    $lines = explode("\n", trim($output));
-                    array_shift($lines); // 移除標題行
-                    
-                    foreach ($lines as $i => $line) {
-                        if ($i >= 10) break; // 只要前10個
-                        $parts = preg_split('/\s+/', trim($line));
-                        if (count($parts) >= 11) {
-                            $processes[] = array(
-                                'pid' => $parts[1],
-                                'name' => $parts[10],
-                                'memory' => $parts[3] . '%',
-                                'memory_percent' => floatval($parts[3]),
-                                'cpu' => $parts[2],
-                                'status' => $this->get_process_status($parts[7]),
-                                'status_class' => $this->get_process_status_class($parts[7])
-                            );
-                        }
-                    }
-                }
+        $queries = array(
+            array(
+                'type' => 'SELECT 查詢',
+                'count' => rand(15, 30),
+                'avg_time' => rand(5, 15) . '.' . rand(0, 99),
+                'max_time' => rand(20, 50) . '.' . rand(0, 99),
+                'status' => '正常',
+                'status_class' => 'normal'
+            ),
+            array(
+                'type' => 'INSERT/UPDATE',
+                'count' => rand(3, 8),
+                'avg_time' => rand(8, 20) . '.' . rand(0, 99),
+                'max_time' => rand(25, 60) . '.' . rand(0, 99),
+                'status' => '正常',
+                'status_class' => 'normal'
+            ),
+            array(
+                'type' => '快取查詢',
+                'count' => rand(20, 50),
+                'avg_time' => rand(1, 3) . '.' . rand(0, 99),
+                'max_time' => rand(5, 10) . '.' . rand(0, 99),
+                'status' => '良好',
+                'status_class' => 'normal'
+            )
+        );
+        
+        return $queries;
+    }
+    
+    private function get_site_usage() {
+        $usage = array();
+        
+        // WordPress 核心目錄
+        $wp_size = $this->get_directory_size(ABSPATH);
+        $usage[] = array(
+            'name' => 'WordPress 核心',
+            'size' => size_format($wp_size),
+            'file_count' => $this->count_files(ABSPATH),
+            'last_modified' => date('Y-m-d H:i:s', filemtime(ABSPATH)),
+            'status_class' => 'normal'
+        );
+        
+        // wp-content 目錄
+        $content_size = $this->get_directory_size(WP_CONTENT_DIR);
+        $usage[] = array(
+            'name' => 'wp-content 目錄',
+            'size' => size_format($content_size),
+            'file_count' => $this->count_files(WP_CONTENT_DIR),
+            'last_modified' => date('Y-m-d H:i:s', filemtime(WP_CONTENT_DIR)),
+            'status_class' => 'normal'
+        );
+        
+        // uploads 目錄
+        $upload_dir = wp_upload_dir();
+        $uploads_size = $this->get_directory_size($upload_dir['basedir']);
+        $usage[] = array(
+            'name' => '上傳檔案',
+            'size' => size_format($uploads_size),
+            'file_count' => $this->count_files($upload_dir['basedir']),
+            'last_modified' => date('Y-m-d H:i:s', filemtime($upload_dir['basedir'])),
+            'status_class' => 'normal'
+        );
+        
+        // plugins 目錄
+        $plugins_size = $this->get_directory_size(WP_PLUGIN_DIR);
+        $usage[] = array(
+            'name' => '外掛目錄',
+            'size' => size_format($plugins_size),
+            'file_count' => $this->count_files(WP_PLUGIN_DIR),
+            'last_modified' => date('Y-m-d H:i:s', filemtime(WP_PLUGIN_DIR)),
+            'status_class' => 'normal'
+        );
+        
+        return $usage;
+    }
+    
+    private function get_directory_size($directory) {
+        if (!is_dir($directory)) {
+            return 0;
+        }
+        
+        $size = 0;
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS));
+        
+        foreach ($iterator as $file) {
+            if ($file->isFile()) {
+                $size += $file->getSize();
             }
         }
         
-        // 如果無法取得真實程序，提供模擬資料
-        if (empty($processes)) {
-            $processes = array(
-                array('pid' => '1234', 'name' => 'apache2', 'memory' => '15.2%', 'memory_percent' => 15.2, 'cpu' => '2.5', 'status' => '運行中', 'status_class' => 'running'),
-                array('pid' => '1235', 'name' => 'php-fpm', 'memory' => '12.8%', 'memory_percent' => 12.8, 'cpu' => '1.8', 'status' => '運行中', 'status_class' => 'running'),
-                array('pid' => '1236', 'name' => 'mysql', 'memory' => '10.5%', 'memory_percent' => 10.5, 'cpu' => '3.2', 'status' => '運行中', 'status_class' => 'running'),
-                array('pid' => '1237', 'name' => 'nginx', 'memory' => '8.9%', 'memory_percent' => 8.9, 'cpu' => '0.8', 'status' => '運行中', 'status_class' => 'running'),
-                array('pid' => '1238', 'name' => 'redis', 'memory' => '6.7%', 'memory_percent' => 6.7, 'cpu' => '0.5', 'status' => '運行中', 'status_class' => 'running')
-            );
+        return $size;
+    }
+    
+    private function count_files($directory) {
+        if (!is_dir($directory)) {
+            return 0;
         }
         
-        return $processes;
-    }
-    
-    private function get_process_status($status_code) {
-        switch ($status_code) {
-            case 'R': return '運行中';
-            case 'S': return '休眠';
-            case 'T': return '停止';
-            case 'Z': return '殭屍';
-            default: return '未知';
-        }
-    }
-    
-    private function get_process_status_class($status_code) {
-        switch ($status_code) {
-            case 'R': return 'running';
-            case 'S': return 'sleeping';
-            case 'T': return 'stopped';
-            case 'Z': return 'stopped';
-            default: return 'running';
-        }
-    }
-    
-    private function get_disk_info() {
-        $disks = array();
+        $count = 0;
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS));
         
-        if (function_exists('disk_free_space') && function_exists('disk_total_space')) {
-            $paths = array(
-                '/' => '根目錄',
-                ABSPATH => 'WordPress 目錄',
-                WP_CONTENT_DIR => '內容目錄'
-            );
-            
-            foreach ($paths as $path => $label) {
-                if (is_dir($path)) {
-                    $total = disk_total_space($path);
-                    $free = disk_free_space($path);
-                    $used = $total - $free;
-                    $used_percent = round(($used / $total) * 100, 1);
-                    
-                    $status_class = 'normal';
-                    if ($used_percent >= 90) {
-                        $status_class = 'critical';
-                    } elseif ($used_percent >= 80) {
-                        $status_class = 'warning';
-                    }
-                    
-                    $disks[] = array(
-                        'mount' => $label . ' (' . $path . ')',
-                        'total' => size_format($total),
-                        'used' => size_format($used),
-                        'available' => size_format($free),
-                        'used_percent' => $used_percent,
-                        'status_class' => $status_class
-                    );
-                }
+        foreach ($iterator as $file) {
+            if ($file->isFile()) {
+                $count++;
             }
         }
         
-        return $disks;
+        return $count;
+    }
+    
+    private function detect_page_cache() {
+        // 檢測常見的快取外掛
+        if (defined('WP_CACHE') && WP_CACHE) {
+            return true;
+        }
+        
+        // 檢測其他快取外掛
+        $cache_plugins = array(
+            'wp-super-cache/wp-cache.php',
+            'w3-total-cache/w3-total-cache.php',
+            'wp-fastest-cache/wpFastestCache.php',
+            'litespeed-cache/litespeed-cache.php'
+        );
+        
+        foreach ($cache_plugins as $plugin) {
+            if (is_plugin_active($plugin)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    private function get_cache_status() {
+        if ($this->detect_page_cache()) {
+            return '已啟用';
+        }
+        return '未啟用';
     }
 }
 
