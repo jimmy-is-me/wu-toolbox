@@ -380,7 +380,6 @@ class WU_Admin_Bar_Cleaner {
     public function user_roles_management_callback() {
         $disabled_roles = get_option('wu_disabled_user_roles', array());
         
-        // subscriber 的 label 改成「使用者」，但保留在選項中
         $roles = array(
             'contributor' => array(
                 'name' => '投稿者',
@@ -401,10 +400,6 @@ class WU_Admin_Bar_Cleaner {
             'customer' => array(
                 'name' => '顧客',
                 'description' => 'WooCommerce 顧客角色'
-            ),
-            'subscriber' => array(
-                'name' => '使用者',
-                'description' => '只能管理自己的個人資料'
             )
         );
         
