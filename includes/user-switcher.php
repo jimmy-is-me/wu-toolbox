@@ -14,7 +14,7 @@ class WU_User_Switcher {
     public function __construct() {
         $this->settings = get_option('wu_user_switcher_settings', $this->get_default_settings());
         
-        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_menu', array($this, 'add_admin_menu'), 90);
         add_filter('user_row_actions', array($this, 'add_switch_link'), 10, 2);
         add_action('admin_action_wu_switch_to_user', array($this, 'switch_to_user'));
         add_action('admin_action_wu_switch_back', array($this, 'switch_back'));
@@ -53,8 +53,8 @@ class WU_User_Switcher {
     public function add_admin_menu() {
         add_submenu_page(
             'wumetax-toolkit',
-            '使用者切換',
-            '使用者切換',
+            '使用者切換器',
+            '使用者切換器',
             'manage_options',
             'wu-user-switcher',
             array($this, 'admin_page')

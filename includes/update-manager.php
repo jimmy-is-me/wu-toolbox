@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) exit;
 class WU_Update_Manager {
     
     public function __construct() {
-        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_menu', array($this, 'add_admin_menu'), 85);
         add_action('admin_init', array($this, 'admin_init'));
         
         // 載入更新控制功能
@@ -22,8 +22,8 @@ class WU_Update_Manager {
     public function add_admin_menu() {
         add_submenu_page(
             'wumetax-toolkit',
-            '更新管理',
-            '更新管理',
+            '網站更新管理',
+            '網站更新管理',
             'manage_options',
             'wu-update-manager',
             array($this, 'admin_page')

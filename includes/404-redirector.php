@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) exit;
 class WU_404_Redirector {
     
     public function __construct() {
-        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_menu', array($this, 'add_admin_menu'), 20);
         add_action('admin_init', array($this, 'admin_init'));
         
         // 如果啟用了 404 重新導向，則執行相關動作
@@ -24,8 +24,8 @@ class WU_404_Redirector {
     public function add_admin_menu() {
         add_submenu_page(
             'wumetax-toolkit',
-            '404 錯誤重新導向',
-            '404 錯誤重新導向',
+            '404重新導向',
+            '404重新導向',
             'manage_options',
             'wu-404-redirector',
             array($this, 'admin_page')

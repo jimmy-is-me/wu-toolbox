@@ -30,6 +30,13 @@ class WU_Head_Footer_Code {
         
         // 條件性輸出鉤子
         add_action('template_redirect', array($this, 'conditional_code_output'));
+        
+        // 自訂 CSS 功能
+        add_action('wp_head', array($this, 'output_frontend_css'), 999);
+        add_action('admin_head', array($this, 'output_backend_css'), 999);
+        
+        // ads.txt 管理
+        add_action('init', array($this, 'handle_ads_txt'));
     }
     
     private function get_default_settings() {
@@ -53,15 +60,20 @@ class WU_Head_Footer_Code {
             'mobile_head_code' => '',
             'mobile_footer_code' => '',
             'desktop_head_code' => '',
-            'desktop_footer_code' => ''
+            'desktop_footer_code' => '',
+            'enable_custom_css' => false,
+            'frontend_css' => '',
+            'backend_css' => '',
+            'enable_ads_txt' => false,
+            'ads_txt_content' => ''
         );
     }
     
     public function add_admin_menu() {
         add_submenu_page(
             'wumetax-toolkit',
-            'Head & Footer Code',
-            'Head & Footer Code',
+            '自訂程式碼',
+            '自訂程式碼',
             'manage_options',
             'wumetax-head-footer-code',
             array($this, 'admin_page')
@@ -87,7 +99,7 @@ class WU_Head_Footer_Code {
         wp_enqueue_script('jsonlint');
         ?>
         <div class="wrap">
-            <h1>Head & Footer Code 設定</h1>
+            <h1>自訂程式碼設定</h1>
             
             <div class="notice notice-info">
                 <h3>功能說明</h3>
@@ -310,6 +322,78 @@ class WU_Head_Footer_Code {
                     </tr>
                 </table>
                 
+                <h2>自訂 CSS 管理</h2>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">啟用自訂 CSS</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="enable_custom_css" value="1" <?php checked($this->settings['enable_custom_css']); ?>>
+                                啟用自訂 CSS 功能
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="frontend_css">自訂前台 CSS</label>
+                            <p class="description">在所有前台頁面載入的 CSS</p>
+                        </th>
+                        <td>
+                            <textarea name="frontend_css" id="frontend_css" rows="10" cols="80" class="large-text code"><?php echo esc_textarea($this->settings['frontend_css']); ?></textarea>
+                            <p class="description">在所有使用者角色的前台頁面上新增自訂 CSS 樣式</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="backend_css">自訂後台 CSS</label>
+                            <p class="description">在所有後台頁面載入的 CSS</p>
+                        </th>
+                        <td>
+                            <textarea name="backend_css" id="backend_css" rows="10" cols="80" class="large-text code"><?php echo esc_textarea($this->settings['backend_css']); ?></textarea>
+                            <p class="description">在所有使用者角色的後台頁面上新增自訂 CSS 樣式</p>
+                        </td>
+                    </tr>
+                </table>
+                
+                <h2>Ads.txt 管理</h2>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">啟用 ads.txt 管理</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="enable_ads_txt" value="1" <?php checked($this->settings['enable_ads_txt']); ?>>
+                                啟用 ads.txt 檔案管理功能
+                            </label>
+                            <p class="description">
+                                <strong>ads.txt 檔案位置：</strong> <?php echo esc_url(home_url('/ads.txt')); ?><br>
+                                啟用此功能後，ads.txt 檔案將由此工具管理，不需要手動上傳檔案
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="ads_txt_content">ads.txt 內容</label>
+                            <p class="description">輕鬆編輯您的 ads.txt 內容</p>
+                        </th>
+                        <td>
+                            <textarea name="ads_txt_content" id="ads_txt_content" rows="15" cols="80" class="large-text code" placeholder="google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0
+facebook.com, 0000000000000000, DIRECT, c3e20eee3f780d68"><?php echo esc_textarea($this->settings['ads_txt_content']); ?></textarea>
+                            <p class="description">
+                                每行一個廣告商條目，格式：domain, publisher_id, DIRECT/RESELLER, certification_authority<br>
+                                <strong>範例：</strong><br>
+                                • google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0<br>
+                                • facebook.com, 0000000000000000, DIRECT, c3e20eee3f780d68
+                            </p>
+                            <?php if (!empty($this->settings['ads_txt_content'])): ?>
+                            <div style="margin-top: 10px;">
+                                <a href="<?php echo esc_url(home_url('/ads.txt')); ?>" target="_blank" class="button button-secondary">檢視 ads.txt 檔案</a>
+                                <button type="button" class="button button-secondary" onclick="validateAdsText()" style="margin-left: 10px;">驗證內容</button>
+                            </div>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                </table>
+                
                 <p class="submit">
                     <?php submit_button('儲存設定', 'primary', 'submit', false); ?>
                     <input type="submit" name="preview" value="預覽代碼" class="button button-secondary" style="margin-left: 10px;">
@@ -323,7 +407,7 @@ class WU_Head_Footer_Code {
                     'head_code', 'body_open_code', 'footer_code', 'homepage_only_code', 
                     'posts_only_code', 'pages_only_code', 'mobile_head_code', 'mobile_footer_code',
                     'desktop_head_code', 'desktop_footer_code', 'admin_head_code', 'admin_footer_code',
-                    'login_head_code', 'login_footer_code'
+                    'login_head_code', 'login_footer_code', 'frontend_css', 'backend_css', 'ads_txt_content'
                 ];
                 
                 codeAreas.forEach(function(areaId) {
@@ -347,6 +431,37 @@ class WU_Head_Footer_Code {
                     }
                 });
             });
+            
+            // ads.txt 驗證函數
+            function validateAdsText() {
+                var content = document.getElementById('ads_txt_content').value.trim();
+                if (!content) {
+                    alert('ads.txt 內容為空');
+                    return;
+                }
+                
+                var lines = content.split('\n');
+                var errors = [];
+                var validCount = 0;
+                
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i].trim();
+                    if (!line || line.startsWith('#')) continue; // 跳過空行和註解
+                    
+                    var parts = line.split(',');
+                    if (parts.length < 3) {
+                        errors.push('第 ' + (i + 1) + ' 行格式錯誤：' + line);
+                    } else {
+                        validCount++;
+                    }
+                }
+                
+                if (errors.length > 0) {
+                    alert('發現錯誤：\n' + errors.join('\n'));
+                } else {
+                    alert('ads.txt 內容驗證通過！\n有效條目：' + validCount + ' 個');
+                }
+            }
             </script>
             
             <hr>
@@ -525,7 +640,12 @@ src="https://www.facebook.com/tr?id=YOUR_PIXEL_ID&ev=PageView&noscript=1"/>
             'mobile_head_code' => wp_unslash($_POST['mobile_head_code']),
             'mobile_footer_code' => wp_unslash($_POST['mobile_footer_code']),
             'desktop_head_code' => wp_unslash($_POST['desktop_head_code']),
-            'desktop_footer_code' => wp_unslash($_POST['desktop_footer_code'])
+            'desktop_footer_code' => wp_unslash($_POST['desktop_footer_code']),
+            'enable_custom_css' => isset($_POST['enable_custom_css']),
+            'frontend_css' => wp_unslash($_POST['frontend_css']),
+            'backend_css' => wp_unslash($_POST['backend_css']),
+            'enable_ads_txt' => isset($_POST['enable_ads_txt']),
+            'ads_txt_content' => wp_unslash($_POST['ads_txt_content'])
         );
         
         update_option('wu_head_footer_code_settings', $settings);
@@ -702,6 +822,58 @@ src="https://www.facebook.com/tr?id=YOUR_PIXEL_ID&ev=PageView&noscript=1"/>
         // 簡單的行動裝置檢測
         $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
         return preg_match('/Mobile|Android|iPhone|iPad|iPod|BlackBerry|Windows Phone/i', $user_agent);
+    }
+    
+    // 輸出前台 CSS
+    public function output_frontend_css() {
+        if (!$this->settings['enable_custom_css'] || empty($this->settings['frontend_css'])) {
+            return;
+        }
+        
+        echo "\n<!-- WU Custom Frontend CSS -->\n";
+        echo '<style type="text/css">' . "\n";
+        echo $this->settings['frontend_css'];
+        echo "\n</style>\n";
+        echo "<!-- End WU Custom Frontend CSS -->\n";
+    }
+    
+    // 輸出後台 CSS
+    public function output_backend_css() {
+        if (!$this->settings['enable_custom_css'] || empty($this->settings['backend_css'])) {
+            return;
+        }
+        
+        echo "\n<!-- WU Custom Backend CSS -->\n";
+        echo '<style type="text/css">' . "\n";
+        echo $this->settings['backend_css'];
+        echo "\n</style>\n";
+        echo "<!-- End WU Custom Backend CSS -->\n";
+    }
+    
+    // 處理 ads.txt 請求
+    public function handle_ads_txt() {
+        if (!$this->settings['enable_ads_txt']) {
+            return;
+        }
+        
+        // 檢查是否是 ads.txt 請求
+        if (isset($_SERVER['REQUEST_URI']) && $_SERVER['REQUEST_URI'] === '/ads.txt') {
+            $content = trim($this->settings['ads_txt_content']);
+            
+            if (!empty($content)) {
+                // 設定正確的內容類型
+                header('Content-Type: text/plain; charset=utf-8');
+                header('X-Robots-Tag: noindex');
+                
+                // 輸出 ads.txt 內容
+                echo $content;
+                exit;
+            } else {
+                // 如果沒有內容，返回 404
+                status_header(404);
+                exit;
+            }
+        }
     }
 }
 

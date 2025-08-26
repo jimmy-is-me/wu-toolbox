@@ -26,7 +26,7 @@ class WU_Revision_Manager {
      */
     private function init_hooks() {
         // 管理員頁面
-        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_menu', array($this, 'add_admin_menu'), 65);
         add_action('admin_init', array($this, 'init_settings'));
         
         // 修訂版本限制

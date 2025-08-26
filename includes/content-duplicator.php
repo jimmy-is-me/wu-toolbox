@@ -13,7 +13,7 @@ class WU_Content_Duplicator {
     public function __construct() {
         $this->settings = get_option('wu_content_duplicator_settings', $this->get_default_settings());
         
-        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_menu', array($this, 'add_admin_menu'), 35);
         add_action('post_row_actions', array($this, 'add_duplicate_link'), 10, 2);
         add_action('page_row_actions', array($this, 'add_duplicate_link'), 10, 2);
         add_action('admin_action_wu_duplicate_post', array($this, 'duplicate_post'));
@@ -39,8 +39,8 @@ class WU_Content_Duplicator {
     public function add_admin_menu() {
         add_submenu_page(
             'wumetax-toolkit',
-            '內容重複',
-            '內容重複',
+            '內容重覆設定',
+            '內容重覆設定',
             'manage_options',
             'wu-content-duplicator',
             array($this, 'admin_page')

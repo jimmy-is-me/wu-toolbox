@@ -6,14 +6,14 @@ if (!defined('ABSPATH')) exit;
 function moving_mode_menu() {
     add_submenu_page(
         'wumetax-toolkit',        // 父選單 slug
-        '維護模式',          // 頁面標題
-        '維護模式',          // 選單標題
+        '維護模式設定',          // 頁面標題
+        '維護模式設定',          // 選單標題
         'manage_options',    // 權限
         'moving-mode',       // 唯一的 slug
         'moving_mode_settings_page' // 維護模式的回調函數
     );
 }
-add_action('admin_menu', 'moving_mode_menu', 10); // 優先級 10，在常用外掛管理之後
+add_action('admin_menu', 'moving_mode_menu', 60); // 優先級 60
 
 
 

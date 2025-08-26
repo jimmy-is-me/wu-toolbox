@@ -11,7 +11,7 @@ class WU_Audit_Logger {
         global $wpdb;
         $this->table_name = $wpdb->prefix . 'wu_audit_logs';
 
-        add_action('admin_menu', array($this, 'add_submenu_page'));
+        add_action('admin_menu', array($this, 'add_submenu_page'), 25);
         add_action('admin_init', array($this, 'init_settings'));
 
         // 延遲載入選項以優化效能
@@ -82,8 +82,8 @@ class WU_Audit_Logger {
     public function add_submenu_page() {
         add_submenu_page(
             'wumetax-toolkit',
-            '後台紀錄追蹤',
-            '後台紀錄追蹤',
+            '使用者紀錄',
+            '使用者紀錄',
             'manage_options',
             'wu-audit-logger',
             array($this, 'settings_page')
