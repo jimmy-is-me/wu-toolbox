@@ -17,7 +17,7 @@ class WU_Login_Limiter {
         $this->settings = get_option('wu_login_limiter_settings', $this->get_default_settings());
         
         add_action('admin_init', array($this, 'init_database'));
-        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_menu', array($this, 'add_admin_menu'), 55);
         add_action('wp_login_failed', array($this, 'log_failed_attempt'));
         add_action('wp_login', array($this, 'clear_failed_attempts'), 10, 2);
         add_filter('authenticate', array($this, 'check_ip_blocked'), 30, 3);

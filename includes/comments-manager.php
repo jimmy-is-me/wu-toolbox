@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) exit;
 class WU_Comments_Manager {
     
     public function __construct() {
-        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_menu', array($this, 'add_admin_menu'), 30);
         add_action('admin_init', array($this, 'admin_init'));
         
         // 如果啟用了評論禁用功能，則執行相關動作
@@ -27,8 +27,8 @@ class WU_Comments_Manager {
     public function add_admin_menu() {
         add_submenu_page(
             'wumetax-toolkit',
-            '評論管理',
-            '評論管理',
+            '禁用評論設定',
+            '禁用評論設定',
             'manage_options',
             'wu-comments-manager',
             array($this, 'admin_page')

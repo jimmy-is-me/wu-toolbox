@@ -12,7 +12,7 @@ class WU_Hide_Login_Page {
     private $option_name = 'wu_hide_login_page_options';
     
     public function __construct() {
-        add_action('admin_menu', array($this, 'add_submenu_page'));
+        add_action('admin_menu', array($this, 'add_submenu_page'), 50);
         add_action('admin_init', array($this, 'init_settings'));
         add_action('init', array($this, 'init_hide_login'));
         add_action('wp_loaded', array($this, 'redirect_login_pages'));
@@ -34,8 +34,8 @@ class WU_Hide_Login_Page {
     public function add_submenu_page() {
         add_submenu_page(
             'wumetax-toolkit',
-            '隱藏登入頁面',
-            '隱藏登入頁面',
+            '變更登入網址',
+            '變更登入網址',
             'manage_options',
             'wu-hide-login-page',
             array($this, 'settings_page')

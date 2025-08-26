@@ -12,7 +12,7 @@ function media_encoder_menu() {
         'media_encoder_settings_page'
     );
 }
-add_action('admin_menu', 'media_encoder_menu', 20);
+add_action('admin_menu', 'media_encoder_menu', 100);
 
 /* === 取得與預設設定 === */
 function media_encoder_get_settings() {

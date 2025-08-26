@@ -13,7 +13,7 @@ class WU_Enhanced_User_List {
     public function __construct() {
         $this->settings = get_option('wu_enhanced_user_list_settings', $this->get_default_settings());
         
-        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_menu', array($this, 'add_admin_menu'), 15);
         
         // 用戶列表欄位
         add_filter('manage_users_columns', array($this, 'add_user_columns'));
@@ -42,6 +42,25 @@ class WU_Enhanced_User_List {
             $this->hide_user_profile_options();
             // 添加更強力的隱藏功能
             add_action('admin_head', array($this, 'hide_profile_sections'));
+        }
+        
+        // 用戶匯出功能
+        if ($this->settings['enable_user_export']) {
+            add_filter('user_row_actions', array($this, 'add_export_link'), 10, 2);
+            add_filter('bulk_actions-users', array($this, 'add_bulk_export_action'));
+            add_filter('handle_bulk_actions-users', array($this, 'handle_bulk_export'), 10, 3);
+            add_action('admin_action_wu_export_user', array($this, 'export_single_user'));
+            add_action('wp_ajax_wu_export_users', array($this, 'ajax_export_users'));
+        }
+        
+        // 自訂頭像功能
+        if ($this->settings['enable_custom_avatar']) {
+            add_action('show_user_profile', array($this, 'show_custom_avatar_field'));
+            add_action('edit_user_profile', array($this, 'show_custom_avatar_field'));
+            add_action('personal_options_update', array($this, 'save_custom_avatar'));
+            add_action('edit_user_profile_update', array($this, 'save_custom_avatar'));
+            add_filter('get_avatar', array($this, 'custom_avatar'), 10, 5);
+            add_filter('get_avatar_url', array($this, 'custom_avatar_url'), 10, 3);
         }
     }
     
@@ -100,15 +119,39 @@ class WU_Enhanced_User_List {
             'hide_toolbar' => false,
             'hide_language' => false,
             'hide_biographical_info' => false,
-            'hide_application_passwords' => false
+            'hide_application_passwords' => false,
+            // 用戶匯出功能
+            'enable_user_export' => false,
+            'include_meta' => true,
+            'include_roles' => true,
+            'export_fields' => array(
+                'ID' => true,
+                'user_login' => true,
+                'user_email' => true,
+                'user_nicename' => true,
+                'display_name' => true,
+                'user_registered' => true,
+                'user_status' => false,
+                'user_url' => false
+            ),
+            'export_meta_fields' => array(
+                'first_name' => true,
+                'last_name' => true,
+                'nickname' => true,
+                'description' => false
+            ),
+            // 自訂頭像功能
+            'enable_custom_avatar' => false,
+            'avatar_size_limit' => 2048, // KB
+            'allowed_avatar_types' => array('jpg', 'jpeg', 'png', 'gif')
         );
     }
     
     public function add_admin_menu() {
         add_submenu_page(
             'wumetax-toolkit',
-            '增強使用者列表',
-            '增強使用者列表',
+            '強化使用者功能',
+            '強化使用者功能',
             'manage_options',
             'wumetax-enhanced-user-list',
             array($this, 'admin_page')
@@ -277,6 +320,91 @@ class WU_Enhanced_User_List {
                     </tr>
                 </table>
                 
+                <h2>用戶匯出功能</h2>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">啟用用戶匯出</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="enable_user_export" value="1" <?php checked($this->settings['enable_user_export']); ?>>
+                                啟用用戶資料匯出功能
+                            </label>
+                            <p class="description">在用戶列表中新增匯出選項，支援單個和批量匯出</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">匯出欄位</th>
+                        <td>
+                            <fieldset>
+                                <legend class="screen-reader-text"><span>匯出欄位</span></legend>
+                                <?php foreach ($this->settings['export_fields'] as $field => $enabled): ?>
+                                <label style="display: block; margin: 5px 0;">
+                                    <input type="checkbox" name="export_fields[<?php echo $field; ?>]" value="1" <?php checked($enabled); ?>>
+                                    <?php echo ucfirst(str_replace('_', ' ', $field)); ?>
+                                </label>
+                                <?php endforeach; ?>
+                            </fieldset>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">匯出中繼資料</th>
+                        <td>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="include_meta" value="1" <?php checked($this->settings['include_meta']); ?>>
+                                包含用戶中繼資料
+                            </label>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="include_roles" value="1" <?php checked($this->settings['include_roles']); ?>>
+                                包含用戶角色資訊
+                            </label>
+                        </td>
+                    </tr>
+                </table>
+                
+                <h2>自訂頭像功能</h2>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">啟用自訂頭像</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="enable_custom_avatar" value="1" <?php checked($this->settings['enable_custom_avatar']); ?>>
+                                允許使用 WordPress 媒體庫中的任何圖像作為使用者頭像
+                            </label>
+                            <p class="description">用戶可以從媒體庫選擇或上傳新圖片作為頭像</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">檔案大小限制</th>
+                        <td>
+                            <input type="number" name="avatar_size_limit" value="<?php echo esc_attr($this->settings['avatar_size_limit']); ?>" min="512" max="10240" class="small-text">
+                            KB
+                            <p class="description">頭像檔案大小上限</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">允許的檔案類型</th>
+                        <td>
+                            <?php $allowed_types = $this->settings['allowed_avatar_types']; ?>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="allowed_avatar_types[]" value="jpg" <?php checked(in_array('jpg', $allowed_types)); ?>>
+                                JPG
+                            </label>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="allowed_avatar_types[]" value="jpeg" <?php checked(in_array('jpeg', $allowed_types)); ?>>
+                                JPEG
+                            </label>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="allowed_avatar_types[]" value="png" <?php checked(in_array('png', $allowed_types)); ?>>
+                                PNG
+                            </label>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="allowed_avatar_types[]" value="gif" <?php checked(in_array('gif', $allowed_types)); ?>>
+                                GIF
+                            </label>
+                        </td>
+                    </tr>
+                </table>
+                
                 <?php submit_button('儲存設定'); ?>
             </form>
             
@@ -437,7 +565,16 @@ class WU_Enhanced_User_List {
             'hide_toolbar' => isset($_POST['hide_toolbar']),
             'hide_language' => isset($_POST['hide_language']),
             'hide_biographical_info' => isset($_POST['hide_biographical_info']),
-            'hide_application_passwords' => isset($_POST['hide_application_passwords'])
+            'hide_application_passwords' => isset($_POST['hide_application_passwords']),
+            // 用戶匯出功能
+            'enable_user_export' => isset($_POST['enable_user_export']),
+            'include_meta' => isset($_POST['include_meta']),
+            'include_roles' => isset($_POST['include_roles']),
+            'export_fields' => isset($_POST['export_fields']) ? $_POST['export_fields'] : array(),
+            // 自訂頭像功能
+            'enable_custom_avatar' => isset($_POST['enable_custom_avatar']),
+            'avatar_size_limit' => intval($_POST['avatar_size_limit']),
+            'allowed_avatar_types' => isset($_POST['allowed_avatar_types']) ? $_POST['allowed_avatar_types'] : array('jpg', 'jpeg', 'png')
         );
         
         update_option('wu_enhanced_user_list_settings', $settings);
@@ -1103,6 +1240,309 @@ class WU_Enhanced_User_List {
             });
             </script>';
         }
+    }
+    
+    // === 用戶匯出功能 ===
+    
+    public function add_export_link($actions, $user_object) {
+        if (current_user_can('manage_options')) {
+            $nonce = wp_create_nonce('wu_export_user_' . $user_object->ID);
+            $export_url = admin_url('admin.php?action=wu_export_user&user_id=' . $user_object->ID . '&_wpnonce=' . $nonce);
+            $actions['wu_export'] = '<a href="' . $export_url . '">下載 CSV</a>';
+        }
+        return $actions;
+    }
+    
+    public function add_bulk_export_action($bulk_actions) {
+        $bulk_actions['wu_export'] = '下載 CSV';
+        return $bulk_actions;
+    }
+    
+    public function handle_bulk_export($redirect_to, $doaction, $user_ids) {
+        if ($doaction !== 'wu_export') {
+            return $redirect_to;
+        }
+        
+        if (!current_user_can('manage_options')) {
+            return $redirect_to;
+        }
+        
+        $this->export_users($user_ids);
+        exit;
+    }
+    
+    public function export_single_user() {
+        if (!isset($_GET['user_id']) || !isset($_GET['_wpnonce'])) {
+            wp_die('缺少必要參數');
+        }
+        
+        $user_id = intval($_GET['user_id']);
+        if (!wp_verify_nonce($_GET['_wpnonce'], 'wu_export_user_' . $user_id)) {
+            wp_die('安全驗證失敗');
+        }
+        
+        if (!current_user_can('manage_options')) {
+            wp_die('權限不足');
+        }
+        
+        $this->export_users(array($user_id));
+        exit;
+    }
+    
+    public function ajax_export_users() {
+        if (!current_user_can('manage_options')) {
+            wp_die('權限不足');
+        }
+        
+        $user_ids = isset($_POST['user_ids']) ? array_map('intval', $_POST['user_ids']) : array();
+        if (empty($user_ids)) {
+            wp_die('沒有選擇用戶');
+        }
+        
+        $this->export_users($user_ids);
+        exit;
+    }
+    
+    private function export_users($user_ids) {
+        // 設定 CSV 標頭
+        $filename = 'users_export_' . date('Y-m-d_H-i-s') . '.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        
+        // 開始輸出
+        $output = fopen('php://output', 'w');
+        
+        // 添加 BOM 以確保中文正確顯示
+        fputs($output, "\xEF\xBB\xBF");
+        
+        // 建立標題行
+        $headers = array();
+        foreach ($this->settings['export_fields'] as $field => $enabled) {
+            if ($enabled) {
+                $headers[] = ucfirst(str_replace('_', ' ', $field));
+            }
+        }
+        
+        if ($this->settings['include_roles']) {
+            $headers[] = 'Roles';
+        }
+        
+        if ($this->settings['include_meta']) {
+            foreach ($this->settings['export_meta_fields'] as $meta_field => $enabled) {
+                if ($enabled) {
+                    $headers[] = ucfirst(str_replace('_', ' ', $meta_field));
+                }
+            }
+        }
+        
+        fputcsv($output, $headers);
+        
+        // 匯出用戶資料
+        foreach ($user_ids as $user_id) {
+            $user = get_userdata($user_id);
+            if (!$user) continue;
+            
+            $row = array();
+            
+            // 基本欄位
+            foreach ($this->settings['export_fields'] as $field => $enabled) {
+                if ($enabled) {
+                    $value = isset($user->$field) ? $user->$field : '';
+                    if ($field === 'user_registered') {
+                        $value = date($this->settings['date_format'], strtotime($value));
+                    }
+                    $row[] = $value;
+                }
+            }
+            
+            // 角色資訊
+            if ($this->settings['include_roles']) {
+                $roles = implode(', ', $user->roles);
+                $row[] = $roles;
+            }
+            
+            // 中繼資料
+            if ($this->settings['include_meta']) {
+                foreach ($this->settings['export_meta_fields'] as $meta_field => $enabled) {
+                    if ($enabled) {
+                        $meta_value = get_user_meta($user_id, $meta_field, true);
+                        $row[] = $meta_value;
+                    }
+                }
+            }
+            
+            fputcsv($output, $row);
+        }
+        
+        fclose($output);
+    }
+    
+    // === 自訂頭像功能 ===
+    
+    public function show_custom_avatar_field($user) {
+        $custom_avatar = get_user_meta($user->ID, 'wu_custom_avatar', true);
+        ?>
+        <h3>自訂頭像</h3>
+        <table class="form-table">
+            <tr>
+                <th><label for="wu_custom_avatar">選擇頭像</label></th>
+                <td>
+                    <div id="wu-avatar-preview" style="margin-bottom: 10px;">
+                        <?php if ($custom_avatar): ?>
+                            <img src="<?php echo esc_url($custom_avatar); ?>" alt="自訂頭像" style="width: 96px; height: 96px; border-radius: 48px; object-fit: cover;">
+                        <?php else: ?>
+                            <img src="<?php echo get_avatar_url($user->ID, 96); ?>" alt="預設頭像" style="width: 96px; height: 96px; border-radius: 48px; object-fit: cover;">
+                        <?php endif; ?>
+                    </div>
+                    
+                    <input type="hidden" id="wu_custom_avatar" name="wu_custom_avatar" value="<?php echo esc_attr($custom_avatar); ?>">
+                    
+                    <button type="button" class="button" id="wu-select-avatar">選擇圖片</button>
+                    <?php if ($custom_avatar): ?>
+                        <button type="button" class="button" id="wu-remove-avatar">移除自訂頭像</button>
+                    <?php endif; ?>
+                    
+                    <p class="description">
+                        點擊「選擇圖片」從媒體庫選擇頭像，或上傳新圖片。<br>
+                        建議尺寸：至少 96x96 像素，檔案大小不超過 <?php echo $this->settings['avatar_size_limit']; ?> KB<br>
+                        支援格式：<?php echo implode(', ', array_map('strtoupper', $this->settings['allowed_avatar_types'])); ?>
+                    </p>
+                </td>
+            </tr>
+        </table>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            var frame;
+            
+            $('#wu-select-avatar').click(function(e) {
+                e.preventDefault();
+                
+                if (frame) {
+                    frame.open();
+                    return;
+                }
+                
+                frame = wp.media({
+                    title: '選擇頭像',
+                    button: {
+                        text: '使用此圖片'
+                    },
+                    library: {
+                        type: ['image']
+                    },
+                    multiple: false
+                });
+                
+                frame.on('select', function() {
+                    var attachment = frame.state().get('selection').first().toJSON();
+                    
+                    // 檢查檔案大小
+                    if (attachment.filesizeInBytes > <?php echo $this->settings['avatar_size_limit'] * 1024; ?>) {
+                        alert('檔案太大！請選擇小於 <?php echo $this->settings['avatar_size_limit']; ?> KB 的圖片。');
+                        return;
+                    }
+                    
+                    // 檢查檔案類型
+                    var allowedTypes = <?php echo json_encode($this->settings['allowed_avatar_types']); ?>;
+                    var fileExtension = attachment.filename.split('.').pop().toLowerCase();
+                    if (allowedTypes.indexOf(fileExtension) === -1) {
+                        alert('不支援的檔案格式！請選擇 ' + allowedTypes.join(', ').toUpperCase() + ' 格式的圖片。');
+                        return;
+                    }
+                    
+                    $('#wu_custom_avatar').val(attachment.url);
+                    $('#wu-avatar-preview img').attr('src', attachment.url);
+                    
+                    if ($('#wu-remove-avatar').length === 0) {
+                        $('#wu-select-avatar').after('<button type="button" class="button" id="wu-remove-avatar" style="margin-left: 10px;">移除自訂頭像</button>');
+                    }
+                });
+                
+                frame.open();
+            });
+            
+            $(document).on('click', '#wu-remove-avatar', function(e) {
+                e.preventDefault();
+                
+                if (confirm('確定要移除自訂頭像嗎？')) {
+                    $('#wu_custom_avatar').val('');
+                    $('#wu-avatar-preview img').attr('src', '<?php echo get_avatar_url($user->ID, 96); ?>');
+                    $('#wu-remove-avatar').remove();
+                }
+            });
+        });
+        </script>
+        <?php
+    }
+    
+    public function save_custom_avatar($user_id) {
+        if (!current_user_can('edit_user', $user_id)) {
+            return false;
+        }
+        
+        $custom_avatar = isset($_POST['wu_custom_avatar']) ? esc_url($_POST['wu_custom_avatar']) : '';
+        
+        if ($custom_avatar) {
+            update_user_meta($user_id, 'wu_custom_avatar', $custom_avatar);
+        } else {
+            delete_user_meta($user_id, 'wu_custom_avatar');
+        }
+    }
+    
+    public function custom_avatar($avatar, $id_or_email, $size, $default, $alt) {
+        $user = false;
+        
+        if (is_numeric($id_or_email)) {
+            $user = get_user_by('id', intval($id_or_email));
+        } elseif (is_object($id_or_email)) {
+            if (isset($id_or_email->user_id)) {
+                $user = get_user_by('id', intval($id_or_email->user_id));
+            }
+        } else {
+            $user = get_user_by('email', $id_or_email);
+        }
+        
+        if ($user && is_object($user)) {
+            $custom_avatar = get_user_meta($user->ID, 'wu_custom_avatar', true);
+            if ($custom_avatar) {
+                $avatar = sprintf(
+                    '<img alt="%s" src="%s" class="avatar avatar-%d photo" height="%d" width="%d" />',
+                    esc_attr($alt),
+                    esc_url($custom_avatar),
+                    esc_attr($size),
+                    esc_attr($size),
+                    esc_attr($size)
+                );
+            }
+        }
+        
+        return $avatar;
+    }
+    
+    public function custom_avatar_url($url, $id_or_email, $args) {
+        $user = false;
+        
+        if (is_numeric($id_or_email)) {
+            $user = get_user_by('id', intval($id_or_email));
+        } elseif (is_object($id_or_email)) {
+            if (isset($id_or_email->user_id)) {
+                $user = get_user_by('id', intval($id_or_email->user_id));
+            }
+        } else {
+            $user = get_user_by('email', $id_or_email);
+        }
+        
+        if ($user && is_object($user)) {
+            $custom_avatar = get_user_meta($user->ID, 'wu_custom_avatar', true);
+            if ($custom_avatar) {
+                return $custom_avatar;
+            }
+        }
+        
+        return $url;
     }
 }
 

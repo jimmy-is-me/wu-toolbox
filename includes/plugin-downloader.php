@@ -106,11 +106,11 @@ function get_popular_plugins_list() {
             'wp_url' => 'https://wordpress.org/plugins/auto-upload-images/',
             'category' => '效能優化'
         ),
-        'thumbnails-regenerate' => array(
+        'image-sizes' => array(
             'name' => 'ThumbPress',
             'description' => '重新產生縮圖，優化圖片顯示和載入效能。',
-            'slug' => 'thumbnails-regenerate',
-            'wp_url' => 'https://wordpress.org/plugins/thumbnails-regenerate/',
+            'slug' => 'image-sizes',
+            'wp_url' => 'https://wordpress.org/plugins/image-sizes/',
             'category' => '效能優化'
         ),
 

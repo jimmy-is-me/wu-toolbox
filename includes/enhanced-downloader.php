@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) exit;
 class WU_Enhanced_Downloader {
     
     public function __construct() {
-        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_menu', array($this, 'add_admin_menu'), 40);
         add_action('admin_init', array($this, 'admin_init'));
         
         // 如果啟用了下載功能，則添加下載按鈕
@@ -32,8 +32,8 @@ class WU_Enhanced_Downloader {
     public function add_admin_menu() {
         add_submenu_page(
             'wumetax-toolkit',
-            '增強下載器',
-            '增強下載器',
+            '檔案下載功能',
+            '檔案下載功能',
             'manage_options',
             'wu-enhanced-downloader',
             array($this, 'admin_page')

@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) exit;
 class WU_RSS_Disabler {
     
     public function __construct() {
-        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_menu', array($this, 'add_admin_menu'), 70);
         add_action('admin_init', array($this, 'admin_init'));
         
         // 如果啟用了 RSS 禁用功能，則執行相關動作

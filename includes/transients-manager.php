@@ -13,7 +13,7 @@ class WU_Transients_Manager {
     public function __construct() {
         $this->settings = get_option('wu_transients_manager_settings', $this->get_default_settings());
         
-        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_menu', array($this, 'add_admin_menu'), 80);
         add_action('wp_ajax_wu_clear_transients', array($this, 'ajax_clear_transients'));
         add_action('wp_ajax_wu_get_transients_stats', array($this, 'ajax_get_transients_stats'));
         
@@ -36,8 +36,8 @@ class WU_Transients_Manager {
     public function add_admin_menu() {
         add_submenu_page(
             'wumetax-toolkit',
-            'Transients 管理',
-            'Transients 管理',
+            '瞬態資料管理',
+            '瞬態資料管理',
             'manage_options',
             'wu-transients-manager',
             array($this, 'admin_page')

@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) exit;
 class WU_Admin_Bar_Cleaner {
     
     public function __construct() {
-        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_menu', array($this, 'add_admin_menu'), 10);
         add_action('admin_init', array($this, 'admin_init'));
         
         // AJAX 處理
@@ -25,8 +25,8 @@ class WU_Admin_Bar_Cleaner {
     public function add_admin_menu() {
         add_submenu_page(
             'wumetax-toolkit',
-            '後台設定',
-            '後台設定',
+            '後台介面管理',
+            '後台介面管理',
             'manage_options',
             'wumetax-admin-bar-cleaner',
             array($this, 'admin_page')
@@ -44,7 +44,7 @@ class WU_Admin_Bar_Cleaner {
             'wu_hide_login_logo',
             'wu_disable_login_language_switcher',
             'wu_enable_login_beautify',
-            'wu_disable_dashboard_widgets',
+            'wu_dashboard_widgets_settings',
             'wu_custom_admin_footer_text',
             'wu_remove_admin_footer_text',
             'wu_hide_tools_menu',
@@ -145,9 +145,9 @@ class WU_Admin_Bar_Cleaner {
         
         // 添加儀表板設定欄位
         add_settings_field(
-            'wu_disable_dashboard_widgets',
-            '停用 WordPress 儀表板小工具',
-            array($this, 'disable_dashboard_widgets_callback'),
+            'wu_dashboard_widgets_settings',
+            '儀表板小工具管理',
+            array($this, 'dashboard_widgets_settings_callback'),
             'wu_admin_bar_settings',
             'wu_dashboard_section'
         );
@@ -323,11 +323,60 @@ class WU_Admin_Bar_Cleaner {
     /**
      * 停用儀表板小工具選項回調
      */
-    public function disable_dashboard_widgets_callback() {
-        $value = get_option('wu_disable_dashboard_widgets', false);
-        echo '<input type="checkbox" id="wu_disable_dashboard_widgets" name="wu_disable_dashboard_widgets" value="1" ' . checked(1, $value, false) . ' />';
-        echo '<label for="wu_disable_dashboard_widgets">停用 WordPress 儀表板小工具</label>';
-        echo '<p class="description">停用站點健康狀況、概覽、活動、快速草稿、WordPress 活動和新聞、歡迎面板等小工具。WordPress 預設安裝了許多儀表板小工具，它們通常根本不會用到，但會增加後端和前端的負載。</p>';
+    public function dashboard_widgets_settings_callback() {
+        $dashboard_widgets = get_option('wu_dashboard_widgets_settings', array());
+        
+        $widgets = array(
+            'dashboard_welcome' => array(
+                'name' => '歡迎使用 WordPress',
+                'description' => '顯示歡迎訊息和快速設定連結'
+            ),
+            'dashboard_php_nag' => array(
+                'name' => 'PHP 執行環境建議更新',
+                'description' => 'PHP 版本過舊時的升級提醒'
+            ),
+            'dashboard_primary' => array(
+                'name' => 'WordPress 活動及新聞',
+                'description' => '顯示 WordPress 官方消息和社群活動'
+            ),
+            'dashboard_quick_press' => array(
+                'name' => '快速草稿',
+                'description' => '快速撰寫新文章的小工具'
+            ),
+            'dashboard_right_now' => array(
+                'name' => '網站概況',
+                'description' => '顯示文章、頁面、評論等統計資訊'
+            ),
+            'dashboard_activity' => array(
+                'name' => '網站活動',
+                'description' => '顯示近期發布的文章和評論活動'
+            ),
+            'dashboard_site_health' => array(
+                'name' => '網站狀態',
+                'description' => '檢查網站效能和安全性狀態'
+            )
+        );
+        
+        echo '<div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px;">';
+        echo '<h4 style="margin-top: 0;">儀表板小工具管理</h4>';
+        echo '<p>透過完全停用部分或所有小工具來清理並加速控制台。停用的小工具不會載入任何資源，也不會顯示在螢幕選項下。</p>';
+        echo '</div>';
+        
+        echo '<table class="widefat" style="margin-top: 10px;">';
+        echo '<thead><tr><th width="50">停用</th><th>小工具名稱</th><th>說明</th></tr></thead>';
+        echo '<tbody>';
+        
+        foreach ($widgets as $widget_id => $widget_info) {
+            $checked = isset($dashboard_widgets[$widget_id]) ? checked(1, $dashboard_widgets[$widget_id], false) : '';
+            echo '<tr>';
+            echo '<td><input type="checkbox" name="wu_dashboard_widgets_settings[' . $widget_id . ']" value="1" ' . $checked . ' /></td>';
+            echo '<td><strong>' . esc_html($widget_info['name']) . '</strong></td>';
+            echo '<td>' . esc_html($widget_info['description']) . '</td>';
+            echo '</tr>';
+        }
+        
+        echo '</tbody></table>';
+        echo '<p class="description">勾選的小工具將被完全停用，不會在儀表板中顯示或載入資源。</p>';
     }
     
     /**
@@ -440,7 +489,7 @@ class WU_Admin_Bar_Cleaner {
             'wu_hide_login_logo',
             'wu_disable_login_language_switcher',
             'wu_enable_login_beautify',
-            'wu_disable_dashboard_widgets',
+            'wu_dashboard_widgets_settings',
             'wu_remove_admin_footer_text',
             'wu_hide_tools_menu',
             'wu_hide_wordpress_address',
@@ -488,7 +537,7 @@ class WU_Admin_Bar_Cleaner {
                 'wu_hide_login_logo',
                 'wu_disable_login_language_switcher',
                 'wu_enable_login_beautify',
-                'wu_disable_dashboard_widgets',
+                'wu_dashboard_widgets_settings',
                 'wu_remove_admin_footer_text',
                 'wu_hide_tools_menu',
                 'wu_hide_wordpress_address',
@@ -516,7 +565,8 @@ class WU_Admin_Bar_Cleaner {
         $hide_login_logo = get_option('wu_hide_login_logo', false);
         $disable_language_switcher = get_option('wu_disable_login_language_switcher', false);
         $enable_login_beautify = get_option('wu_enable_login_beautify', false);
-        $disable_dashboard_widgets = get_option('wu_disable_dashboard_widgets', false);
+        $dashboard_widgets_settings = get_option('wu_dashboard_widgets_settings', array());
+        $disable_dashboard_widgets = !empty($dashboard_widgets_settings);
         $remove_admin_footer = get_option('wu_remove_admin_footer_text', false);
         $custom_footer_text = get_option('wu_custom_admin_footer_text', '');
         $hide_tools_menu = get_option('wu_hide_tools_menu', false);
@@ -824,7 +874,8 @@ class WU_Admin_Bar_Cleaner {
         }
         
         // 停用儀表板小工具
-        if (get_option('wu_disable_dashboard_widgets', false)) {
+        $dashboard_widgets_settings = get_option('wu_dashboard_widgets_settings', array());
+        if (!empty($dashboard_widgets_settings)) {
             add_action('wp_dashboard_setup', array($this, 'disable_dashboard_widgets'));
         }
         
@@ -1059,23 +1110,50 @@ class WU_Admin_Bar_Cleaner {
      * 停用儀表板小工具
      */
     public function disable_dashboard_widgets() {
-        // 移除預設的儀表板小工具
-        remove_meta_box('dashboard_site_health', 'dashboard', 'normal');      // 站點健康狀況
-        remove_meta_box('dashboard_right_now', 'dashboard', 'normal');        // 概覽
-        remove_meta_box('dashboard_activity', 'dashboard', 'normal');         // 活動
-        remove_meta_box('dashboard_quick_press', 'dashboard', 'side');        // 快速草稿
-        remove_meta_box('dashboard_primary', 'dashboard', 'side');            // WordPress 活動和新聞
-        remove_meta_box('welcome-panel', 'dashboard', 'normal');              // 歡迎面板
+        $dashboard_widgets_settings = get_option('wu_dashboard_widgets_settings', array());
         
-        // 移除其他可能的小工具
-        remove_meta_box('dashboard_recent_comments', 'dashboard', 'normal');  // 近期評論
-        remove_meta_box('dashboard_incoming_links', 'dashboard', 'normal');   // 引用連結
-        remove_meta_box('dashboard_plugins', 'dashboard', 'normal');          // 外掛
-        remove_meta_box('dashboard_recent_drafts', 'dashboard', 'side');      // 近期草稿
-        remove_meta_box('dashboard_secondary', 'dashboard', 'side');          // 其他 WordPress 新聞
+        // 定義小工具對應的移除操作
+        $widget_removal_map = array(
+            'dashboard_welcome' => function() {
+                remove_meta_box('welcome-panel', 'dashboard', 'normal');
+                remove_action('welcome_panel', 'wp_welcome_panel');
+            },
+            'dashboard_php_nag' => function() {
+                // PHP Nag 通常透過 admin_notices 顯示，需要移除相關的 notice
+                remove_action('admin_notices', 'wp_dashboard_php_nag_notice');
+            },
+            'dashboard_primary' => function() {
+                remove_meta_box('dashboard_primary', 'dashboard', 'side');
+            },
+            'dashboard_quick_press' => function() {
+                remove_meta_box('dashboard_quick_press', 'dashboard', 'side');
+            },
+            'dashboard_right_now' => function() {
+                remove_meta_box('dashboard_right_now', 'dashboard', 'normal');
+            },
+            'dashboard_activity' => function() {
+                remove_meta_box('dashboard_activity', 'dashboard', 'normal');
+            },
+            'dashboard_site_health' => function() {
+                remove_meta_box('dashboard_site_health', 'dashboard', 'normal');
+            }
+        );
         
-        // 停用歡迎面板
-        remove_action('welcome_panel', 'wp_welcome_panel');
+        // 根據設定執行相應的移除操作
+        foreach ($dashboard_widgets_settings as $widget_id => $enabled) {
+            if ($enabled && isset($widget_removal_map[$widget_id])) {
+                $widget_removal_map[$widget_id]();
+            }
+        }
+        
+        // 移除其他通用的小工具（為了向後相容，保留這些）
+        if (!empty($dashboard_widgets_settings)) {
+            remove_meta_box('dashboard_recent_comments', 'dashboard', 'normal');  // 近期評論
+            remove_meta_box('dashboard_incoming_links', 'dashboard', 'normal');   // 引用連結
+            remove_meta_box('dashboard_plugins', 'dashboard', 'normal');          // 外掛
+            remove_meta_box('dashboard_recent_drafts', 'dashboard', 'side');      // 近期草稿
+            remove_meta_box('dashboard_secondary', 'dashboard', 'side');          // 其他 WordPress 新聞
+        }
     }
     
     /**
