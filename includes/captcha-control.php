@@ -16,7 +16,7 @@ class WU_Captcha_Control {
         add_action('admin_menu', array($this, 'add_admin_menu'), 52);
         add_action('init', array($this, 'init_captcha'));
         
-        // 確保 session 在適當時機啟動
+        // 優化 session 處理
         add_action('init', array($this, 'maybe_start_session'), 1);
         
         // 載入驗證碼功能
@@ -29,15 +29,23 @@ class WU_Captcha_Control {
     }
     
     public function maybe_start_session() {
-        if (!session_id() && !headers_sent()) {
-            session_start();
+        // 改善 session 啟動邏輯
+        if (!session_id() && !headers_sent() && !is_admin()) {
+            @session_start();
+        }
+        
+        // 確保 WooCommerce 頁面也能正常啟動 session
+        if (class_exists('WooCommerce') && (is_account_page() || is_checkout() || is_cart())) {
+            if (!session_id() && !headers_sent()) {
+                @session_start();
+            }
         }
     }
     
     private function get_default_settings() {
         return array(
             'enabled' => false,
-            'captcha_type' => 'mixed', // mixed, letters, numbers
+            'captcha_type' => 'mixed',
             'captcha_length' => 6,
             'case_sensitive' => false,
             'enable_login' => true,
@@ -46,49 +54,93 @@ class WU_Captcha_Control {
             'enable_woocommerce' => true,
             'image_width' => 120,
             'image_height' => 40,
-            'font_size' => 28, // 修改預設字體大小為28px
+            'font_size' => 28,
             'text_color' => '#333333',
             'background_color' => '#ffffff',
-            'noise_level' => 'low', // 修改預設噪點為低
-            'session_timeout' => 600 // 10 minutes
+            'noise_level' => 'low',
+            'session_timeout' => 600,
+            // 新增重定向設定
+            'login_redirect_type' => 'homepage', // homepage, admin, custom
+            'logout_redirect_type' => 'homepage', // homepage, admin, custom
+            'custom_login_redirect' => '',
+            'custom_logout_redirect' => ''
         );
     }
     
     private function init_redirect_hooks() {
-        // 登入後重定向到首頁
-        add_filter('login_redirect', array($this, 'redirect_after_login'), 10, 3);
-        
-        // 登出後重定向到首頁
-        add_action('wp_logout', array($this, 'redirect_after_logout'));
-        
-        // WooCommerce 登入後重定向
-        if (class_exists('WooCommerce')) {
-            add_filter('woocommerce_login_redirect', array($this, 'woocommerce_login_redirect'), 10, 2);
+        // 只在前端處理重定向，避免後台問題
+        if (!is_admin()) {
+            add_filter('login_redirect', array($this, 'redirect_after_login'), 10, 3);
+            add_action('wp_logout', array($this, 'redirect_after_logout'));
+            
+            // WooCommerce 登入後重定向
+            if (class_exists('WooCommerce')) {
+                add_filter('woocommerce_login_redirect', array($this, 'woocommerce_login_redirect'), 10, 2);
+            }
         }
     }
     
     public function redirect_after_login($redirect_to, $request, $user) {
-        // 如果沒有特定的重定向要求，導向首頁
-        if (empty($redirect_to) || $redirect_to === admin_url()) {
-            return home_url();
-        }
-        
-        // 如果是管理員且要求訪問後台，允許
-        if (isset($user->ID) && user_can($user->ID, 'manage_options') && strpos($redirect_to, admin_url()) === 0) {
+        // 如果是 AJAX 請求或管理員直接進入後台，不重定向
+        if (wp_doing_ajax() || (isset($_REQUEST['action']) && $_REQUEST['action'] === 'login')) {
             return $redirect_to;
         }
         
-        // 其他情況導向首頁
-        return home_url();
+        // 管理員訪問後台的處理
+        if (isset($user->ID) && user_can($user->ID, 'manage_options')) {
+            switch ($this->settings['login_redirect_type']) {
+                case 'admin':
+                    return admin_url();
+                case 'custom':
+                    if (!empty($this->settings['custom_login_redirect'])) {
+                        return esc_url($this->settings['custom_login_redirect']);
+                    }
+                    return home_url();
+                case 'homepage':
+                default:
+                    return home_url();
+            }
+        }
+        
+        // 一般用戶處理
+        switch ($this->settings['login_redirect_type']) {
+            case 'custom':
+                if (!empty($this->settings['custom_login_redirect'])) {
+                    return esc_url($this->settings['custom_login_redirect']);
+                }
+                return home_url();
+            case 'homepage':
+            default:
+                return home_url();
+        }
     }
     
     public function redirect_after_logout() {
-        wp_safe_redirect(home_url());
+        // 避免在 AJAX 或管理頁面中重定向
+        if (wp_doing_ajax() || is_admin()) {
+            return;
+        }
+        
+        $redirect_url = home_url();
+        
+        switch ($this->settings['logout_redirect_type']) {
+            case 'custom':
+                if (!empty($this->settings['custom_logout_redirect'])) {
+                    $redirect_url = esc_url($this->settings['custom_logout_redirect']);
+                }
+                break;
+            case 'homepage':
+            default:
+                $redirect_url = home_url();
+                break;
+        }
+        
+        wp_safe_redirect($redirect_url);
         exit;
     }
     
     public function woocommerce_login_redirect($redirect, $user) {
-        return home_url();
+        return $this->redirect_after_login($redirect, '', $user);
     }
     
     public function add_admin_menu() {
@@ -108,6 +160,9 @@ class WU_Captcha_Control {
         }
         
         $this->settings = get_option('wu_captcha_control_settings', $this->get_default_settings());
+        
+        // 獲取所有頁面供選擇
+        $pages = get_pages();
         ?>
         <div class="wrap">
             <h1>註冊/登入驗證碼設定</h1>
@@ -123,15 +178,7 @@ class WU_Captcha_Control {
                     <li><strong>廣泛支援</strong>：支援登入、註冊、忘記密碼表單</li>
                     <li><strong>WooCommerce 整合</strong>：自動支援 WooCommerce 表單</li>
                     <li><strong>自訂外觀</strong>：可調整顏色、大小、噪點等</li>
-                    <li><strong>智慧重定向</strong>：登入/登出後自動導向首頁</li>
-                </ul>
-                
-                <h4>安全優勢：</h4>
-                <ul>
-                    <li>防止自動漫遊器的垃圾訊息攻擊</li>
-                    <li>增加網站安全性</li>
-                    <li>減少惡意註冊和登入嘗試</li>
-                    <li>不依賴第三方服務，確保隱私</li>
+                    <li><strong>智慧重定向</strong>：登入/登出後可選擇重定向頁面</li>
                 </ul>
             </div>
             
@@ -227,6 +274,61 @@ class WU_Captcha_Control {
                     </tr>
                 </table>
                 
+                <h2>重定向設定</h2>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">登入後重定向</th>
+                        <td>
+                            <select name="login_redirect_type" onchange="toggleCustomField(this, 'custom_login_redirect_row')">
+                                <option value="homepage" <?php selected($this->settings['login_redirect_type'], 'homepage'); ?>>首頁</option>
+                                <option value="admin" <?php selected($this->settings['login_redirect_type'], 'admin'); ?>>管理後台（僅管理員）</option>
+                                <option value="custom" <?php selected($this->settings['login_redirect_type'], 'custom'); ?>>自訂頁面</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr id="custom_login_redirect_row" style="<?php echo ($this->settings['login_redirect_type'] !== 'custom') ? 'display:none;' : ''; ?>">
+                        <th scope="row">自訂登入重定向頁面</th>
+                        <td>
+                            <select name="custom_login_redirect">
+                                <option value="">選擇頁面...</option>
+                                <option value="<?php echo home_url(); ?>" <?php selected($this->settings['custom_login_redirect'], home_url()); ?>>首頁</option>
+                                <?php foreach ($pages as $page): ?>
+                                    <option value="<?php echo get_permalink($page->ID); ?>" <?php selected($this->settings['custom_login_redirect'], get_permalink($page->ID)); ?>>
+                                        <?php echo esc_html($page->post_title); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="description">或輸入完整 URL：</p>
+                            <input type="url" name="custom_login_redirect_url" value="<?php echo esc_url($this->settings['custom_login_redirect']); ?>" placeholder="https://example.com/page" style="width: 400px;">
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">登出後重定向</th>
+                        <td>
+                            <select name="logout_redirect_type" onchange="toggleCustomField(this, 'custom_logout_redirect_row')">
+                                <option value="homepage" <?php selected($this->settings['logout_redirect_type'], 'homepage'); ?>>首頁</option>
+                                <option value="custom" <?php selected($this->settings['logout_redirect_type'], 'custom'); ?>>自訂頁面</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr id="custom_logout_redirect_row" style="<?php echo ($this->settings['logout_redirect_type'] !== 'custom') ? 'display:none;' : ''; ?>">
+                        <th scope="row">自訂登出重定向頁面</th>
+                        <td>
+                            <select name="custom_logout_redirect">
+                                <option value="">選擇頁面...</option>
+                                <option value="<?php echo home_url(); ?>" <?php selected($this->settings['custom_logout_redirect'], home_url()); ?>>首頁</option>
+                                <?php foreach ($pages as $page): ?>
+                                    <option value="<?php echo get_permalink($page->ID); ?>" <?php selected($this->settings['custom_logout_redirect'], get_permalink($page->ID)); ?>>
+                                        <?php echo esc_html($page->post_title); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="description">或輸入完整 URL：</p>
+                            <input type="url" name="custom_logout_redirect_url" value="<?php echo esc_url($this->settings['custom_logout_redirect']); ?>" placeholder="https://example.com/page" style="width: 400px;">
+                        </td>
+                    </tr>
+                </table>
+                
                 <h2>外觀設定</h2>
                 <table class="form-table">
                     <tr>
@@ -314,35 +416,6 @@ class WU_Captcha_Control {
                     <p>啟用驗證碼功能以查看預覽</p>
                 <?php endif; ?>
             </div>
-            
-            <h2>使用說明</h2>
-            <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
-                <h3>GDPR 合規性：</h3>
-                <ul>
-                    <li>所有驗證碼在本地生成，不使用外部服務</li>
-                    <li>不會收集或儲存任何個人識別資訊</li>
-                    <li>不需要 API 金鑰或第三方帳戶</li>
-                    <li>驗證碼資料僅在 Session 中暫存</li>
-                </ul>
-                
-                <h3>安全機制：</h3>
-                <ul>
-                    <li>每次請求產生新的隨機驗證碼</li>
-                    <li>設定工作階段逾時防止重複使用</li>
-                    <li>支援大小寫敏感提高安全性</li>
-                    <li>視覺噪點干擾機器人識別</li>
-                    <li>登入/登出後自動導向首頁</li>
-                </ul>
-                
-                <h3>注意事項：</h3>
-                <ul>
-                    <li>請確保 PHP 支援 GD 函式庫以生成圖片</li>
-                    <li>驗證碼無法顯示時會提供文字替代方案</li>
-                    <li>建議定期測試表單功能確保正常運作</li>
-                    <li>可在測試模式下檢查各表單的顯示效果</li>
-                    <li>管理員登入後台不受重定向影響</li>
-                </ul>
-            </div>
         </div>
         
         <style>
@@ -364,6 +437,17 @@ class WU_Captcha_Control {
             padding: 0;
         }
         </style>
+        
+        <script>
+        function toggleCustomField(select, rowId) {
+            var row = document.getElementById(rowId);
+            if (select.value === 'custom') {
+                row.style.display = 'table-row';
+            } else {
+                row.style.display = 'none';
+            }
+        }
+        </script>
         <?php
     }
     
@@ -371,6 +455,15 @@ class WU_Captcha_Control {
         if (!wp_verify_nonce($_POST['_wpnonce'], 'wu_captcha_control_settings')) {
             wp_die('安全驗證失敗');
         }
+        
+        // 處理自訂重定向 URL
+        $custom_login_redirect = !empty($_POST['custom_login_redirect_url']) 
+            ? sanitize_url($_POST['custom_login_redirect_url']) 
+            : sanitize_url($_POST['custom_login_redirect']);
+            
+        $custom_logout_redirect = !empty($_POST['custom_logout_redirect_url']) 
+            ? sanitize_url($_POST['custom_logout_redirect_url']) 
+            : sanitize_url($_POST['custom_logout_redirect']);
         
         $settings = array(
             'enabled' => isset($_POST['enabled']),
@@ -387,7 +480,12 @@ class WU_Captcha_Control {
             'text_color' => sanitize_hex_color($_POST['text_color']),
             'background_color' => sanitize_hex_color($_POST['background_color']),
             'noise_level' => sanitize_text_field($_POST['noise_level']),
-            'session_timeout' => intval($_POST['session_timeout'])
+            'session_timeout' => intval($_POST['session_timeout']),
+            // 重定向設定
+            'login_redirect_type' => sanitize_text_field($_POST['login_redirect_type']),
+            'logout_redirect_type' => sanitize_text_field($_POST['logout_redirect_type']),
+            'custom_login_redirect' => $custom_login_redirect,
+            'custom_logout_redirect' => $custom_logout_redirect
         );
         
         update_option('wu_captcha_control_settings', $settings);
@@ -397,7 +495,7 @@ class WU_Captcha_Control {
     }
     
     public function init_captcha() {
-        // AJAX 處理 - 只註冊一次
+        // AJAX 處理
         add_action('wp_ajax_wu_generate_captcha', array($this, 'generate_captcha_image'));
         add_action('wp_ajax_nopriv_wu_generate_captcha', array($this, 'generate_captcha_image'));
         add_action('wp_ajax_wu_refresh_captcha', array($this, 'ajax_refresh_captcha'));
@@ -423,17 +521,22 @@ class WU_Captcha_Control {
             add_action('lostpassword_post', array($this, 'validate_lost_password_captcha'));
         }
         
-        // WooCommerce 整合
+        // WooCommerce 整合 - 改善處理邏輯
         if ($this->settings['enable_woocommerce'] && class_exists('WooCommerce')) {
-            add_action('woocommerce_login_form', array($this, 'display_captcha_field'));
-            add_action('woocommerce_register_form', array($this, 'display_captcha_field'));
-            add_filter('woocommerce_process_login_errors', array($this, 'validate_woocommerce_login_captcha'), 10, 3);
-            add_filter('woocommerce_registration_errors', array($this, 'validate_woocommerce_register_captcha'), 10, 3);
+            // 延遲到 WooCommerce 完全載入後
+            add_action('woocommerce_loaded', array($this, 'init_woocommerce_hooks'));
         }
         
         // 前端腳本和樣式
         add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
         add_action('login_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
+    }
+    
+    public function init_woocommerce_hooks() {
+        add_action('woocommerce_login_form', array($this, 'display_captcha_field'));
+        add_action('woocommerce_register_form', array($this, 'display_captcha_field'));
+        add_filter('woocommerce_process_login_errors', array($this, 'validate_woocommerce_login_captcha'), 10, 3);
+        add_filter('woocommerce_registration_errors', array($this, 'validate_woocommerce_register_captcha'), 10, 3);
     }
     
     public function enqueue_frontend_assets() {
@@ -485,7 +588,8 @@ class WU_Captcha_Control {
         if ($this->captcha_displayed) return;
         $this->captcha_displayed = true;
         
-        $this->maybe_start_session();
+        // 強制啟動 session
+        $this->force_start_session();
         
         $captcha_code = $this->generate_captcha_code();
         $_SESSION['wu_captcha_code'] = $this->settings['case_sensitive'] ? $captcha_code : strtolower($captcha_code);
@@ -516,8 +620,21 @@ class WU_Captcha_Control {
         <?php
     }
     
+    private function force_start_session() {
+        if (!session_id()) {
+            if (!headers_sent()) {
+                @session_start();
+            } else {
+                // 如果 headers 已經發送，嘗試使用其他方式處理
+                if (!isset($_SESSION)) {
+                    $_SESSION = array();
+                }
+            }
+        }
+    }
+    
     public function ajax_refresh_captcha() {
-        $this->maybe_start_session();
+        $this->force_start_session();
         
         $captcha_code = $this->generate_captcha_code();
         $_SESSION['wu_captcha_code'] = $this->settings['case_sensitive'] ? $captcha_code : strtolower($captcha_code);
@@ -533,10 +650,10 @@ class WU_Captcha_Control {
         
         switch ($this->settings['captcha_type']) {
             case 'letters':
-                $characters = 'ABCDEFGHIJKLMNPQRSTUVWXYZ'; // 移除容易混淆的字母
+                $characters = 'ABCDEFGHIJKLMNPQRSTUVWXYZ';
                 break;
             case 'numbers':
-                $characters = '23456789'; // 移除容易混淆的數字
+                $characters = '23456789';
                 break;
             case 'mixed':
             default:
@@ -555,7 +672,6 @@ class WU_Captcha_Control {
     
     public function generate_captcha_image() {
         if (!function_exists('imagecreate')) {
-            // 如果 GD 不可用，返回文字驗證碼
             header('Content-Type: text/plain');
             echo 'GD Library not available';
             exit;
@@ -566,10 +682,8 @@ class WU_Captcha_Control {
         $width = $this->settings['image_width'];
         $height = $this->settings['image_height'];
         
-        // 建立圖片
         $image = imagecreate($width, $height);
         
-        // 設定顏色
         $bg_color = imagecolorallocate($image, 
             hexdec(substr($this->settings['background_color'], 1, 2)),
             hexdec(substr($this->settings['background_color'], 3, 2)),
@@ -582,14 +696,10 @@ class WU_Captcha_Control {
             hexdec(substr($this->settings['text_color'], 5, 2))
         );
         
-        // 添加噪點
         $this->add_noise($image, $width, $height, $text_color);
         
-        // 添加文字 - 針對較大字體進行優化
         $font_size = $this->settings['font_size'];
         $text_length = strlen($code);
-        
-        // 根據字體大小調整字符間距
         $char_width = $font_size * 0.8;
         $total_text_width = $text_length * $char_width;
         $start_x = max(10, ($width - $total_text_width) / 2);
@@ -597,19 +707,15 @@ class WU_Captcha_Control {
         for ($i = 0; $i < $text_length; $i++) {
             $x = $start_x + ($i * $char_width) + wp_rand(-3, 3);
             $y = ($height + $font_size) / 2 + wp_rand(-2, 2);
-            
-            // 減少角度變化，提高可讀性
             $angle = wp_rand(-8, 8);
             
             if (function_exists('imagettftext') && $this->get_font_file()) {
                 imagettftext($image, $font_size, $angle, $x, $y, $text_color, $this->get_font_file(), $code[$i]);
             } else {
-                // 使用更大的內建字體
                 imagestring($image, 5, $x, $y - $font_size/2, $code[$i], $text_color);
             }
         }
         
-        // 輸出圖片
         header('Content-Type: image/png');
         header('Cache-Control: no-cache, no-store, must-revalidate');
         header('Pragma: no-cache');
@@ -622,17 +728,9 @@ class WU_Captcha_Control {
     
     private function add_noise($image, $width, $height, $color) {
         $noise_level = $this->settings['noise_level'];
-        
-        // 降低噪點數量，提高可讀性
-        $multiplier = array(
-            'low' => 5,
-            'medium' => 15,
-            'high' => 30
-        );
-        
+        $multiplier = array('low' => 5, 'medium' => 15, 'high' => 30);
         $noise_count = $multiplier[$noise_level];
         
-        // 添加點 - 使用較淡的顏色
         $light_color = imagecolorallocate($image, 
             min(255, hexdec(substr($this->settings['text_color'], 1, 2)) + 60),
             min(255, hexdec(substr($this->settings['text_color'], 3, 2)) + 60),
@@ -643,7 +741,6 @@ class WU_Captcha_Control {
             imagesetpixel($image, wp_rand(0, $width-1), wp_rand(0, $height-1), $light_color);
         }
         
-        // 減少線條數量
         $line_count = max(1, intval($noise_count / 8));
         for ($i = 0; $i < $line_count; $i++) {
             imageline($image, wp_rand(0, $width-1), wp_rand(0, $height-1), 
@@ -652,12 +749,11 @@ class WU_Captcha_Control {
     }
     
     private function get_font_file() {
-        // 嘗試使用系統字體，這裡返回 null 使用預設字體
         return null;
     }
     
     private function validate_captcha() {
-        $this->maybe_start_session();
+        $this->force_start_session();
         
         // 檢查是否有驗證碼輸入
         if (!isset($_POST['wu_captcha']) || empty(trim($_POST['wu_captcha']))) {
@@ -669,10 +765,15 @@ class WU_Captcha_Control {
             return new WP_Error('wu_captcha_missing', '驗證碼已過期，請重新整理頁面');
         }
         
-        // 檢查驗證碼是否過期
+        // 檢查驗證碼是否過期 - 放寬時間限制
         $current_time = time();
         $captcha_time = intval($_SESSION['wu_captcha_time']);
         $timeout = intval($this->settings['session_timeout']);
+        
+        // 對於 WooCommerce，給予額外的時間緩衝
+        if (class_exists('WooCommerce') && (is_account_page() || is_checkout())) {
+            $timeout = $timeout + 300; // 額外 5 分鐘
+        }
         
         if (($current_time - $captcha_time) > $timeout) {
             unset($_SESSION['wu_captcha_code'], $_SESSION['wu_captcha_time']);
@@ -694,14 +795,16 @@ class WU_Captcha_Control {
     }
     
     public function validate_login_captcha($user, $username, $password) {
-        // 只在有輸入帳號密碼時才驗證驗證碼
+        // 避免在 AJAX 或管理請求中進行驗證
+        if (wp_doing_ajax() || is_admin()) {
+            return $user;
+        }
+        
         if (empty($username) || empty($password)) {
             return $user;
         }
         
-        // 如果已經有錯誤，先讓其他驗證通過
         if (is_wp_error($user)) {
-            // 但仍需要驗證驗證碼以清除 session
             $this->validate_captcha();
             return $user;
         }
@@ -731,7 +834,6 @@ class WU_Captcha_Control {
     }
     
     public function validate_woocommerce_login_captcha($validation_error, $username, $password) {
-        // 只在有輸入帳號密碼時才驗證
         if (empty($username) || empty($password)) {
             return $validation_error;
         }
