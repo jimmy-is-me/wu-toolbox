@@ -128,7 +128,7 @@ function wu_captcha_render_field() {
 		<img src="<?php echo esc_url( add_query_arg(array('wu_captcha'=>1,'token'=>$token), home_url('/')) ); ?>" alt="CAPTCHA" style="display:block;border:1px solid #ddd;padding:4px;background:#fff;margin-bottom:6px;max-width:100%;height:auto;">
 		<input type="text" id="wu_captcha_input" name="wu_captcha_input" autocomplete="off" placeholder="請輸入圖片中的驗證碼" required style="width:100%;max-width:220px;">
 		<input type="hidden" name="wu_captcha_token" value="<?php echo esc_attr($token); ?>">
-		<small style="display:block;color:#666;margin-top:4px;">此驗證碼不使用外部服務，不儲存個資，符合 GDPR 規範。</small>
+		<small style="display:block;color:#666;margin-top:4px;">此驗證碼符合 GDPR 規範</small>
 	</p>
 	<?php
 }
