@@ -22,6 +22,8 @@ function media_encoder_get_settings() {
         'replace_original' => 'on', // 強制啟用以節省主機容量
         'enable_logging' => get_option('media_encoder_enable_logging', 'off'),
         'enable_webp_fallback' => get_option('media_encoder_enable_webp_fallback', 'on'), // 啟用WebP回退功能
+        // 新增：縮圖與清理
+        'disabled_sizes' => (array) get_option('media_encoder_disabled_sizes', array()),
     );
 }
 
@@ -37,6 +39,25 @@ function media_encoder_log_error($message, $context = array()) {
     error_log($log_message);
 }
 
+/* === 取得所有縮圖尺寸 === */
+function media_encoder_all_image_sizes() {
+	global $_wp_additional_image_sizes;
+	$sizes = array();
+	$builtins = array('thumbnail','medium','medium_large','large','1536x1536','2048x2048');
+	foreach ($builtins as $s) {
+		$w = intval(get_option("{$s}_size_w"));
+		$h = intval(get_option("{$s}_size_h"));
+		$crop = (bool) get_option("{$s}_crop");
+		if ($w || $h) $sizes[$s] = array('width'=>$w,'height'=>$h,'crop'=>$crop);
+	}
+	if (is_array($_wp_additional_image_sizes)) {
+		foreach ($_wp_additional_image_sizes as $k => $v) {
+			$sizes[$k] = array('width'=>intval($v['width']),'height'=>intval($v['height']),'crop'=>!empty($v['crop']));
+		}
+	}
+	return $sizes;
+}
+
 /* === 儲存設定 === */
 function media_encoder_save_settings() {
     if (!current_user_can('manage_options')) return;
@@ -48,6 +69,11 @@ function media_encoder_save_settings() {
     // 移除 replace_original 選項儲存，因為強制啟用
     update_option('media_encoder_enable_logging', isset($_POST['media_encoder_enable_logging']) ? 'on' : 'off');
     update_option('media_encoder_enable_webp_fallback', isset($_POST['media_encoder_enable_webp_fallback']) ? 'on' : 'off');
+    // 儲存停用縮圖尺寸
+    $all_sizes = media_encoder_all_image_sizes();
+    $disabled = isset($_POST['media_encoder_disabled_sizes']) ? (array) $_POST['media_encoder_disabled_sizes'] : array();
+    $disabled = array_values(array_intersect($disabled, array_keys($all_sizes)));
+    update_option('media_encoder_disabled_sizes', $disabled);
     
     echo '<div class="updated"><p>媒體編碼器設定已更新 ✅</p></div>';
 }
@@ -96,6 +122,19 @@ function media_encoder_settings_page() {
                     <small>啟用後會將轉換錯誤記錄到 WordPress 錯誤日誌中。</small>
                 </p>
                 <p><input type="submit" class="button-primary" name="media_encoder_save" value="儲存設定"></p>
+
+                <h2>縮圖尺寸管理</h2>
+                <p>關閉網站未使用的縮圖尺寸，可節省空間與生成時間：</p>
+                <fieldset style="max-height:180px;overflow:auto;border:1px solid #ddd;padding:8px;border-radius:6px;">
+                <?php $sizes = media_encoder_all_image_sizes(); $disabled = (array) get_option('media_encoder_disabled_sizes', array());
+                foreach ($sizes as $size_key => $info): $is_disabled = in_array($size_key, $disabled, true); ?>
+                    <label style="display:flex;align-items:center;gap:8px;margin:6px 0;">
+                        <input type="checkbox" name="media_encoder_disabled_sizes[]" value="<?php echo esc_attr($size_key); ?>" <?php checked($is_disabled); ?>>
+                        <span><strong><?php echo esc_html($size_key); ?></strong> (<?php echo intval($info['width']); ?>x<?php echo intval($info['height']); ?>, <?php echo $info['crop'] ? '裁切' : '不裁切'; ?>)</span>
+                    </label>
+                <?php endforeach; ?>
+                </fieldset>
+                <p class="description">被停用的尺寸將不會再生成；已存在檔案不會自動刪除，可使用下方清理工具。</p>
 
                 <h2>預覽模式</h2>
                 <p>在啟動全域轉換前，先對單一影像進行測試壓縮。</p>
@@ -217,6 +256,15 @@ function media_encoder_settings_page() {
                         <li>📊 即時系統負載監控</li>
                         <li>🛑 隨時可暫停、繼續或取消</li>
                     </ul>
+                </div>
+
+                <h2 style="margin-top:24px;">縮圖與清理工具</h2>
+                <div style="background:#f9f9f9;padding:12px;border-radius:6px;border:1px solid #e0e0e0;">
+                    <p><button type="button" class="button" id="media-encoder-regenerate-thumbs">重新產生所需縮圖</button>
+                    <span id="media-encoder-regenerate-status" style="margin-left:10px;color:#666;"></span></p>
+                    <p><button type="button" class="button" id="media-encoder-scan-unused">掃描未使用的圖像</button>
+                    <button type="button" class="button button-danger" id="media-encoder-delete-unused" style="display:none;">刪除選取的未使用圖像</button></p>
+                    <div id="media-encoder-unused-list" style="display:none;max-height:240px;overflow:auto;border:1px solid #ddd;border-radius:6px;padding:8px;background:#fff;"></div>
                 </div>
             </div>
         </div>
@@ -518,6 +566,50 @@ function media_encoder_settings_page() {
             $('#media-encoder-bulk-resume').hide();
             $('#media-encoder-bulk-cancel').hide();
         }
+
+        // ===== 縮圖重新產生 =====
+        $('#media-encoder-regenerate-thumbs').on('click', function(){
+            const $status = $('#media-encoder-regenerate-status');
+            $status.text('準備中…');
+            $.post(ajaxurl, {action: 'media_encoder_regenerate_thumbnails', _wpnonce: nonce}, function(res){
+                if(!res || !res.success){ $status.text((res && res.data) ? res.data : '啟動失敗'); return; }
+                $status.text('已開始背景處理…');
+            }).fail(function(){ $status.text('網路錯誤'); });
+        });
+
+        // ===== 掃描未使用圖像 =====
+        $('#media-encoder-scan-unused').on('click', function(){
+            const $list = $('#media-encoder-unused-list');
+            $list.show().html('掃描中…');
+            $.post(ajaxurl, {action: 'media_encoder_scan_unused', _wpnonce: nonce}, function(res){
+                if(!res || !res.success){ $list.html('<div style="color:red;">掃描失敗</div>'); return; }
+                const items = res.data || [];
+                if(items.length === 0){ $list.html('<div>沒有找到未使用的圖像。</div>'); $('#media-encoder-delete-unused').hide(); return; }
+                let html = '<table class="widefat"><thead><tr><th style="width:32px;"><input type="checkbox" id="wu-unused-all"></th><th>檔名</th><th>上傳者</th><th>大小</th></tr></thead><tbody>';
+                items.forEach(function(it){
+                    html += '<tr>'+
+                        '<td><input type="checkbox" class="wu-unused-item" value="'+ it.id +'"></td>'+
+                        '<td>'+ it.file +'</td>'+
+                        '<td>'+ it.uploader +'</td>'+
+                        '<td>'+ it.size_human +'</td>'+
+                    '</tr>';
+                });
+                html += '</tbody></table>';
+                $list.html(html);
+                $('#media-encoder-delete-unused').show();
+                $('#wu-unused-all').on('change', function(){ $('.wu-unused-item').prop('checked', this.checked); });
+            }).fail(function(){ $list.html('<div style="color:red;">網路錯誤</div>'); });
+        });
+
+        // ===== 刪除未使用圖像 =====
+        $('#media-encoder-delete-unused').on('click', function(){
+            const ids = $('.wu-unused-item:checked').map(function(){ return this.value; }).get();
+            if(ids.length === 0){ alert('請先選擇要刪除的圖像'); return; }
+            if(!confirm('確定刪除選取的 '+ids.length+' 個圖像？此動作無法復原。')) return;
+            $.post(ajaxurl, {action: 'media_encoder_delete_unused', _wpnonce: nonce, ids: ids}, function(res){
+                if(res && res.success){ $('#media-encoder-scan-unused').click(); } else { alert(res && res.data ? res.data : '刪除失敗'); }
+            }).fail(function(){ alert('網路錯誤'); });
+        });
     });
     </script>
     <?php
@@ -532,6 +624,84 @@ function media_encoder_maybe_register_hooks() {
     add_filter('wp_generate_attachment_metadata', 'media_encoder_convert_on_upload', 10, 2);
 }
 add_action('init', 'media_encoder_maybe_register_hooks');
+
+/* === AJAX：重新產生縮圖（分批背景處理）=== */
+add_action('wp_ajax_media_encoder_regenerate_thumbnails', function(){
+	if (!current_user_can('manage_options')) wp_send_json_error('權限不足');
+	check_ajax_referer('media_encoder_ajax');
+	// 啟動一個非同步事件：使用 WP Cron 分批處理
+	if (!wp_next_scheduled('media_encoder_cron_regen_batch')) {
+		wp_schedule_single_event(time()+1, 'media_encoder_cron_regen_batch', array('offset'=>0));
+	}
+	wp_send_json_success(true);
+});
+
+add_action('media_encoder_cron_regen_batch', function($offset){
+	$batch = 25;
+	$q = new WP_Query(array(
+		'post_type'=>'attachment','post_mime_type'=>array('image/jpeg','image/png','image/webp'),'posts_per_page'=>$batch,'offset'=>intval($offset),'fields'=>'ids','orderby'=>'ID','order'=>'ASC',
+	));
+	if (empty($q->posts)) return; // done
+	foreach ($q->posts as $aid) {
+		$path = get_attached_file($aid);
+		if (!$path || !file_exists($path)) continue;
+		$meta = wp_generate_attachment_metadata($aid, $path);
+		if ($meta) wp_update_attachment_metadata($aid, $meta);
+	}
+	// queue next batch
+	wp_schedule_single_event(time()+15, 'media_encoder_cron_regen_batch', array('offset'=>intval($offset)+$batch));
+}, 10, 1);
+
+/* === AJAX：掃描未使用圖像 === */
+add_action('wp_ajax_media_encoder_scan_unused', function(){
+	if (!current_user_can('manage_options')) wp_send_json_error('權限不足');
+	check_ajax_referer('media_encoder_ajax');
+	$results = array();
+	$attachments = get_posts(array('post_type'=>'attachment','post_status'=>'inherit','posts_per_page'=>500,'orderby'=>'date','order'=>'DESC'));
+	foreach ($attachments as $att) {
+		$attached = get_post_field('post_parent', $att->ID);
+		$file = get_attached_file($att->ID);
+		if (!$file || !file_exists($file)) continue;
+		$filesize = @filesize($file);
+		$in_use = false;
+		// 判斷是否被內容引用（快速但不完整）：以 URL 搜尋近期文章
+		$url = wp_get_attachment_url($att->ID);
+		$search = new WP_Query(array('s' => esc_url_raw($url), 'posts_per_page' => 1, 'post_status'=>'any'));
+		if ($attached || ($search && $search->have_posts())) { $in_use = true; }
+		if ($in_use) continue;
+		$author = get_user_by('id', $att->post_author);
+		$results[] = array(
+			'id' => $att->ID,
+			'file' => basename($file),
+			'uploader' => $author ? $author->display_name : '未知',
+			'size' => $filesize,
+			'size_human' => size_format($filesize),
+		);
+		if (count($results) >= 200) break; // 上限避免過慢
+	}
+	wp_send_json_success($results);
+});
+
+/* === AJAX：刪除未使用圖像 === */
+add_action('wp_ajax_media_encoder_delete_unused', function(){
+	if (!current_user_can('manage_options')) wp_send_json_error('權限不足');
+	check_ajax_referer('media_encoder_ajax');
+	$ids = isset($_POST['ids']) ? array_map('intval', (array) $_POST['ids']) : array();
+	if (empty($ids)) wp_send_json_error('沒有選取項目');
+	$deleted = 0;
+	foreach ($ids as $aid) {
+		if (wp_delete_attachment($aid, true)) $deleted++;
+	}
+	wp_send_json_success(array('deleted'=>$deleted));
+});
+
+/* === 過濾：停用選取的縮圖尺寸 === */
+add_filter('intermediate_image_sizes_advanced', function($sizes){
+	$disabled = (array) get_option('media_encoder_disabled_sizes', array());
+	if (empty($disabled)) return $sizes;
+	foreach ($disabled as $d) { unset($sizes[$d]); }
+	return $sizes;
+}, 10, 1);
 
 /* === 轉換工具：GD 或 Imagick === */
 function media_encoder_can_convert() {

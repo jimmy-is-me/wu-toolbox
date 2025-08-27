@@ -17,6 +17,9 @@ class WU_Admin_Bar_Cleaner {
         
         // 載入所有啟用的功能
         $this->load_features();
+
+        // 前台注入複製保護
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_copy_protection')); 
     }
     
     /**
@@ -31,6 +34,27 @@ class WU_Admin_Bar_Cleaner {
             'wumetax-admin-bar-cleaner',
             array($this, 'admin_page')
         );
+    }
+
+    public function enqueue_copy_protection() {
+        if (is_admin()) return;
+        if (!get_option('wu_enable_copy_protection', false)) return;
+        $message = get_option('wu_copy_protection_message', '此網站已啟用內容保護，禁止複製與右鍵操作。');
+        add_action('wp_head', function() use ($message) {
+            echo '<style>body{user-select:none;-webkit-user-select:none;-ms-user-select:none}</style>';
+            echo '<script>(function(){
+                var msg = ' . wp_json_encode($message) . ';
+                function alertMsg(e){ try{ if(e) e.preventDefault(); }catch(_){} alert(msg); }
+                document.addEventListener("contextmenu", function(e){ e.preventDefault(); alert(msg); });
+                document.addEventListener("copy", alertMsg);
+                document.addEventListener("cut", alertMsg);
+                document.addEventListener("paste", alertMsg);
+                document.addEventListener("keydown", function(e){
+                    var k=e.key.toLowerCase();
+                    if((e.ctrlKey||e.metaKey) && (k==='a'||k==='c'||k==='x'||k==='s'||k==='v')){ e.preventDefault(); alert(msg); }
+                }, true);
+            })();</script>';
+        });
     }
     
     /**
@@ -55,7 +79,10 @@ class WU_Admin_Bar_Cleaner {
             'wu_custom_frontend_footer_text',
             'wu_hide_wumetax_toolkit',
             'wu_hide_admin_updates',
-            'wu_disabled_user_roles'
+            'wu_disabled_user_roles',
+            // 新增：內容複製保護
+            'wu_enable_copy_protection',
+            'wu_copy_protection_message'
         );
         
         foreach ($settings as $setting) {
@@ -239,6 +266,15 @@ class WU_Admin_Bar_Cleaner {
             'wu_custom_frontend_footer_text',
             '自訂前台頁尾文本',
             array($this, 'custom_frontend_footer_text_callback'),
+            'wu_admin_bar_settings',
+            'wu_frontend_section'
+        );
+
+        // 內容複製保護
+        add_settings_field(
+            'wu_enable_copy_protection',
+            '內容複製保護',
+            array($this, 'copy_protection_callback'),
             'wu_admin_bar_settings',
             'wu_frontend_section'
         );
@@ -516,6 +552,14 @@ class WU_Admin_Bar_Cleaner {
         $value = get_option('wu_custom_frontend_footer_text', '');
         echo '<input type="text" id="wu_custom_frontend_footer_text" name="wu_custom_frontend_footer_text" value="' . esc_attr($value) . '" class="regular-text" />';
         echo '<p class="description">輸入自訂的前台頁尾文本。留空則不顯示任何文本。</p>';
+    }
+
+    public function copy_protection_callback() {
+        $enabled = get_option('wu_enable_copy_protection', false);
+        $message = get_option('wu_copy_protection_message', '此網站已啟用內容保護，禁止複製與右鍵操作。');
+        echo '<label><input type="checkbox" name="wu_enable_copy_protection" value="1" ' . checked(1, $enabled, false) . '> 啟用前台內容複製保護</label>';
+        echo '<p style="margin-top:8px;"><label>警告訊息：<br><input type="text" name="wu_copy_protection_message" value="' . esc_attr($message) . '" style="width:100%;max-width:520px;"></label></p>';
+        echo '<p class="description">禁止右鍵、選取與常見快捷鍵（CTRL/⌘ + A/C/X/S/V），觸發時顯示警告。</p>';
     }
     
     /**
