@@ -126,7 +126,8 @@ class WU_Enhanced_User_List {
             'show_filters' => true,
             'show_statistics' => true,
             'highlight_inactive_users' => 30, // 天數
-            // 新增隱藏選項
+            // 隱藏選項
+            'hide_personal_options' => false,
             'hide_admin_color_scheme' => false,
             'hide_syntax_highlighting' => false,
             'hide_keyboard_shortcuts' => false,
@@ -134,6 +135,24 @@ class WU_Enhanced_User_List {
             'hide_language' => false,
             'hide_biographical_info' => false,
             'hide_application_passwords' => false,
+            'hide_elementor_ai' => false,
+            // 社交媒體相關隱藏選項
+            'hide_user_url' => false,
+            'hide_user_facebook' => false,
+            'hide_user_twitter' => false,
+            'hide_user_linkedin' => false,
+            'hide_user_mastodon' => false,
+            'hide_user_tiktok' => false,
+            'hide_user_odnoklassniki' => false,
+            'hide_user_vkontakte' => false,
+            'hide_user_vimeo' => false,
+            'hide_user_youtube' => false,
+            'hide_user_medium' => false,
+            'hide_user_github' => false,
+            'hide_user_wordpress' => false,
+            'hide_user_pinterest' => false,
+            'hide_user_instagram' => false,
+            'hide_user_dribbble' => false,
             // 用戶匯出功能
             'enable_user_export' => false,
             'include_meta' => true,
@@ -666,7 +685,8 @@ class WU_Enhanced_User_List {
             'show_filters' => isset($_POST['show_filters']),
             'show_statistics' => isset($_POST['show_statistics']),
             'highlight_inactive_users' => intval($_POST['highlight_inactive_users']),
-            // 新增隱藏選項
+            // 隱藏選項
+            'hide_personal_options' => isset($_POST['hide_personal_options']),
             'hide_admin_color_scheme' => isset($_POST['hide_admin_color_scheme']),
             'hide_syntax_highlighting' => isset($_POST['hide_syntax_highlighting']),
             'hide_keyboard_shortcuts' => isset($_POST['hide_keyboard_shortcuts']),
@@ -674,7 +694,6 @@ class WU_Enhanced_User_List {
             'hide_language' => isset($_POST['hide_language']),
             'hide_biographical_info' => isset($_POST['hide_biographical_info']),
             'hide_application_passwords' => isset($_POST['hide_application_passwords']),
-            'hide_personal_options' => isset($_POST['hide_personal_options']),
             'hide_elementor_ai' => isset($_POST['hide_elementor_ai']),
             // 社交媒體相關隱藏選項
             'hide_user_url' => isset($_POST['hide_user_url']),
@@ -1661,7 +1680,7 @@ class WU_Enhanced_User_List {
                     
                     <button type="button" class="button" id="wu-select-avatar">選擇圖片</button>
                     <?php if ($custom_avatar): ?>
-                        <button type="button" class="button" id="wu-remove-avatar">移除自訂頭像</button>
+                    <button type="button" class="button" id="wu-remove-avatar">移除自訂頭像</button>
                     <?php endif; ?>
                     
                     <p class="description">
@@ -1885,3 +1904,4 @@ $wu_enhanced_user_list = new WU_Enhanced_User_List();
 if (class_exists('WooCommerce')) {
     add_action('woocommerce_order_status_changed', array($wu_enhanced_user_list, 'update_user_woo_total'), 10, 3);
 }
+?>
