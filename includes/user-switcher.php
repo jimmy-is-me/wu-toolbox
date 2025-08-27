@@ -610,7 +610,7 @@ class WU_User_Switcher {
         setcookie('wu_switched_user', $cookie_value, $data['expires'], COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
     }
     
-    private function clear_switch_cookie() {
+    public function clear_switch_cookie($user_login = null, $user = null) {
         if (isset($_COOKIE['wu_switched_user'])) {
             setcookie('wu_switched_user', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
             unset($_COOKIE['wu_switched_user']);

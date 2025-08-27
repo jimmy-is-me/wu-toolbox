@@ -124,6 +124,7 @@ function media_encoder_settings_page() {
                 <p><input type="submit" class="button-primary" name="media_encoder_save" value="儲存設定"></p>
 
                 <h2>縮圖尺寸管理</h2>
+                <p style="color:#b32d2e;font-weight:600;">建議：打勾代表關閉未使用的縮圖尺寸（請僅關閉確定不會用到的尺寸）。</p>
                 <p>關閉網站未使用的縮圖尺寸，可節省空間與生成時間：</p>
                 <fieldset style="max-height:180px;overflow:auto;border:1px solid #ddd;padding:8px;border-radius:6px;">
                 <?php $sizes = media_encoder_all_image_sizes(); $disabled = (array) get_option('media_encoder_disabled_sizes', array());
@@ -262,6 +263,7 @@ function media_encoder_settings_page() {
                 <div style="background:#f9f9f9;padding:12px;border-radius:6px;border:1px solid #e0e0e0;">
                     <p><button type="button" class="button" id="media-encoder-regenerate-thumbs">重新產生所需縮圖</button>
                     <span id="media-encoder-regenerate-status" style="margin-left:10px;color:#666;"></span></p>
+                    <div id="media-encoder-regenerate-list" style="display:none;max-height:220px;overflow:auto;border:1px solid #e0e0e0;background:#fff;border-radius:6px;padding:8px;margin-top:8px;"></div>
                     <p><button type="button" class="button" id="media-encoder-scan-unused">掃描未使用的圖像</button>
                     <button type="button" class="button button-danger" id="media-encoder-delete-unused" style="display:none;">刪除選取的未使用圖像</button></p>
                     <div id="media-encoder-unused-list" style="display:none;max-height:240px;overflow:auto;border:1px solid #ddd;border-radius:6px;padding:8px;background:#fff;"></div>
@@ -570,12 +572,39 @@ function media_encoder_settings_page() {
         // ===== 縮圖重新產生 =====
         $('#media-encoder-regenerate-thumbs').on('click', function(){
             const $status = $('#media-encoder-regenerate-status');
+            const $list = $('#media-encoder-regenerate-list');
             $status.text('準備中…');
+            $list.empty().show().append('<div>開始背景處理，將逐步列出已處理的媒體項目…</div>');
             $.post(ajaxurl, {action: 'media_encoder_regenerate_thumbnails', _wpnonce: nonce}, function(res){
                 if(!res || !res.success){ $status.text((res && res.data) ? res.data : '啟動失敗'); return; }
                 $status.text('已開始背景處理…');
+                startRegenPolling($status, $list);
             }).fail(function(){ $status.text('網路錯誤'); });
         });
+
+        let regenPollingTimer = null;
+        function startRegenPolling($status, $list){
+            if (regenPollingTimer) clearInterval(regenPollingTimer);
+            regenPollingTimer = setInterval(function(){
+                $.post(ajaxurl, {action: 'media_encoder_get_regen_progress', _wpnonce: nonce}, function(res){
+                    if (!res || !res.success) return;
+                    const data = res.data || {};
+                    if (Array.isArray(data.items)) {
+                        $list.empty();
+                        data.items.forEach(function(it){
+                            $list.append('<div style="display:flex;justify-content:space-between;border-bottom:1px dashed #eee;padding:4px 0;">'
+                                + '<span>#'+it.id+' '+it.file+'</span>'
+                                + '<span style="color:#2271b1;">'+it.status+'</span>'
+                            + '</div>');
+                        });
+                    }
+                    if (data.done) {
+                        clearInterval(regenPollingTimer);
+                        $status.text('完成');
+                    }
+                });
+            }, 4000);
+        }
 
         // ===== 掃描未使用圖像 =====
         $('#media-encoder-scan-unused').on('click', function(){
@@ -633,6 +662,7 @@ add_action('wp_ajax_media_encoder_regenerate_thumbnails', function(){
 	if (!wp_next_scheduled('media_encoder_cron_regen_batch')) {
 		wp_schedule_single_event(time()+1, 'media_encoder_cron_regen_batch', array('offset'=>0));
 	}
+	update_option('media_encoder_regen_progress', array('items'=>array(), 'done'=>false));
 	wp_send_json_success(true);
 });
 
@@ -641,16 +671,37 @@ add_action('media_encoder_cron_regen_batch', function($offset){
 	$q = new WP_Query(array(
 		'post_type'=>'attachment','post_mime_type'=>array('image/jpeg','image/png','image/webp'),'posts_per_page'=>$batch,'offset'=>intval($offset),'fields'=>'ids','orderby'=>'ID','order'=>'ASC',
 	));
-	if (empty($q->posts)) return; // done
+	$progress = get_option('media_encoder_regen_progress', array('items'=>array(), 'done'=>false));
+	if (empty($q->posts)) {
+		$progress['done'] = true;
+		update_option('media_encoder_regen_progress', $progress);
+		return; // done
+	}
 	foreach ($q->posts as $aid) {
 		$path = get_attached_file($aid);
 		if (!$path || !file_exists($path)) continue;
 		$meta = wp_generate_attachment_metadata($aid, $path);
 		if ($meta) wp_update_attachment_metadata($aid, $meta);
+		$progress['items'][] = array(
+			'id' => $aid,
+			'file' => basename($path),
+			'status' => '已重新產生縮圖'
+		);
 	}
 	// queue next batch
 	wp_schedule_single_event(time()+15, 'media_encoder_cron_regen_batch', array('offset'=>intval($offset)+$batch));
+	update_option('media_encoder_regen_progress', $progress);
 }, 10, 1);
+
+// AJAX 取得縮圖重建進度
+add_action('wp_ajax_media_encoder_get_regen_progress', function(){
+	if (!current_user_can('manage_options')) wp_send_json_error();
+	check_ajax_referer('media_encoder_ajax');
+	$progress = get_option('media_encoder_regen_progress', array('items'=>array(), 'done'=>false));
+	// 僅回傳最近 50 筆以避免過大
+	$items = array_slice($progress['items'], -50);
+	wp_send_json_success(array('items'=>$items, 'done'=>!empty($progress['done'])));
+});
 
 /* === AJAX：掃描未使用圖像 === */
 add_action('wp_ajax_media_encoder_scan_unused', function(){

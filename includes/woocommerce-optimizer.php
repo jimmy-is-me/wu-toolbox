@@ -17,7 +17,8 @@ class WU_WooCommerce_Optimizer {
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_init', array($this, 'admin_init'));
         
-        // 載入優化功能
+        // 載入優化功能（強制啟用所需關閉項目）
+        $this->force_disable_requests();
         $this->load_optimizations();
 
         // 購買量顯示與短代碼
@@ -436,40 +437,27 @@ class WU_WooCommerce_Optimizer {
      */
     private function load_optimizations() {
         // 禁用 WooCommerce 市場中心
-        if (get_option('wu_woo_disable_marketing_hub', false)) {
-            add_action('admin_init', array($this, 'disable_marketing_hub'));
-        }
-        
+        add_action('admin_init', array($this, 'disable_marketing_hub'));
         // 移除 Home 選單
-        if (get_option('wu_woo_remove_home', false)) {
-            add_action('admin_menu', array($this, 'remove_home_menu'), 999);
-        }
-        
+        add_action('admin_menu', array($this, 'remove_home_menu'), 999);
         // 禁用市場建議
-        if (get_option('wu_woo_disable_marketplace_suggestions', false)) {
-            add_action('admin_init', array($this, 'disable_marketplace_suggestions'));
-        }
-        
+        add_action('admin_init', array($this, 'disable_marketplace_suggestions'));
         // 禁用 Stripe 腳本
-        if (get_option('wu_woo_disable_stripe_scripts', false)) {
-            add_action('wp_enqueue_scripts', array($this, 'disable_stripe_scripts'), 100);
-            add_action('admin_enqueue_scripts', array($this, 'disable_stripe_scripts'), 100);
-        }
-        
+        add_action('wp_enqueue_scripts', array($this, 'disable_stripe_scripts'), 100);
+        add_action('admin_enqueue_scripts', array($this, 'disable_stripe_scripts'), 100);
         // 停用指南郵件
-        if (get_option('wu_woo_disable_guide_emails', false)) {
-            add_action('init', array($this, 'disable_guide_emails'));
-        }
-        
+        add_action('init', array($this, 'disable_guide_emails'));
         // 禁用 WooCommerce.com 通知
-        if (get_option('wu_woo_disable_woocom_notifications', false)) {
-            add_action('admin_init', array($this, 'disable_woocom_notifications'));
-        }
-        
+        add_action('admin_init', array($this, 'disable_woocom_notifications'));
         // 隱藏付款提供者鏈接
-        if (get_option('wu_woo_hide_payment_providers_link', false)) {
-            add_action('admin_init', array($this, 'hide_payment_providers_link'));
-        }
+        add_action('admin_init', array($this, 'hide_payment_providers_link'));
+    }
+
+    // 強制關閉在早期階段也能生效的建議與通知
+    private function force_disable_requests() {
+        add_filter('woocommerce_allow_marketplace_suggestions', '__return_false');
+        add_filter('woocommerce_helper_suppress_admin_notices', '__return_true');
+        add_filter('woocommerce_helper_suppress_connect_notice', '__return_true');
     }
     
     /**
@@ -531,6 +519,7 @@ class WU_WooCommerce_Optimizer {
             wp_dequeue_script('stripe');
             wp_dequeue_script('wc-stripe-payment-request');
             wp_dequeue_script('wc-stripe-elements');
+            wp_dequeue_style('wc-stripe-style');
         }
     }
     
