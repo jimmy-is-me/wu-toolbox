@@ -184,35 +184,35 @@ class WU_WooCommerce_Optimizer {
         $value = get_option('wu_woo_disable_marketing_hub', false);
         echo '<input type="checkbox" id="wu_woo_disable_marketing_hub" name="wu_woo_disable_marketing_hub" value="1" ' . checked(1, $value, false) . ' />';
         echo '<label for="wu_woo_disable_marketing_hub">完全停用 WooCommerce 行銷中心</label>';
-        echo '<p class="description">此選項將完全停用 WooCommerce 行銷中心。優惠券選單項目將維持原有的存取方式（WooCommerce -> 優惠券）。</p>';
+        echo '<p class="description">此選項將完全停用 WooCommerce 行銷中心並隱藏後台行銷選單。優惠券選單項目將維持原有的存取方式（WooCommerce -> 優惠券）。</p>';
     }
     
     public function disable_home_callback() {
         $value = get_option('wu_woo_disable_home', false);
         echo '<input type="checkbox" id="wu_woo_disable_home" name="wu_woo_disable_home" value="1" ' . checked(1, $value, false) . ' />';
         echo '<label for="wu_woo_disable_home">移除 WooCommerce 首頁選單項目</label>';
-        echo '<p class="description">從 WooCommerce 管理選單中移除首頁項目。</p>';
+        echo '<p class="description">從 WooCommerce 管理選單中移除首頁項目，同時會隱藏擴充功能相關選單。</p>';
     }
     
     public function disable_notifications_callback() {
         $value = get_option('wu_woo_disable_notifications', false);
         echo '<input type="checkbox" id="wu_woo_disable_notifications" name="wu_woo_disable_notifications" value="1" ' . checked(1, $value, false) . ' />';
         echo '<label for="wu_woo_disable_notifications">停用 WooCommerce 通知欄</label>';
-        echo '<p class="description">隱藏 WooCommerce 管理介面的通知欄。</p>';
+        echo '<p class="description">隱藏整個 WooCommerce 管理介面的通知標題欄（woocommerce-layout__header）。</p>';
     }
     
     public function disable_reports_callback() {
         $value = get_option('wu_woo_disable_reports', false);
         echo '<input type="checkbox" id="wu_woo_disable_reports" name="wu_woo_disable_reports" value="1" ' . checked(1, $value, false) . ' />';
         echo '<label for="wu_woo_disable_reports">停用 WooCommerce 報表</label>';
-        echo '<p class="description">移除 WooCommerce 報表功能以提升效能。</p>';
+        echo '<p class="description">移除 WooCommerce 報表功能並隱藏後台報表選單以提升效能。</p>';
     }
     
     public function disable_marketplace_callback() {
         $value = get_option('wu_woo_disable_marketplace', false);
         echo '<input type="checkbox" id="wu_woo_disable_marketplace" name="wu_woo_disable_marketplace" value="1" ' . checked(1, $value, false) . ' />';
         echo '<label for="wu_woo_disable_marketplace">停用 WooCommerce Marketplace</label>';
-        echo '<p class="description">完全停用 WooCommerce Marketplace 功能。</p>';
+        echo '<p class="description">完全停用 WooCommerce Marketplace 功能並隱藏相關選單。</p>';
     }
     
     public function marketplace_suggestions_callback() {
@@ -226,7 +226,7 @@ class WU_WooCommerce_Optimizer {
         $value = get_option('wu_woo_disable_stripe_scripts', false);
         echo '<input type="checkbox" id="wu_woo_disable_stripe_scripts" name="wu_woo_disable_stripe_scripts" value="1" ' . checked(1, $value, false) . ' />';
         echo '<label for="wu_woo_disable_stripe_scripts">禁用不必要的 Stripe 腳本</label>';
-        echo '<p class="description">禁用在不需要的頁面載入的 Stripe 相關腳本。</p>';
+        echo '<p class="description">禁用在非結帳相關頁面載入的 Stripe 腳本：stripe.js、wc-stripe-payment-request.js、wc-stripe-elements.js、wc-stripe-style.css</p>';
     }
     
     public function guide_emails_callback() {
@@ -247,14 +247,14 @@ class WU_WooCommerce_Optimizer {
         $value = get_option('wu_woo_hide_payment_providers_link', false);
         echo '<input type="checkbox" id="wu_woo_hide_payment_providers_link" name="wu_woo_hide_payment_providers_link" value="1" ' . checked(1, $value, false) . ' />';
         echo '<label for="wu_woo_hide_payment_providers_link">隱藏「發現其他付款提供者」鏈接</label>';
-        echo '<p class="description">發現其他支付提供者連結顯示在您的支付網關下方，並透過付費擴充將使用者引導至外部市場。</p>';
+        echo '<p class="description">隱藏支付設定頁面的「發現其他支付提供者」連結、支付網關建議區塊及相關推廣內容。</p>';
     }
     
     public function payment_plugins_metabox_callback() {
         $value = get_option('wu_woo_disable_payment_plugins_metabox', false);
         echo '<input type="checkbox" id="wu_woo_disable_payment_plugins_metabox" name="wu_woo_disable_payment_plugins_metabox" value="1" ' . checked(1, $value, false) . ' />';
         echo '<label for="wu_woo_disable_payment_plugins_metabox">停用建議的付款外掛程式 Metabox</label>';
-        echo '<p class="description">建議的付款外掛程式 Metabox 出現在 WooCommerce 付款配置頁面上，主要用於廣告推廣。</p>';
+        echo '<p class="description">隱藏付款配置頁面的建議付款外掛 Metabox、支付建議區塊及相關廣告推廣內容。</p>';
     }
     
     public function sales_with_offset_callback() {
@@ -268,7 +268,16 @@ class WU_WooCommerce_Optimizer {
         $value = get_option('wu_woo_clean_cache', false);
         echo '<input type="checkbox" id="wu_woo_clean_cache" name="wu_woo_clean_cache" value="1" ' . checked(1, $value, false) . ' />';
         echo '<label for="wu_woo_clean_cache">啟用 WooCommerce 暫存清理功能</label>';
-        echo '<p class="description">智能檢測並清理過期的 WooCommerce 暫存檔案，不影響網站正常運作。</p>';
+        echo '<p class="description">智能檢測並清理過期的 WooCommerce 暫存檔案：</p>';
+        echo '<ul style="margin-left: 20px; font-size: 0.9em; color: #666;">';
+        echo '<li>• WooCommerce 暫存資料 (transients)</li>';
+        echo '<li>• 用戶會話資料 (sessions)</li>';
+        echo '<li>• 商品查詢暫存 (product lookup)</li>';
+        echo '<li>• 運送區域暫存 (shipping zones)</li>';
+        echo '<li>• 稅率計算暫存 (tax rates)</li>';
+        echo '<li>• 地理位置暫存 (geolocation)</li>';
+        echo '<li>• 過期的 WooCommerce transients</li>';
+        echo '</ul>';
         
         if ($value) {
             echo '<div style="margin-top: 10px;">';
@@ -285,6 +294,7 @@ class WU_WooCommerce_Optimizer {
         // 只有在選項啟用時才執行對應功能
         if (get_option('wu_woo_disable_marketing_hub')) {
             add_action('admin_init', array($this, 'disable_marketing_hub'));
+            add_action('admin_menu', array($this, 'remove_marketing_menu'), 999);
         }
         
         if (get_option('wu_woo_disable_home')) {
@@ -297,6 +307,7 @@ class WU_WooCommerce_Optimizer {
         
         if (get_option('wu_woo_disable_reports')) {
             add_action('admin_init', array($this, 'disable_reports'));
+            add_action('admin_menu', array($this, 'remove_reports_menu'), 999);
         }
         
         if (get_option('wu_woo_disable_marketplace')) {
@@ -347,12 +358,19 @@ class WU_WooCommerce_Optimizer {
         });
     }
     
+    public function remove_marketing_menu() {
+        remove_submenu_page('woocommerce', 'wc-marketing');
+        remove_submenu_page('woocommerce', 'marketing');
+    }
+    
     public function remove_home_menu() {
         remove_submenu_page('woocommerce', 'wc-admin');
+        remove_submenu_page('woocommerce', 'wc-addons');
         global $submenu;
         if (isset($submenu['woocommerce'])) {
             foreach ($submenu['woocommerce'] as $key => $menu_item) {
-                if (strpos($menu_item[2], 'wc-admin') !== false) {
+                if (strpos($menu_item[2], 'wc-admin') !== false || 
+                    strpos($menu_item[2], 'wc-addons') !== false) {
                     unset($submenu['woocommerce'][$key]);
                 }
             }
@@ -361,16 +379,27 @@ class WU_WooCommerce_Optimizer {
     
     public function disable_notifications() {
         add_action('admin_head', function() {
-            echo '<style>.woocommerce-admin-notices { display: none !important; }</style>';
+            echo '<style>
+                .woocommerce-layout__header,
+                .woocommerce-admin-notices,
+                .wc-admin-notice,
+                #woocommerce-admin-notices {
+                    display: none !important;
+                }
+            </style>';
         });
         add_filter('woocommerce_admin_disabled', '__return_true');
     }
     
     public function disable_reports() {
-        remove_submenu_page('woocommerce', 'wc-reports');
         add_filter('woocommerce_admin_features', function($features) {
-            return array_diff($features, array('analytics'));
+            return array_diff($features, array('analytics', 'reports'));
         });
+    }
+    
+    public function remove_reports_menu() {
+        remove_submenu_page('woocommerce', 'wc-reports');
+        remove_submenu_page('woocommerce', 'wc-admin&path=/analytics');
     }
     
     public function disable_marketplace() {
@@ -406,11 +435,15 @@ class WU_WooCommerce_Optimizer {
     
     public function hide_payment_providers_link() {
         add_action('admin_head', function() {
-            if (isset($_GET['page']) && $_GET['page'] === 'wc-settings' && isset($_GET['tab']) && $_GET['tab'] === 'checkout') {
+            if (isset($_GET['page']) && $_GET['page'] === 'wc-settings' && 
+                isset($_GET['tab']) && $_GET['tab'] === 'checkout') {
                 echo '<style>
                     .woocommerce-BlankState-cta,
                     .payment-gateway-suggestions,
-                    .wc-payment-gateway-method-suggestions {
+                    .wc-payment-gateway-method-suggestions,
+                    .woocommerce-payments-welcome,
+                    .woocommerce-gateway-suggestions,
+                    .wc-payment-gateway-suggestions {
                         display: none !important;
                     }
                 </style>';
@@ -422,12 +455,24 @@ class WU_WooCommerce_Optimizer {
         add_action('admin_head', function() {
             echo '<style>
                 #woocommerce-gateway-suggestions,
-                .woocommerce-recommended-payment-plugins {
+                .woocommerce-recommended-payment-plugins,
+                .woocommerce-payment-gateway-suggestions,
+                .payment-gateway-suggestion,
+                .wc-payment-gateway-method-suggestion,
+                .woocommerce-gateway-suggestion {
                     display: none !important;
                 }
             </style>';
         });
-        remove_meta_box('woocommerce-gateway-suggestions', 'woocommerce_page_wc-settings', 'normal');
+        
+        // 移除相關 metabox
+        add_action('admin_init', function() {
+            remove_meta_box('woocommerce-gateway-suggestions', 'woocommerce_page_wc-settings', 'normal');
+            remove_meta_box('woocommerce-payment-gateway-suggestions', 'woocommerce_page_wc-settings', 'normal');
+        });
+        
+        // 禁用相關 hooks
+        add_filter('woocommerce_admin_payment_gateway_suggestion_specs', '__return_empty_array');
     }
     
     public function register_sales_features() {
@@ -500,12 +545,14 @@ class WU_WooCommerce_Optimizer {
         
         // 清理項目列表
         $cache_items = array(
-            'transients' => '暫存資料',
-            'sessions' => '用戶會話',
+            'wc_transients' => 'WooCommerce 暫存資料',
+            'wc_sessions' => '用戶會話資料',
             'product_lookup' => '商品查詢暫存',
             'shipping_zones' => '運送區域暫存',
-            'tax_rates' => '稅率暫存',
-            'geolocation' => '地理位置暫存'
+            'tax_rates' => '稅率計算暫存',
+            'geolocation' => '地理位置暫存',
+            'wc_cache' => 'WooCommerce 物件暫存',
+            'expired_transients' => '過期的 transients'
         );
         
         foreach ($cache_items as $type => $description) {
@@ -513,7 +560,8 @@ class WU_WooCommerce_Optimizer {
             if ($size > 0) {
                 $results['cleaned'][$type] = array(
                     'description' => $description,
-                    'size' => $this->format_bytes($size)
+                    'size' => $this->format_bytes($size),
+                    'items_count' => $this->get_cache_items_count($type)
                 );
                 $results['total_size'] += $size;
             }
@@ -522,9 +570,10 @@ class WU_WooCommerce_Optimizer {
         // WooCommerce 內建清理
         if (function_exists('wc_delete_expired_transients')) {
             wc_delete_expired_transients();
-            $results['cleaned']['wc_transients'] = array(
-                'description' => 'WooCommerce 過期暫存',
-                'size' => '已清理'
+            $results['cleaned']['wc_builtin'] = array(
+                'description' => 'WooCommerce 內建清理',
+                'size' => '已執行',
+                'items_count' => '不明'
             );
         }
         
@@ -536,45 +585,106 @@ class WU_WooCommerce_Optimizer {
         $size = 0;
         
         switch ($type) {
-            case 'transients':
+            case 'wc_transients':
                 $transients = $wpdb->get_results(
-                    "SELECT option_name FROM {$wpdb->options} 
+                    "SELECT option_name, option_value FROM {$wpdb->options} 
                      WHERE option_name LIKE '_transient_wc_%' 
                      OR option_name LIKE '_transient_timeout_wc_%'"
                 );
                 foreach ($transients as $transient) {
-                    $size += strlen(get_option($transient->option_name, ''));
+                    $size += strlen($transient->option_value);
                     delete_option($transient->option_name);
                 }
                 break;
                 
-            case 'sessions':
-                $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_wc_session_%'");
-                $size = $wpdb->rows_affected * 100; // 估算
+            case 'wc_sessions':
+                $sessions = $wpdb->get_results(
+                    "SELECT option_name, option_value FROM {$wpdb->options} 
+                     WHERE option_name LIKE '_wc_session_%'"
+                );
+                foreach ($sessions as $session) {
+                    $size += strlen($session->option_value);
+                    delete_option($session->option_name);
+                }
                 break;
                 
             case 'product_lookup':
-                wp_cache_delete('woocommerce_products', 'products');
+                wp_cache_flush_group('woocommerce_products');
+                wp_cache_flush_group('products');
                 $size = 1024; // 估算
                 break;
                 
             case 'shipping_zones':
-                wp_cache_delete('woocommerce_shipping_zones', 'shipping');
+                wp_cache_flush_group('woocommerce_shipping_zones');
+                wp_cache_flush_group('shipping');
+                delete_transient('wc_shipping_method_count');
                 $size = 512; // 估算
                 break;
                 
             case 'tax_rates':
-                wp_cache_delete('woocommerce_tax_rates', 'tax');
+                wp_cache_flush_group('woocommerce_tax_rates');
+                wp_cache_flush_group('tax');
+                delete_transient('wc_tax_rate_classes');
                 $size = 256; // 估算
                 break;
                 
             case 'geolocation':
-                $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE 'geoip_%'");
-                $size = $wpdb->rows_affected * 50; // 估算
+                $geoip = $wpdb->get_results(
+                    "SELECT option_name, option_value FROM {$wpdb->options} 
+                     WHERE option_name LIKE 'geoip_%' OR option_name LIKE '_transient_geoip_%'"
+                );
+                foreach ($geoip as $geo) {
+                    $size += strlen($geo->option_value);
+                    delete_option($geo->option_name);
+                }
+                break;
+                
+            case 'wc_cache':
+                wp_cache_flush_group('woocommerce');
+                wp_cache_flush_group('wc_session_id');
+                $size = 2048; // 估算
+                break;
+                
+            case 'expired_transients':
+                $expired = $wpdb->query(
+                    "DELETE a, b FROM {$wpdb->options} a, {$wpdb->options} b 
+                     WHERE a.option_name LIKE '_transient_%' 
+                     AND a.option_name NOT LIKE '_transient_timeout_%' 
+                     AND b.option_name = CONCAT('_transient_timeout_', SUBSTRING(a.option_name, 12))
+                     AND b.option_value < UNIX_TIMESTAMP()"
+                );
+                $size = $expired * 100; // 估算
                 break;
         }
         
         return $size;
+    }
+    
+    private function get_cache_items_count($type) {
+        global $wpdb;
+        
+        switch ($type) {
+            case 'wc_transients':
+                return $wpdb->get_var(
+                    "SELECT COUNT(*) FROM {$wpdb->options} 
+                     WHERE option_name LIKE '_transient_wc_%'"
+                );
+                
+            case 'wc_sessions':
+                return $wpdb->get_var(
+                    "SELECT COUNT(*) FROM {$wpdb->options} 
+                     WHERE option_name LIKE '_wc_session_%'"
+                );
+                
+            case 'geolocation':
+                return $wpdb->get_var(
+                    "SELECT COUNT(*) FROM {$wpdb->options} 
+                     WHERE option_name LIKE 'geoip_%'"
+                );
+                
+            default:
+                return '不明';
+        }
     }
     
     private function format_bytes($bytes) {
@@ -647,12 +757,12 @@ class WU_WooCommerce_Optimizer {
                 
                 <h3>優化項目說明</h3>
                 <ul>
-                    <li><strong>行銷中心：</strong>移除 WooCommerce 行銷推廣介面</li>
-                    <li><strong>首頁：</strong>移除 WooCommerce 管理首頁</li>
-                    <li><strong>通知欄：</strong>隱藏管理介面通知</li>
-                    <li><strong>報表：</strong>停用報表功能以提升效能</li>
+                    <li><strong>行銷中心：</strong>移除 WooCommerce 行銷推廣介面及選單</li>
+                    <li><strong>首頁：</strong>移除 WooCommerce 管理首頁及擴充功能選單</li>
+                    <li><strong>通知欄：</strong>隱藏整個管理介面通知標題欄</li>
+                    <li><strong>報表：</strong>停用報表功能及選單以提升效能</li>
                     <li><strong>Marketplace：</strong>移除市場推廣功能</li>
-                    <li><strong>暫存清理：</strong>智能清理過期暫存檔案</li>
+                    <li><strong>暫存清理：</strong>智能清理過期暫存檔案，顯示詳細清理資訊</li>
                 </ul>
                 
                 <h3>注意事項</h3>
@@ -660,14 +770,14 @@ class WU_WooCommerce_Optimizer {
                     <li>所有優化不會影響 WooCommerce 核心功能</li>
                     <li>設定可隨時啟用或停用</li>
                     <li>建議在測試環境中先行測試</li>
-                    <li>暫存清理功能會定期自動執行</li>
+                    <li>暫存清理功能會顯示詳細的清理項目和大小</li>
                 </ul>
             </div>
         </div>
         
         <script>
         function cleanWooCache() {
-            document.getElementById('cache-status').innerHTML = '清理中...';
+            document.getElementById('cache-status').innerHTML = '<div style="padding: 10px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">正在清理中，請稍候...</div>';
             
             fetch(ajaxurl, {
                 method: 'POST',
@@ -679,18 +789,31 @@ class WU_WooCommerce_Optimizer {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    let html = '<h4>清理完成：</h4><ul>';
+                    let html = '<div style="background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; padding: 15px;">';
+                    html += '<h4 style="margin-top: 0; color: #0c5460;">清理完成：</h4><ul style="margin: 0;">';
+                    
                     for (let type in data.data.cleaned) {
-                        html += '<li>' + data.data.cleaned[type].description + '：' + data.data.cleaned[type].size + '</li>';
+                        const item = data.data.cleaned[type];
+                        html += '<li><strong>' + item.description + '：</strong>' + item.size;
+                        if (item.items_count && item.items_count !== '不明') {
+                            html += ' (' + item.items_count + ' 項目)';
+                        }
+                        html += '</li>';
                     }
                     html += '</ul>';
+                    
                     if (data.data.total_size > 0) {
-                        html += '<p><strong>總計清理：' + formatBytes(data.data.total_size) + '</strong></p>';
+                        html += '<p style="margin: 10px 0 0 0;"><strong>總計清理：' + formatBytes(data.data.total_size) + '</strong></p>';
                     }
+                    html += '</div>';
+                    
                     document.getElementById('cache-status').innerHTML = html;
                 } else {
-                    document.getElementById('cache-status').innerHTML = '清理失敗：' + data.data;
+                    document.getElementById('cache-status').innerHTML = '<div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; padding: 10px; color: #721c24;">清理失敗：' + (data.data || '未知錯誤') + '</div>';
                 }
+            })
+            .catch(error => {
+                document.getElementById('cache-status').innerHTML = '<div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; padding: 10px; color: #721c24;">請求失敗：' + error.message + '</div>';
             });
         }
         
@@ -711,7 +834,10 @@ class WU_WooCommerce_Optimizer {
         .wc-status-table { width: 100%; margin-top: 15px; border-collapse: collapse; }
         .wc-status-table th, .wc-status-table td { padding: 8px; border: 1px solid #ddd; text-align: left; }
         .wc-status-table th { background-color: #f5f5f5; }
-        #cache-status ul { background: #f0f8ff; padding: 10px; border-radius: 4px; }
+        #cache-status { margin-top: 10px; }
+        #cache-status ul { list-style-type: none; padding-left: 0; }
+        #cache-status li { padding: 5px 0; border-bottom: 1px solid #e9ecef; }
+        #cache-status li:last-child { border-bottom: none; }
         </style>
         <?php
     }
@@ -759,9 +885,9 @@ class WU_WooCommerce_Optimizer {
         }
         
         if (empty($enabled_features)) {
-            echo '<tr><td colspan="2">目前沒有啟用任何優化功能</td></tr>';
+            echo '<tr><td colspan="2"><span style="color: #666;">目前沒有啟用任何優化功能</span></td></tr>';
         } else {
-            echo '<tr><td colspan="2">' . implode('、', $enabled_features) . '</td></tr>';
+            echo '<tr><td colspan="2"><span style="color: #0073aa; font-weight: bold;">' . implode('、', $enabled_features) . '</span></td></tr>';
         }
         
         echo '</table>';
