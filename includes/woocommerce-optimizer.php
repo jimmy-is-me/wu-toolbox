@@ -16,10 +16,10 @@ class WU_WooCommerce_Optimizer {
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_init', array($this, 'admin_init'));
         
-        // 載入優化功能（僅在啟用時執行）
+        // 載入優化功能
         $this->load_optimizations();
         
-        // 重組選單結構
+        // 重組選單結構（始終執行）
         add_action('admin_menu', array($this, 'reorganize_woo_menu'), 999);
     }
     
@@ -43,18 +43,9 @@ class WU_WooCommerce_Optimizer {
     public function admin_init() {
         // 註冊設定
         $settings = array(
-            'wu_woo_disable_marketing_hub',
-            'wu_woo_disable_home',
             'wu_woo_disable_notifications',
-            'wu_woo_disable_marketplace',
-            'wu_woo_disable_marketplace_suggestions',
-            'wu_woo_disable_stripe_scripts',
-            'wu_woo_disable_guide_emails',
-            'wu_woo_disable_woocom_notifications',
-            'wu_woo_disable_payment_plugins_metabox',
             'wu_woo_show_sales_with_offset',
-            'wu_woo_clean_cache',
-            'wu_woo_reorganize_menu'
+            'wu_woo_clean_cache'
         );
         
         foreach ($settings as $setting) {
@@ -68,75 +59,10 @@ class WU_WooCommerce_Optimizer {
             'wu_woocommerce_settings'
         );
         
-        // 基本優化功能
-        add_settings_field(
-            'wu_woo_disable_marketing_hub',
-            '隱藏 WooCommerce 行銷選單',
-            array($this, 'marketing_hub_callback'),
-            'wu_woocommerce_settings',
-            'wu_woocommerce_section'
-        );
-        
-        add_settings_field(
-            'wu_woo_disable_home',
-            '停用 WooCommerce 首頁',
-            array($this, 'disable_home_callback'),
-            'wu_woocommerce_settings',
-            'wu_woocommerce_section'
-        );
-        
         add_settings_field(
             'wu_woo_disable_notifications',
             '停用 WooCommerce 通知欄',
             array($this, 'disable_notifications_callback'),
-            'wu_woocommerce_settings',
-            'wu_woocommerce_section'
-        );
-        
-        add_settings_field(
-            'wu_woo_disable_marketplace',
-            '停用 WooCommerce Marketplace',
-            array($this, 'disable_marketplace_callback'),
-            'wu_woocommerce_settings',
-            'wu_woocommerce_section'
-        );
-        
-        add_settings_field(
-            'wu_woo_disable_marketplace_suggestions',
-            '停用市場建議',
-            array($this, 'marketplace_suggestions_callback'),
-            'wu_woocommerce_settings',
-            'wu_woocommerce_section'
-        );
-        
-        add_settings_field(
-            'wu_woo_disable_stripe_scripts',
-            '禁用不必要的 Stripe 腳本',
-            array($this, 'stripe_scripts_callback'),
-            'wu_woocommerce_settings',
-            'wu_woocommerce_section'
-        );
-        
-        add_settings_field(
-            'wu_woo_disable_guide_emails',
-            '停用指南電子郵件通知',
-            array($this, 'guide_emails_callback'),
-            'wu_woocommerce_settings',
-            'wu_woocommerce_section'
-        );
-        
-        add_settings_field(
-            'wu_woo_disable_woocom_notifications',
-            '禁用 WooCommerce.com 通知',
-            array($this, 'woocom_notifications_callback'),
-            'wu_woocommerce_settings',
-            'wu_woocommerce_section'
-        );
-        
-        add_settings_field(
-            'wu_woo_disable_payment_plugins_metabox',
-            '停用建議的付款外掛程式 Metabox',
-            array($this, 'payment_plugins_metabox_callback'),
             'wu_woocommerce_settings',
             'wu_woocommerce_section'
         );
@@ -156,85 +82,21 @@ class WU_WooCommerce_Optimizer {
             'wu_woocommerce_settings',
             'wu_woocommerce_section'
         );
-        
-        add_settings_field(
-            'wu_woo_reorganize_menu',
-            '重組 WooCommerce 選單結構',
-            array($this, 'reorganize_menu_callback'),
-            'wu_woocommerce_settings',
-            'wu_woocommerce_section'
-        );
     }
     
     /**
      * 設定區塊回調
      */
     public function settings_section_callback() {
-        echo '<p>配置 WooCommerce 優化選項，清理管理介面並重組選單結構。<strong>所有功能預設停用，請勾選需要的功能。</strong></p>';
+        echo '<p>配置 WooCommerce 優化選項。<strong>選單重組功能已自動啟用，訂單和優惠券已移至主選單。</strong></p>';
     }
     
     // 回調函數
-    public function marketing_hub_callback() {
-        $value = get_option('wu_woo_disable_marketing_hub', false);
-        echo '<input type="checkbox" id="wu_woo_disable_marketing_hub" name="wu_woo_disable_marketing_hub" value="1" ' . checked(1, $value, false) . ' />';
-        echo '<label for="wu_woo_disable_marketing_hub">隱藏 WooCommerce 後台行銷選單</label>';
-        echo '<p class="description">僅隱藏後台行銷選單項目，不影響行銷功能本身。優惠券選單將維持原有的存取方式。</p>';
-    }
-    
-    public function disable_home_callback() {
-        $value = get_option('wu_woo_disable_home', false);
-        echo '<input type="checkbox" id="wu_woo_disable_home" name="wu_woo_disable_home" value="1" ' . checked(1, $value, false) . ' />';
-        echo '<label for="wu_woo_disable_home">移除 WooCommerce 首頁選單項目</label>';
-        echo '<p class="description">從 WooCommerce 管理選單中移除首頁項目，同時會隱藏擴充功能相關選單。</p>';
-    }
-    
     public function disable_notifications_callback() {
         $value = get_option('wu_woo_disable_notifications', false);
         echo '<input type="checkbox" id="wu_woo_disable_notifications" name="wu_woo_disable_notifications" value="1" ' . checked(1, $value, false) . ' />';
         echo '<label for="wu_woo_disable_notifications">停用 WooCommerce 通知欄</label>';
-        echo '<p class="description">隱藏整個 WooCommerce 管理介面的通知標題欄（woocommerce-layout__header）。</p>';
-    }
-    
-    public function disable_marketplace_callback() {
-        $value = get_option('wu_woo_disable_marketplace', false);
-        echo '<input type="checkbox" id="wu_woo_disable_marketplace" name="wu_woo_disable_marketplace" value="1" ' . checked(1, $value, false) . ' />';
-        echo '<label for="wu_woo_disable_marketplace">停用 WooCommerce Marketplace</label>';
-        echo '<p class="description">完全停用 WooCommerce Marketplace 功能並隱藏相關選單。</p>';
-    }
-    
-    public function marketplace_suggestions_callback() {
-        $value = get_option('wu_woo_disable_marketplace_suggestions', false);
-        echo '<input type="checkbox" id="wu_woo_disable_marketplace_suggestions" name="wu_woo_disable_marketplace_suggestions" value="1" ' . checked(1, $value, false) . ' />';
-        echo '<label for="wu_woo_disable_marketplace_suggestions">禁用市場建議</label>';
-        echo '<p class="description">此選項將停用市場建議。建議在產品編輯頁面和訂單頁面上可見。</p>';
-    }
-    
-    public function stripe_scripts_callback() {
-        $value = get_option('wu_woo_disable_stripe_scripts', false);
-        echo '<input type="checkbox" id="wu_woo_disable_stripe_scripts" name="wu_woo_disable_stripe_scripts" value="1" ' . checked(1, $value, false) . ' />';
-        echo '<label for="wu_woo_disable_stripe_scripts">禁用不必要的 Stripe 腳本</label>';
-        echo '<p class="description">禁用在非結帳相關頁面載入的 Stripe 腳本：stripe.js、wc-stripe-payment-request.js、wc-stripe-elements.js、wc-stripe-style.css</p>';
-    }
-    
-    public function guide_emails_callback() {
-        $value = get_option('wu_woo_disable_guide_emails', false);
-        echo '<input type="checkbox" id="wu_woo_disable_guide_emails" name="wu_woo_disable_guide_emails" value="1" ' . checked(1, $value, false) . ' />';
-        echo '<label for="wu_woo_disable_guide_emails">停用指南電子郵件通知</label>';
-        echo '<p class="description">WooCommerce 會發送電子郵件通知，其中包含完成商店設定的額外指導。啟用此選項可阻止此行為並停止傳送這些電子郵件。</p>';
-    }
-    
-    public function woocom_notifications_callback() {
-        $value = get_option('wu_woo_disable_woocom_notifications', false);
-        echo '<input type="checkbox" id="wu_woo_disable_woocom_notifications" name="wu_woo_disable_woocom_notifications" value="1" ' . checked(1, $value, false) . ' />';
-        echo '<label for="wu_woo_disable_woocom_notifications">禁用 WooCommerce.com 通知</label>';
-        echo '<p class="description">停用來自 WooCommerce.com 外掛程式的通知：Connect your store to WooCommerce.com to receive extensions updates and support。</p>';
-    }
-    
-    public function payment_plugins_metabox_callback() {
-        $value = get_option('wu_woo_disable_payment_plugins_metabox', false);
-        echo '<input type="checkbox" id="wu_woo_disable_payment_plugins_metabox" name="wu_woo_disable_payment_plugins_metabox" value="1" ' . checked(1, $value, false) . ' />';
-        echo '<label for="wu_woo_disable_payment_plugins_metabox">停用建議的付款外掛程式 Metabox</label>';
-        echo '<p class="description">隱藏付款配置頁面的建議付款外掛 Metabox、支付建議區塊及相關廣告推廣內容。</p>';
+        echo '<p class="description">隱藏整個 WooCommerce 管理介面的通知標題欄。</p>';
     }
     
     public function sales_with_offset_callback() {
@@ -258,53 +120,12 @@ class WU_WooCommerce_Optimizer {
         }
     }
     
-    public function reorganize_menu_callback() {
-        $value = get_option('wu_woo_reorganize_menu', false);
-        echo '<input type="checkbox" id="wu_woo_reorganize_menu" name="wu_woo_reorganize_menu" value="1" ' . checked(1, $value, false) . ' />';
-        echo '<label for="wu_woo_reorganize_menu">重組選單結構</label>';
-        echo '<p class="description">將訂單、優惠券、設定移至主選單，隱藏 WooCommerce 選單中的報表。</p>';
-    }
-    
     /**
      * 載入優化功能
      */
     private function load_optimizations() {
-        // 只有在選項啟用時才執行對應功能
-        if (get_option('wu_woo_disable_marketing_hub')) {
-            add_action('admin_menu', array($this, 'remove_marketing_menu'), 999);
-        }
-        
-        if (get_option('wu_woo_disable_home')) {
-            add_action('admin_menu', array($this, 'remove_home_menu'), 999);
-        }
-        
         if (get_option('wu_woo_disable_notifications')) {
             add_action('admin_init', array($this, 'disable_notifications'));
-        }
-        
-        if (get_option('wu_woo_disable_marketplace')) {
-            add_action('admin_init', array($this, 'disable_marketplace'));
-        }
-        
-        if (get_option('wu_woo_disable_marketplace_suggestions')) {
-            add_action('admin_init', array($this, 'disable_marketplace_suggestions'));
-        }
-        
-        if (get_option('wu_woo_disable_stripe_scripts')) {
-            add_action('wp_enqueue_scripts', array($this, 'disable_stripe_scripts'), 100);
-            add_action('admin_enqueue_scripts', array($this, 'disable_stripe_scripts'), 100);
-        }
-        
-        if (get_option('wu_woo_disable_guide_emails')) {
-            add_action('init', array($this, 'disable_guide_emails'));
-        }
-        
-        if (get_option('wu_woo_disable_woocom_notifications')) {
-            add_action('admin_init', array($this, 'disable_woocom_notifications'));
-        }
-        
-        if (get_option('wu_woo_disable_payment_plugins_metabox')) {
-            add_action('admin_init', array($this, 'disable_payment_plugins_metabox'));
         }
         
         if (get_option('wu_woo_show_sales_with_offset')) {
@@ -317,28 +138,30 @@ class WU_WooCommerce_Optimizer {
     }
     
     /**
-     * 重組 WooCommerce 選單結構
+     * 重組 WooCommerce 選單結構（自動執行）
      */
     public function reorganize_woo_menu() {
-        if (!get_option('wu_woo_reorganize_menu')) {
-            return;
-        }
-        
         global $menu, $submenu;
         
-        // 移除 WooCommerce 子選單中的報表
+        // 隱藏行銷選單
+        remove_submenu_page('woocommerce', 'wc-marketing');
+        remove_submenu_page('woocommerce', 'marketing');
+        
+        // 移除 WooCommerce 子選單中的報表和行銷
         if (isset($submenu['woocommerce'])) {
             foreach ($submenu['woocommerce'] as $key => $menu_item) {
                 if (strpos($menu_item[2], 'wc-reports') !== false || 
                     strpos($menu_item[2], 'analytics') !== false ||
                     $menu_item[0] === '報表' || 
-                    $menu_item[0] === 'Analytics') {
+                    $menu_item[0] === 'Analytics' ||
+                    $menu_item[0] === '行銷' || 
+                    $menu_item[0] === 'Marketing') {
                     unset($submenu['woocommerce'][$key]);
                 }
             }
         }
         
-        // 將訂單、優惠券、設定移至主選單
+        // 將訂單、優惠券移至主選單
         add_menu_page(
             '訂單',
             '訂單',
@@ -359,25 +182,13 @@ class WU_WooCommerce_Optimizer {
             27
         );
         
-        add_menu_page(
-            'WooCommerce 設定',
-            'WC 設定',
-            'manage_woocommerce',
-            'wc-settings',
-            '',
-            'dashicons-admin-settings',
-            28
-        );
-        
         // 從 WooCommerce 子選單中移除這些項目
         if (isset($submenu['woocommerce'])) {
             foreach ($submenu['woocommerce'] as $key => $menu_item) {
                 if (strpos($menu_item[2], 'shop_order') !== false || 
                     strpos($menu_item[2], 'shop_coupon') !== false ||
-                    strpos($menu_item[2], 'wc-settings') !== false ||
                     $menu_item[0] === '訂單' || 
-                    $menu_item[0] === '優惠券' ||
-                    $menu_item[0] === '設定') {
+                    $menu_item[0] === '優惠券') {
                     unset($submenu['woocommerce'][$key]);
                 }
             }
@@ -387,33 +198,6 @@ class WU_WooCommerce_Optimizer {
     /**
      * 各項優化功能實作
      */
-    public function remove_marketing_menu() {
-        remove_submenu_page('woocommerce', 'wc-marketing');
-        remove_submenu_page('woocommerce', 'marketing');
-        global $submenu;
-        if (isset($submenu['woocommerce'])) {
-            foreach ($submenu['woocommerce'] as $key => $menu_item) {
-                if ($menu_item[0] === '行銷' || $menu_item[0] === 'Marketing') {
-                    unset($submenu['woocommerce'][$key]);
-                }
-            }
-        }
-    }
-    
-    public function remove_home_menu() {
-        remove_submenu_page('woocommerce', 'wc-admin');
-        remove_submenu_page('woocommerce', 'wc-addons');
-        global $submenu;
-        if (isset($submenu['woocommerce'])) {
-            foreach ($submenu['woocommerce'] as $key => $menu_item) {
-                if (strpos($menu_item[2], 'wc-admin') !== false || 
-                    strpos($menu_item[2], 'wc-addons') !== false) {
-                    unset($submenu['woocommerce'][$key]);
-                }
-            }
-        }
-    }
-    
     public function disable_notifications() {
         add_action('admin_head', function() {
             echo '<style>
@@ -426,61 +210,6 @@ class WU_WooCommerce_Optimizer {
             </style>';
         });
         add_filter('woocommerce_admin_disabled', '__return_true');
-    }
-    
-    public function disable_marketplace() {
-        add_filter('woocommerce_admin_features', function($features) {
-            return array_diff($features, array('marketplace'));
-        });
-        remove_submenu_page('woocommerce', 'wc-addons');
-    }
-    
-    public function disable_marketplace_suggestions() {
-        add_filter('woocommerce_allow_marketplace_suggestions', '__return_false');
-        add_filter('woocommerce_helper_suppress_admin_notices', '__return_true');
-    }
-    
-    public function disable_stripe_scripts() {
-        if (!is_checkout() && !is_cart() && !is_account_page()) {
-            wp_dequeue_script('stripe');
-            wp_dequeue_script('wc-stripe-payment-request');
-            wp_dequeue_script('wc-stripe-elements');
-            wp_dequeue_style('wc-stripe-style');
-        }
-    }
-    
-    public function disable_guide_emails() {
-        remove_action('woocommerce_tracker_send_event', array('WC_Admin_Setup_Wizard', 'track_setup_wizard_completion'));
-        add_filter('woocommerce_email_enabled_new_order', '__return_false');
-    }
-    
-    public function disable_woocom_notifications() {
-        add_filter('woocommerce_helper_suppress_admin_notices', '__return_true');
-        add_filter('woocommerce_helper_suppress_connect_notice', '__return_true');
-    }
-    
-    public function disable_payment_plugins_metabox() {
-        add_action('admin_head', function() {
-            echo '<style>
-                #woocommerce-gateway-suggestions,
-                .woocommerce-recommended-payment-plugins,
-                .woocommerce-payment-gateway-suggestions,
-                .payment-gateway-suggestion,
-                .wc-payment-gateway-method-suggestion,
-                .woocommerce-gateway-suggestion {
-                    display: none !important;
-                }
-            </style>';
-        });
-        
-        // 移除相關 metabox
-        add_action('admin_init', function() {
-            remove_meta_box('woocommerce-gateway-suggestions', 'woocommerce_page_wc-settings', 'normal');
-            remove_meta_box('woocommerce-payment-gateway-suggestions', 'woocommerce_page_wc-settings', 'normal');
-        });
-        
-        // 禁用相關 hooks
-        add_filter('woocommerce_admin_payment_gateway_suggestion_specs', '__return_empty_array');
     }
     
     public function register_sales_features() {
@@ -719,30 +448,32 @@ class WU_WooCommerce_Optimizer {
             check_admin_referer('wu_woocommerce_settings-options');
             
             $settings = array(
-                'wu_woo_disable_marketing_hub',
-                'wu_woo_disable_home',
                 'wu_woo_disable_notifications',
-                'wu_woo_disable_marketplace',
-                'wu_woo_disable_marketplace_suggestions',
-                'wu_woo_disable_stripe_scripts',
-                'wu_woo_disable_guide_emails',
-                'wu_woo_disable_woocom_notifications',
-                'wu_woo_disable_payment_plugins_metabox',
                 'wu_woo_show_sales_with_offset',
-                'wu_woo_clean_cache',
-                'wu_woo_reorganize_menu'
+                'wu_woo_clean_cache'
             );
             
             foreach ($settings as $setting) {
                 update_option($setting, isset($_POST[$setting]) ? 1 : 0);
             }
             
-            echo '<div class="notice notice-success"><p>設定已儲存！請重新整理頁面以查看選單變更。</p></div>';
+            echo '<div class="notice notice-success"><p>設定已儲存！</p></div>';
         }
         
         ?>
         <div class="wrap">
             <h1>WooCommerce 優化器設定</h1>
+            
+            <div class="card">
+                <h2>選單重組狀態</h2>
+                <p style="color: #0073aa; font-weight: bold;">✓ 選單重組已自動啟用</p>
+                <ul>
+                    <li>✓ 訂單選單已移至主選單</li>
+                    <li>✓ 優惠券選單已移至主選單</li>
+                    <li>✓ WooCommerce 報表選單已隱藏</li>
+                    <li>✓ WooCommerce 行銷選單已隱藏</li>
+                </ul>
+            </div>
             
             <div class="card">
                 <h2>WooCommerce 狀態與系統資訊</h2>
@@ -760,32 +491,28 @@ class WU_WooCommerce_Optimizer {
             
             <div class="card">
                 <h2>功能說明</h2>
-                <p>WooCommerce 優化器可幫助您清理管理介面，重組選單結構，提升網站效能。所有功能預設為停用狀態，請根據需要勾選啟用。</p>
+                <p>WooCommerce 優化器提供核心優化功能，自動重組選單結構以提升使用體驗。</p>
                 
-                <h3>主要改進</h3>
+                <h3>自動功能</h3>
                 <ul>
-                    <li><strong>選單重組：</strong>將訂單、優惠券、設定移至 WordPress 主選單，便於快速存取</li>
-                    <li><strong>隱藏報表：</strong>自動隱藏 WooCommerce 選單中的報表功能，保持選單清潔</li>
-                    <li><strong>移除推廣：</strong>移除各種市場建議和廣告內容</li>
-                    <li><strong>系統整合：</strong>將 WooCommerce 狀態資訊整合到優化器頁面中</li>
+                    <li><strong>選單重組：</strong>將訂單、優惠券移至 WordPress 主選單，便於快速存取</li>
+                    <li><strong>隱藏報表：</strong>自動隱藏 WooCommerce 選單中的報表功能</li>
+                    <li><strong>隱藏行銷：</strong>自動隱藏 WooCommerce 選單中的行銷功能</li>
                 </ul>
                 
-                <h3>優化項目說明</h3>
+                <h3>可選功能</h3>
                 <ul>
-                    <li><strong>行銷選單：</strong>隱藏後台行銷選單項目</li>
-                    <li><strong>首頁與擴充：</strong>移除 WooCommerce 管理首頁及擴充功能選單</li>
-                    <li><strong>通知欄：</strong>隱藏整個管理介面通知標題欄</li>
-                    <li><strong>Marketplace：</strong>移除市場推廣功能</li>
-                    <li><strong>暫存清理：</strong>智能清理過期暫存檔案，顯示詳細清理資訊</li>
-                    <li><strong>選單重組：</strong>重新安排 WooCommerce 相關選單的結構</li>
+                    <li><strong>通知欄：</strong>可選擇隱藏 WooCommerce 管理介面通知標題欄</li>
+                    <li><strong>購買量顯示：</strong>可在商品頁面顯示自訂購買量（真實+調整）</li>
+                    <li><strong>暫存清理：</strong>智能清理過期的 WooCommerce 暫存檔案</li>
                 </ul>
                 
                 <h3>注意事項</h3>
                 <ul>
                     <li>所有優化不會影響 WooCommerce 核心功能</li>
-                    <li>設定可隨時啟用或停用</li>
+                    <li>選單重組功能會自動執行，無需額外設定</li>
+                    <li>可選功能可隨時啟用或停用</li>
                     <li>建議在測試環境中先行測試</li>
-                    <li>選單重組功能需要重新整理頁面才會生效</li>
                 </ul>
             </div>
         </div>
@@ -858,7 +585,7 @@ class WU_WooCommerce_Optimizer {
     }
     
     /**
-     * 顯示 WC Status 資訊（整合原本的狀態頁面內容）
+     * 顯示 WC Status 資訊
      */
     private function display_wc_status() {
         echo '<table class="wc-status-table">';
@@ -874,22 +601,18 @@ class WU_WooCommerce_Optimizer {
         echo '<tr><th colspan="2">主題資訊</th></tr>';
         echo '<tr><td>主題名稱</td><td>' . $theme->get('Name') . '</td></tr>';
         echo '<tr><td>主題版本</td><td>' . $theme->get('Version') . '</td></tr>';
-        echo '<tr><td>主題作者</td><td>' . $theme->get('Author') . '</td></tr>';
         
         // WooCommerce 設定資訊
         echo '<tr><th colspan="2">商店設定</th></tr>';
         echo '<tr><td>商店貨幣</td><td>' . get_woocommerce_currency() . '</td></tr>';
         echo '<tr><td>貨幣位置</td><td>' . get_option('woocommerce_currency_pos') . '</td></tr>';
         echo '<tr><td>小數位數</td><td>' . wc_get_price_decimals() . '</td></tr>';
-        echo '<tr><td>千位分隔符</td><td>' . wc_get_price_thousand_separator() . '</td></tr>';
-        echo '<tr><td>小數分隔符</td><td>' . wc_get_price_decimal_separator() . '</td></tr>';
         
         // 商品統計
         $product_counts = wp_count_posts('product');
         echo '<tr><th colspan="2">商品統計</th></tr>';
         echo '<tr><td>已發布商品</td><td>' . $product_counts->publish . '</td></tr>';
         echo '<tr><td>草稿商品</td><td>' . $product_counts->draft . '</td></tr>';
-        echo '<tr><td>私人商品</td><td>' . $product_counts->private . '</td></tr>';
         
         // 訂單統計
         $order_counts = wp_count_posts('shop_order');
@@ -901,22 +624,14 @@ class WU_WooCommerce_Optimizer {
             }
         }
         
-        // 顯示當前啟用的優化功能
-        echo '<tr><th colspan="2">已啟用的優化功能</th></tr>';
-        $enabled_features = array();
+        // 顯示當前啟用的功能
+        echo '<tr><th colspan="2">已啟用的功能</th></tr>';
+        $enabled_features = array('選單重組'); // 默認啟用
+        
         $all_options = array(
-            'wu_woo_disable_marketing_hub' => '隱藏行銷選單',
-            'wu_woo_disable_home' => '移除首頁',
             'wu_woo_disable_notifications' => '停用通知欄',
-            'wu_woo_disable_marketplace' => '停用 Marketplace',
-            'wu_woo_disable_marketplace_suggestions' => '停用市場建議',
-            'wu_woo_disable_stripe_scripts' => '優化 Stripe 腳本',
-            'wu_woo_disable_guide_emails' => '停用指南郵件',
-            'wu_woo_disable_woocom_notifications' => '停用 WooCommerce.com 通知',
-            'wu_woo_disable_payment_plugins_metabox' => '停用付款外掛 Metabox',
             'wu_woo_show_sales_with_offset' => '商品購買量顯示',
-            'wu_woo_clean_cache' => '暫存清理功能',
-            'wu_woo_reorganize_menu' => '選單重組'
+            'wu_woo_clean_cache' => '暫存清理功能'
         );
         
         foreach ($all_options as $option => $name) {
@@ -925,11 +640,7 @@ class WU_WooCommerce_Optimizer {
             }
         }
         
-        if (empty($enabled_features)) {
-            echo '<tr><td colspan="2"><span style="color: #666;">目前沒有啟用任何優化功能</span></td></tr>';
-        } else {
-            echo '<tr><td colspan="2"><span style="color: #0073aa; font-weight: bold;">' . implode('、', $enabled_features) . '</span></td></tr>';
-        }
+        echo '<tr><td colspan="2"><span style="color: #0073aa; font-weight: bold;">' . implode('、', $enabled_features) . '</span></td></tr>';
         
         echo '</table>';
     }
