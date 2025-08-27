@@ -95,8 +95,8 @@ class WU_Enhanced_Downloader {
     public function theme_downloader_callback() {
         $value = get_option('wu_enable_theme_downloader', false);
         echo '<input type="checkbox" id="wu_enable_theme_downloader" name="wu_enable_theme_downloader" value="1" ' . checked(1, $value, false) . ' />';
-        echo '<label for="wu_enable_theme_downloader">在主題管理頁面添加下載按鈕</label>';
-        echo '<p class="description">在每個主題旁邊添加下載按鈕，可以將主題打包為 ZIP 檔案下載。</p>';
+        echo '<label for="wu_enable_theme_downloader">在下列清單直接下載</label>';
+        echo '<p class="description">在下方清單中每個主題旁邊添加下載按鈕，可以將主題打包為 ZIP 檔案下載。</p>';
     }
     
     /**
