@@ -18,9 +18,6 @@ class WU_WooCommerce_Optimizer {
         
         // 載入優化功能
         $this->load_optimizations();
-        
-        // 重組選單結構（始終執行）
-        add_action('admin_menu', array($this, 'reorganize_woo_menu'), 999);
     }
     
     /**
@@ -45,7 +42,11 @@ class WU_WooCommerce_Optimizer {
         $settings = array(
             'wu_woo_disable_notifications',
             'wu_woo_show_sales_with_offset',
-            'wu_woo_clean_cache'
+            'wu_woo_clean_cache',
+            'wu_woo_menu_reorganize',
+            'wu_woo_hide_marketing',
+            'wu_woo_hide_payments',
+            'wu_woo_hide_address_2'
         );
         
         foreach ($settings as $setting) {
@@ -82,13 +83,45 @@ class WU_WooCommerce_Optimizer {
             'wu_woocommerce_settings',
             'wu_woocommerce_section'
         );
+        
+        add_settings_field(
+            'wu_woo_menu_reorganize',
+            '重組 WooCommerce 選單結構',
+            array($this, 'menu_reorganize_callback'),
+            'wu_woocommerce_settings',
+            'wu_woocommerce_section'
+        );
+        
+        add_settings_field(
+            'wu_woo_hide_marketing',
+            '隱藏行銷相關選單',
+            array($this, 'hide_marketing_callback'),
+            'wu_woocommerce_settings',
+            'wu_woocommerce_section'
+        );
+        
+        add_settings_field(
+            'wu_woo_hide_payments',
+            '隱藏後台付款選單',
+            array($this, 'hide_payments_callback'),
+            'wu_woocommerce_settings',
+            'wu_woocommerce_section'
+        );
+        
+        add_settings_field(
+            'wu_woo_hide_address_2',
+            '隱藏地址第二行欄位',
+            array($this, 'hide_address_2_callback'),
+            'wu_woocommerce_settings',
+            'wu_woocommerce_section'
+        );
     }
     
     /**
      * 設定區塊回調
      */
     public function settings_section_callback() {
-        echo '<p>配置 WooCommerce 優化選項。<strong>選單重組功能已自動啟用，訂單和優惠券已移至主選單。</strong></p>';
+        echo '<p>配置 WooCommerce 優化選項。所有功能均需手動啟用，確保網站效能和乾淨快速。</p>';
     }
     
     // 回調函數
@@ -120,6 +153,34 @@ class WU_WooCommerce_Optimizer {
         }
     }
     
+    public function menu_reorganize_callback() {
+        $value = get_option('wu_woo_menu_reorganize', false);
+        echo '<input type="checkbox" id="wu_woo_menu_reorganize" name="wu_woo_menu_reorganize" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_woo_menu_reorganize">啟用 WooCommerce 選單重組</label>';
+        echo '<p class="description">將訂單、優惠券移至 WordPress 主選單，隱藏報表和行銷功能。</p>';
+    }
+    
+    public function hide_marketing_callback() {
+        $value = get_option('wu_woo_hide_marketing', false);
+        echo '<input type="checkbox" id="wu_woo_hide_marketing" name="wu_woo_hide_marketing" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_woo_hide_marketing">隱藏行銷相關選單</label>';
+        echo '<p class="description">隱藏後台選單中的行銷概況及 WooCommerce 行銷選單、擴充功能、首頁。</p>';
+    }
+    
+    public function hide_payments_callback() {
+        $value = get_option('wu_woo_hide_payments', false);
+        echo '<input type="checkbox" id="wu_woo_hide_payments" name="wu_woo_hide_payments" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_woo_hide_payments">隱藏後台付款選單</label>';
+        echo '<p class="description">隱藏 WordPress 後台主選單中的付款選項。</p>';
+    }
+    
+    public function hide_address_2_callback() {
+        $value = get_option('wu_woo_hide_address_2', false);
+        echo '<input type="checkbox" id="wu_woo_hide_address_2" name="wu_woo_hide_address_2" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_woo_hide_address_2">隱藏地址第二行欄位</label>';
+        echo '<p class="description">隱藏結帳和配送地址中的第二行地址欄位 (billing_address_2, shipping_address_2)。</p>';
+    }
+    
     /**
      * 載入優化功能
      */
@@ -135,10 +196,29 @@ class WU_WooCommerce_Optimizer {
         if (get_option('wu_woo_clean_cache')) {
             add_action('wp_ajax_clean_woo_cache', array($this, 'ajax_clean_cache'));
         }
+        
+        // 手動啟用的功能
+        if (get_option('wu_woo_menu_reorganize')) {
+            add_action('admin_menu', array($this, 'reorganize_woo_menu'), 999);
+        }
+        
+        if (get_option('wu_woo_hide_marketing')) {
+            add_action('admin_menu', array($this, 'hide_marketing_menus'), 999);
+            add_action('admin_head', array($this, 'hide_marketing_styles'));
+        }
+        
+        if (get_option('wu_woo_hide_payments')) {
+            add_action('admin_menu', array($this, 'hide_payments_menu'), 999);
+        }
+        
+        if (get_option('wu_woo_hide_address_2')) {
+            add_action('wp_enqueue_scripts', array($this, 'hide_address_2_scripts'));
+            add_action('admin_enqueue_scripts', array($this, 'hide_address_2_admin_scripts'));
+        }
     }
     
     /**
-     * 重組 WooCommerce 選單結構（自動執行）
+     * 重組 WooCommerce 選單結構（手動啟用）
      */
     public function reorganize_woo_menu() {
         global $menu, $submenu;
@@ -424,6 +504,108 @@ class WU_WooCommerce_Optimizer {
         }
     }
     
+    /**
+     * 隱藏行銷相關選單
+     */
+    public function hide_marketing_menus() {
+        global $menu, $submenu;
+        
+        // 隱藏主選單中的行銷概況
+        remove_menu_page('edit.php?post_type=shop_coupon');
+        
+        // 隱藏 WooCommerce 子選單中的項目
+        if (isset($submenu['woocommerce'])) {
+            foreach ($submenu['woocommerce'] as $key => $menu_item) {
+                // 隱藏行銷、擴充功能、首頁
+                if (strpos($menu_item[2], 'wc-marketing') !== false || 
+                    strpos($menu_item[2], 'marketing') !== false ||
+                    strpos($menu_item[2], 'wc-addons') !== false ||
+                    strpos($menu_item[2], 'wc-admin&path=/marketplace') !== false ||
+                    strpos($menu_item[2], 'wc-admin') !== false ||
+                    $menu_item[0] === '行銷' || 
+                    $menu_item[0] === 'Marketing' ||
+                    $menu_item[0] === '擴充功能' ||
+                    $menu_item[0] === 'Extensions' ||
+                    $menu_item[0] === '首頁' ||
+                    $menu_item[0] === 'Home') {
+                    unset($submenu['woocommerce'][$key]);
+                }
+            }
+        }
+    }
+    
+    /**
+     * 隱藏行銷相關 CSS
+     */
+    public function hide_marketing_styles() {
+        echo '<style>
+            /* 隱藏 WooCommerce 選單中的相關項目 */
+            #menu-posts-shop_coupon,
+            .wp-submenu li a[href*="wc-marketing"],
+            .wp-submenu li a[href*="marketing"],
+            .wp-submenu li a[href*="wc-addons"],
+            .wp-submenu li a[href*="marketplace"],
+            .wp-submenu li a[href*="wc-admin&path=/"] {
+                display: none !important;
+            }
+        </style>';
+    }
+    
+    /**
+     * 隱藏付款選單
+     */
+    public function hide_payments_menu() {
+        remove_menu_page('edit.php?post_type=payment');
+        remove_submenu_page('tools.php', 'payments');
+        // 隱藏各種可能的付款相關選單
+        remove_menu_page('payments');
+        remove_menu_page('payment_methods');
+    }
+    
+    /**
+     * 隱藏地址第二行 - 前台腳本
+     */
+    public function hide_address_2_scripts() {
+        if (is_admin()) return;
+        
+        wp_add_inline_script('jquery', '
+            jQuery(document).ready(function($) {
+                // 隱藏地址第二行欄位
+                $("#billing_address_2_field, #shipping_address_2_field").hide();
+                $("input#billing_address_2, input#shipping_address_2").closest(".form-row").hide();
+                $("input[name=billing_address_2], input[name=shipping_address_2]").closest(".form-row").hide();
+                
+                // 停用欄位
+                $("#billing_address_2, #shipping_address_2").prop("disabled", true);
+            });
+        ');
+        
+        wp_add_inline_style('woocommerce-general', '
+            #billing_address_2_field,
+            #shipping_address_2_field,
+            .form-row:has(#billing_address_2),
+            .form-row:has(#shipping_address_2) {
+                display: none !important;
+            }
+        ');
+    }
+    
+    /**
+     * 隱藏地址第二行 - 後台腳本
+     */
+    public function hide_address_2_admin_scripts() {
+        $screen = get_current_screen();
+        if (!$screen || strpos($screen->id, 'shop_order') === false) return;
+        
+        wp_add_inline_script('jquery', '
+            jQuery(document).ready(function($) {
+                // 隱藏後台訂單編輯中的地址第二行
+                $(".address input[name*=address_2]").closest(".form-field").hide();
+                $("._billing_address_2_field, ._shipping_address_2_field").hide();
+            });
+        ');
+    }
+    
     private function format_bytes($bytes) {
         if ($bytes == 0) return '0 B';
         $k = 1024;
@@ -450,7 +632,11 @@ class WU_WooCommerce_Optimizer {
             $settings = array(
                 'wu_woo_disable_notifications',
                 'wu_woo_show_sales_with_offset',
-                'wu_woo_clean_cache'
+                'wu_woo_clean_cache',
+                'wu_woo_menu_reorganize',
+                'wu_woo_hide_marketing',
+                'wu_woo_hide_payments',
+                'wu_woo_hide_address_2'
             );
             
             foreach ($settings as $setting) {
@@ -465,13 +651,13 @@ class WU_WooCommerce_Optimizer {
             <h1>WooCommerce 優化器設定</h1>
             
             <div class="card">
-                <h2>選單重組狀態</h2>
-                <p style="color: #0073aa; font-weight: bold;">✓ 選單重組已自動啟用</p>
+                <h2>功能狀態</h2>
+                <p style="color: #d63638; font-weight: bold;">ℹ 所有功能均需手動啟用，確保網站效能最佳化</p>
                 <ul>
-                    <li>✓ 訂單選單已移至主選單</li>
-                    <li>✓ 優惠券選單已移至主選單</li>
-                    <li>✓ WooCommerce 報表選單已隱藏</li>
-                    <li>✓ WooCommerce 行銷選單已隱藏</li>
+                    <li><strong>選單重組：</strong> <?php echo get_option('wu_woo_menu_reorganize') ? '✓ 已啟用' : '❌ 未啟用'; ?></li>
+                    <li><strong>隱藏行銷：</strong> <?php echo get_option('wu_woo_hide_marketing') ? '✓ 已啟用' : '❌ 未啟用'; ?></li>
+                    <li><strong>隱藏付款：</strong> <?php echo get_option('wu_woo_hide_payments') ? '✓ 已啟用' : '❌ 未啟用'; ?></li>
+                    <li><strong>隱藏地址第二行：</strong> <?php echo get_option('wu_woo_hide_address_2') ? '✓ 已啟用' : '❌ 未啟用'; ?></li>
                 </ul>
             </div>
             
@@ -493,11 +679,12 @@ class WU_WooCommerce_Optimizer {
                 <h2>功能說明</h2>
                 <p>WooCommerce 優化器提供核心優化功能，自動重組選單結構以提升使用體驗。</p>
                 
-                <h3>自動功能</h3>
+                <h3>新增功能</h3>
                 <ul>
-                    <li><strong>選單重組：</strong>將訂單、優惠券移至 WordPress 主選單，便於快速存取</li>
-                    <li><strong>隱藏報表：</strong>自動隱藏 WooCommerce 選單中的報表功能</li>
-                    <li><strong>隱藏行銷：</strong>自動隱藏 WooCommerce 選單中的行銷功能</li>
+                    <li><strong>選單重組：</strong>手動啟用將訂單、優惠券移至 WordPress 主選單，便於快速存取</li>
+                    <li><strong>隱藏行銷：</strong>手動啟用隱藏後台行銷概況及 WooCommerce 行銷、擴充功能、首頁選單</li>
+                    <li><strong>隱藏付款：</strong>手動啟用隱藏 WordPress 後台付款相關選單</li>
+                    <li><strong>隱藏地址第二行：</strong>手動啟用隱藏結帳和配送地址中的第二行欄位</li>
                 </ul>
                 
                 <h3>可選功能</h3>
@@ -510,8 +697,9 @@ class WU_WooCommerce_Optimizer {
                 <h3>注意事項</h3>
                 <ul>
                     <li>所有優化不會影響 WooCommerce 核心功能</li>
-                    <li>選單重組功能會自動執行，無需額外設定</li>
-                    <li>可選功能可隨時啟用或停用</li>
+                    <li>所有功能均需手動啟用，確保網站效能和乾淨快速</li>
+                    <li>只有啟用後才會載入相關 PHP 程式碼</li>
+                    <li>停用功能則不會載入，保持網站乾淨快速</li>
                     <li>建議在測試環境中先行測試</li>
                 </ul>
             </div>
