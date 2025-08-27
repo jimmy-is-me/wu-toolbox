@@ -51,7 +51,7 @@ class WU_Admin_Bar_Cleaner {
                 document.addEventListener("paste", alertMsg);
                 document.addEventListener("keydown", function(e){
                     var k=e.key.toLowerCase();
-                    if((e.ctrlKey||e.metaKey) && (k==='a'||k==='c'||k==='x'||k==='s'||k==='v')){ e.preventDefault(); alert(msg); }
+                    if((e.ctrlKey||e.metaKey) && (k==="a"||k==="c"||k==="x"||k==="s"||k==="v")){ e.preventDefault(); alert(msg); }
                 }, true);
             })();</script>';
         });
@@ -269,7 +269,7 @@ class WU_Admin_Bar_Cleaner {
             'wu_admin_bar_settings',
             'wu_frontend_section'
         );
-
+        
         // 內容複製保護
         add_settings_field(
             'wu_enable_copy_protection',
@@ -553,7 +553,10 @@ class WU_Admin_Bar_Cleaner {
         echo '<input type="text" id="wu_custom_frontend_footer_text" name="wu_custom_frontend_footer_text" value="' . esc_attr($value) . '" class="regular-text" />';
         echo '<p class="description">輸入自訂的前台頁尾文本。留空則不顯示任何文本。</p>';
     }
-
+    
+    /**
+     * 內容複製保護選項回調
+     */
     public function copy_protection_callback() {
         $enabled = get_option('wu_enable_copy_protection', false);
         $message = get_option('wu_copy_protection_message', '此網站已啟用內容保護，禁止複製與右鍵操作。');
@@ -603,7 +606,8 @@ class WU_Admin_Bar_Cleaner {
             'wu_hide_writing_settings',
             'wu_hide_privacy_settings',
             'wu_hide_wumetax_toolkit',
-            'wu_hide_admin_updates'
+            'wu_hide_admin_updates',
+            'wu_enable_copy_protection'
         );
         
         foreach ($settings as $setting) {
@@ -613,6 +617,7 @@ class WU_Admin_Bar_Cleaner {
         // 處理自訂頁尾文本
         update_option('wu_custom_admin_footer_text', sanitize_text_field($_POST['wu_custom_admin_footer_text']));
         update_option('wu_custom_frontend_footer_text', sanitize_text_field($_POST['wu_custom_frontend_footer_text']));
+        update_option('wu_copy_protection_message', sanitize_text_field($_POST['wu_copy_protection_message']));
         
         // 處理使用者角色設定
         update_option('wu_disabled_user_roles', isset($_POST['wu_disabled_user_roles']) ? $_POST['wu_disabled_user_roles'] : array());
@@ -642,7 +647,8 @@ class WU_Admin_Bar_Cleaner {
                 'wu_hide_writing_settings',
                 'wu_hide_privacy_settings',
                 'wu_hide_wumetax_toolkit',
-                'wu_hide_admin_updates'
+                'wu_hide_admin_updates',
+                'wu_enable_copy_protection'
             );
             
             foreach ($settings as $setting) {
@@ -652,6 +658,7 @@ class WU_Admin_Bar_Cleaner {
             // 處理自訂頁尾文本
             update_option('wu_custom_admin_footer_text', sanitize_text_field($_POST['wu_custom_admin_footer_text']));
             update_option('wu_custom_frontend_footer_text', sanitize_text_field($_POST['wu_custom_frontend_footer_text']));
+            update_option('wu_copy_protection_message', sanitize_text_field($_POST['wu_copy_protection_message']));
             
             // 處理使用者角色設定
             update_option('wu_disabled_user_roles', isset($_POST['wu_disabled_user_roles']) ? $_POST['wu_disabled_user_roles'] : array());
@@ -677,6 +684,7 @@ class WU_Admin_Bar_Cleaner {
         $hide_wumetax_toolkit = get_option('wu_hide_wumetax_toolkit', false);
         $hide_admin_updates = get_option('wu_hide_admin_updates', false);
         $disabled_roles = get_option('wu_disabled_user_roles', array());
+        $enable_copy_protection = get_option('wu_enable_copy_protection', false);
         
         ?>
         <div class="wrap">
@@ -782,6 +790,14 @@ class WU_Admin_Bar_Cleaner {
                         </td>
                     </tr>
                     <tr>
+                        <td><strong>內容複製保護</strong></td>
+                        <td>
+                            <span class="<?php echo $enable_copy_protection ? 'wu-status-enabled' : 'wu-status-disabled'; ?>">
+                                <?php echo $enable_copy_protection ? '已啟用' : '已停用'; ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
                         <td><strong>WumetaxToolkit 選單隱藏</strong></td>
                         <td>
                             <span class="<?php echo $hide_wumetax_toolkit ? 'wu-status-enabled' : 'wu-status-disabled'; ?>">
@@ -844,6 +860,7 @@ class WU_Admin_Bar_Cleaner {
                     <li><strong>登入頁面美化升級：</strong>採用現代化透明玻璃質感設計，漸層背景，流暢動畫效果</li>
                     <li><strong>儀表板小工具一鍵管理：</strong>簡化操作，一鍵停用所有儀表板小工具</li>
                     <li><strong>使用者角色管理：</strong>可選擇停用特定使用者角色，包括投稿者、作者、編輯、商店管理員、顧客、使用者</li>
+                    <li><strong>內容複製保護：</strong>防止前台內容被複製，包括右鍵選單和常見快捷鍵</li>
                 </ul>
                 
                 <h3>管理列功能</h3>
