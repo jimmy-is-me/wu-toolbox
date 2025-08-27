@@ -12,6 +12,8 @@ class WU_Enhanced_User_List {
     
     public function __construct() {
         $this->settings = get_option('wu_enhanced_user_list_settings', $this->get_default_settings());
+        // 確保所有設定項目都有預設值
+        $this->settings = array_merge($this->get_default_settings(), $this->settings);
         
         add_action('admin_menu', array($this, 'add_admin_menu'), 15);
         
@@ -38,7 +40,7 @@ class WU_Enhanced_User_List {
         add_action('admin_notices', array($this, 'show_user_statistics'));
         
         // 隱藏用戶設定選項
-        if ($this->settings['enabled']) {
+        if ($this->get_setting('enabled', false)) {
             $this->hide_user_profile_options();
             // 添加更強力的隱藏功能
             add_action('admin_head', array($this, 'hide_profile_sections'));
@@ -46,7 +48,7 @@ class WU_Enhanced_User_List {
         }
         
         // 用戶匯出功能
-        if ($this->settings['enable_user_export']) {
+        if ($this->get_setting('enable_user_export', false)) {
             add_filter('user_row_actions', array($this, 'add_export_link'), 10, 2);
             add_filter('bulk_actions-users', array($this, 'add_bulk_export_action'));
             add_filter('handle_bulk_actions-users', array($this, 'handle_bulk_export'), 10, 3);
@@ -55,7 +57,7 @@ class WU_Enhanced_User_List {
         }
         
         // 自訂頭像功能
-        if ($this->settings['enable_custom_avatar']) {
+        if ($this->get_setting('enable_custom_avatar', false)) {
             add_action('show_user_profile', array($this, 'show_custom_avatar_field'));
             add_action('edit_user_profile', array($this, 'show_custom_avatar_field'));
             add_action('personal_options_update', array($this, 'save_custom_avatar'));
@@ -68,47 +70,54 @@ class WU_Enhanced_User_List {
     }
     
     /**
+     * 安全地取得設定值
+     */
+    private function get_setting($key, $default = false) {
+        return isset($this->settings[$key]) ? $this->settings[$key] : $default;
+    }
+    
+    /**
      * 隱藏用戶設定選項
      */
     private function hide_user_profile_options() {
         // 一鍵隱藏 Personal Options 整個區塊
-        if ($this->settings['hide_personal_options']) {
+        if ($this->get_setting('hide_personal_options', false)) {
             add_action('admin_head', array($this, 'hide_personal_options_section'));
         }
         
         // 隱藏 Personal Options 中的選項
-        if ($this->settings['hide_admin_color_scheme']) {
+        if ($this->get_setting('hide_admin_color_scheme', false)) {
             add_action('admin_head', array($this, 'hide_admin_color_scheme'));
         }
         
-        if ($this->settings['hide_syntax_highlighting']) {
+        if ($this->get_setting('hide_syntax_highlighting', false)) {
             add_action('admin_head', array($this, 'hide_syntax_highlighting'));
         }
         
-        if ($this->settings['hide_keyboard_shortcuts']) {
+        if ($this->get_setting('hide_keyboard_shortcuts', false)) {
             add_action('admin_head', array($this, 'hide_keyboard_shortcuts'));
         }
         
-        if ($this->settings['hide_toolbar']) {
+        if ($this->get_setting('hide_toolbar', false)) {
             add_action('admin_head', array($this, 'hide_toolbar'));
         }
         
-        if ($this->settings['hide_language']) {
+        if ($this->get_setting('hide_language', false)) {
             add_action('admin_head', array($this, 'hide_language'));
         }
         
         // 隱藏 About the user 中的選項
-        if ($this->settings['hide_biographical_info']) {
+        if ($this->get_setting('hide_biographical_info', false)) {
             add_action('admin_head', array($this, 'hide_biographical_info'));
         }
         
         // 隱藏 Application Passwords
-        if ($this->settings['hide_application_passwords']) {
+        if ($this->get_setting('hide_application_passwords', false)) {
             add_action('admin_head', array($this, 'hide_application_passwords'));
         }
         
         // 隱藏 Elementor AI
-        if ($this->settings['hide_elementor_ai']) {
+        if ($this->get_setting('hide_elementor_ai', false)) {
             add_action('admin_head', array($this, 'hide_elementor_ai'));
         }
     }
@@ -126,16 +135,24 @@ class WU_Enhanced_User_List {
             'show_filters' => true,
             'show_statistics' => true,
             'highlight_inactive_users' => 30, // 天數
-            // 隱藏選項
+            
+            // Personal Options 隱藏選項
             'hide_personal_options' => false,
             'hide_admin_color_scheme' => false,
             'hide_syntax_highlighting' => false,
             'hide_keyboard_shortcuts' => false,
             'hide_toolbar' => false,
             'hide_language' => false,
+            
+            // About the user 隱藏選項
             'hide_biographical_info' => false,
+            
+            // Application Passwords 隱藏選項
             'hide_application_passwords' => false,
+            
+            // Elementor AI 隱藏選項
             'hide_elementor_ai' => false,
+            
             // 社交媒體相關隱藏選項
             'hide_user_url' => false,
             'hide_user_facebook' => false,
@@ -153,6 +170,7 @@ class WU_Enhanced_User_List {
             'hide_user_pinterest' => false,
             'hide_user_instagram' => false,
             'hide_user_dribbble' => false,
+            
             // 用戶匯出功能
             'enable_user_export' => false,
             'include_meta' => true,
@@ -173,6 +191,7 @@ class WU_Enhanced_User_List {
                 'nickname' => true,
                 'description' => false
             ),
+            
             // 自訂頭像功能
             'enable_custom_avatar' => false,
             'avatar_size_limit' => 2048, // KB
@@ -197,6 +216,7 @@ class WU_Enhanced_User_List {
         }
         
         $this->settings = get_option('wu_enhanced_user_list_settings', $this->get_default_settings());
+        $this->settings = array_merge($this->get_default_settings(), $this->settings);
         $user_stats = $this->get_user_statistics();
         ?>
         <div class="wrap">
@@ -232,7 +252,7 @@ class WU_Enhanced_User_List {
                         <th scope="row">啟用功能</th>
                         <td>
                             <label>
-                                <input type="checkbox" name="enabled" value="1" <?php checked($this->settings['enabled']); ?>>
+                                <input type="checkbox" name="enabled" value="1" <?php checked($this->get_setting('enabled', false)); ?>>
                                 啟用增強使用者列表功能
                             </label>
                         </td>
@@ -241,27 +261,27 @@ class WU_Enhanced_User_List {
                         <th scope="row">顯示欄位</th>
                         <td>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="show_last_login" value="1" <?php checked($this->settings['show_last_login']); ?>>
+                                <input type="checkbox" name="show_last_login" value="1" <?php checked($this->get_setting('show_last_login', true)); ?>>
                                 顯示上次登入時間
                             </label>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="show_registration_date" value="1" <?php checked($this->settings['show_registration_date']); ?>>
+                                <input type="checkbox" name="show_registration_date" value="1" <?php checked($this->get_setting('show_registration_date', true)); ?>>
                                 顯示註冊日期
                             </label>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="show_user_id" value="1" <?php checked($this->settings['show_user_id']); ?>>
+                                <input type="checkbox" name="show_user_id" value="1" <?php checked($this->get_setting('show_user_id', false)); ?>>
                                 顯示用戶 ID
                             </label>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="show_post_count" value="1" <?php checked($this->settings['show_post_count']); ?>>
+                                <input type="checkbox" name="show_post_count" value="1" <?php checked($this->get_setting('show_post_count', false)); ?>>
                                 顯示文章數量
                             </label>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="show_role_since" value="1" <?php checked($this->settings['show_role_since']); ?>>
+                                <input type="checkbox" name="show_role_since" value="1" <?php checked($this->get_setting('show_role_since', false)); ?>>
                                 顯示角色指派時間
                             </label>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="show_woo_total" value="1" <?php checked($this->settings['show_woo_total']); ?>>
+                                <input type="checkbox" name="show_woo_total" value="1" <?php checked($this->get_setting('show_woo_total', false)); ?>>
                                 顯示 WooCommerce 總購買金額（已完成訂單）
                             </label>
                         </td>
@@ -270,11 +290,11 @@ class WU_Enhanced_User_List {
                         <th scope="row">日期格式</th>
                         <td>
                             <select name="date_format">
-                                <option value="Y-m-d H:i:s" <?php selected($this->settings['date_format'], 'Y-m-d H:i:s'); ?>>2024-01-15 14:30:00</option>
-                                <option value="Y-m-d" <?php selected($this->settings['date_format'], 'Y-m-d'); ?>>2024-01-15</option>
-                                <option value="d/m/Y" <?php selected($this->settings['date_format'], 'd/m/Y'); ?>>15/01/2024</option>
-                                <option value="m/d/Y" <?php selected($this->settings['date_format'], 'm/d/Y'); ?>>01/15/2024</option>
-                                <option value="F j, Y" <?php selected($this->settings['date_format'], 'F j, Y'); ?>>January 15, 2024</option>
+                                <option value="Y-m-d H:i:s" <?php selected($this->get_setting('date_format', 'Y-m-d H:i:s'), 'Y-m-d H:i:s'); ?>>2024-01-15 14:30:00</option>
+                                <option value="Y-m-d" <?php selected($this->get_setting('date_format', 'Y-m-d H:i:s'), 'Y-m-d'); ?>>2024-01-15</option>
+                                <option value="d/m/Y" <?php selected($this->get_setting('date_format', 'Y-m-d H:i:s'), 'd/m/Y'); ?>>15/01/2024</option>
+                                <option value="m/d/Y" <?php selected($this->get_setting('date_format', 'Y-m-d H:i:s'), 'm/d/Y'); ?>>01/15/2024</option>
+                                <option value="F j, Y" <?php selected($this->get_setting('date_format', 'Y-m-d H:i:s'), 'F j, Y'); ?>>January 15, 2024</option>
                             </select>
                             <p class="description">選擇日期顯示格式</p>
                         </td>
@@ -283,7 +303,7 @@ class WU_Enhanced_User_List {
                         <th scope="row">顯示篩選器</th>
                         <td>
                             <label>
-                                <input type="checkbox" name="show_filters" value="1" <?php checked($this->settings['show_filters']); ?>>
+                                <input type="checkbox" name="show_filters" value="1" <?php checked($this->get_setting('show_filters', true)); ?>>
                                 在用戶列表頁面顯示篩選器
                             </label>
                             <p class="description">允許按登入日期等條件篩選用戶</p>
@@ -293,7 +313,7 @@ class WU_Enhanced_User_List {
                         <th scope="row">顯示統計資訊</th>
                         <td>
                             <label>
-                                <input type="checkbox" name="show_statistics" value="1" <?php checked($this->settings['show_statistics']); ?>>
+                                <input type="checkbox" name="show_statistics" value="1" <?php checked($this->get_setting('show_statistics', true)); ?>>
                                 在用戶列表頁面顯示統計資訊
                             </label>
                         </td>
@@ -301,7 +321,7 @@ class WU_Enhanced_User_List {
                     <tr>
                         <th scope="row">非活躍用戶高亮</th>
                         <td>
-                            <input type="number" name="highlight_inactive_users" value="<?php echo esc_attr($this->settings['highlight_inactive_users']); ?>" min="0" max="365" class="small-text">
+                            <input type="number" name="highlight_inactive_users" value="<?php echo esc_attr($this->get_setting('highlight_inactive_users', 30)); ?>" min="0" max="365" class="small-text">
                             天未登入的用戶高亮顯示
                             <p class="description">設為 0 停用此功能</p>
                         </td>
@@ -316,28 +336,28 @@ class WU_Enhanced_User_List {
                         <th scope="row">Personal Options</th>
                         <td>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_personal_options" value="1" <?php checked($this->settings['hide_personal_options']); ?>>
+                                <input type="checkbox" name="hide_personal_options" value="1" <?php checked($this->get_setting('hide_personal_options', false)); ?>>
                                 <strong>一鍵隱藏 Personal Options 整個區塊</strong>
                             </label>
                             <hr style="margin: 10px 0;">
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_admin_color_scheme" value="1" <?php checked($this->settings['hide_admin_color_scheme']); ?>>
+                                <input type="checkbox" name="hide_admin_color_scheme" value="1" <?php checked($this->get_setting('hide_admin_color_scheme', false)); ?>>
                                 隱藏 Admin Color Scheme（後台顏色方案）
                             </label>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_syntax_highlighting" value="1" <?php checked($this->settings['hide_syntax_highlighting']); ?>>
+                                <input type="checkbox" name="hide_syntax_highlighting" value="1" <?php checked($this->get_setting('hide_syntax_highlighting', false)); ?>>
                                 隱藏 Syntax Highlighting（語法高亮）
                             </label>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_keyboard_shortcuts" value="1" <?php checked($this->settings['hide_keyboard_shortcuts']); ?>>
+                                <input type="checkbox" name="hide_keyboard_shortcuts" value="1" <?php checked($this->get_setting('hide_keyboard_shortcuts', false)); ?>>
                                 隱藏 Keyboard Shortcuts（鍵盤快捷鍵）
                             </label>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_toolbar" value="1" <?php checked($this->settings['hide_toolbar']); ?>>
+                                <input type="checkbox" name="hide_toolbar" value="1" <?php checked($this->get_setting('hide_toolbar', false)); ?>>
                                 隱藏 Toolbar（工具列）
                             </label>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_language" value="1" <?php checked($this->settings['hide_language']); ?>>
+                                <input type="checkbox" name="hide_language" value="1" <?php checked($this->get_setting('hide_language', false)); ?>>
                                 隱藏 Language（語言設定）
                             </label>
                         </td>
@@ -346,7 +366,7 @@ class WU_Enhanced_User_List {
                         <th scope="row">About the user</th>
                         <td>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_biographical_info" value="1" <?php checked($this->settings['hide_biographical_info']); ?>>
+                                <input type="checkbox" name="hide_biographical_info" value="1" <?php checked($this->get_setting('hide_biographical_info', false)); ?>>
                                 <strong>一鍵隱藏 Biographical Info（個人簡介）</strong>
                             </label>
                         </td>
@@ -355,7 +375,7 @@ class WU_Enhanced_User_List {
                         <th scope="row">Application Passwords</th>
                         <td>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_application_passwords" value="1" <?php checked($this->settings['hide_application_passwords']); ?>>
+                                <input type="checkbox" name="hide_application_passwords" value="1" <?php checked($this->get_setting('hide_application_passwords', false)); ?>>
                                 <strong>一鍵隱藏 Application Passwords（應用程式密碼）</strong>
                             </label>
                         </td>
@@ -364,7 +384,7 @@ class WU_Enhanced_User_List {
                         <th scope="row">Elementor AI</th>
                         <td>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_elementor_ai" value="1" <?php checked($this->settings['hide_elementor_ai']); ?>>
+                                <input type="checkbox" name="hide_elementor_ai" value="1" <?php checked($this->get_setting('hide_elementor_ai', false)); ?>>
                                 <strong>隱藏 Elementor AI 設定</strong>
                             </label>
                         </td>
@@ -374,67 +394,67 @@ class WU_Enhanced_User_List {
                         <td>
                             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_url" value="1" <?php checked($this->settings['hide_user_url']); ?>>
+                                    <input type="checkbox" name="hide_user_url" value="1" <?php checked($this->get_setting('hide_user_url', false)); ?>>
                                     Website URL
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_facebook" value="1" <?php checked($this->settings['hide_user_facebook']); ?>>
+                                    <input type="checkbox" name="hide_user_facebook" value="1" <?php checked($this->get_setting('hide_user_facebook', false)); ?>>
                                     Facebook
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_twitter" value="1" <?php checked($this->settings['hide_user_twitter']); ?>>
+                                    <input type="checkbox" name="hide_user_twitter" value="1" <?php checked($this->get_setting('hide_user_twitter', false)); ?>>
                                     Twitter
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_linkedin" value="1" <?php checked($this->settings['hide_user_linkedin']); ?>>
+                                    <input type="checkbox" name="hide_user_linkedin" value="1" <?php checked($this->get_setting('hide_user_linkedin', false)); ?>>
                                     LinkedIn
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_mastodon" value="1" <?php checked($this->settings['hide_user_mastodon']); ?>>
+                                    <input type="checkbox" name="hide_user_mastodon" value="1" <?php checked($this->get_setting('hide_user_mastodon', false)); ?>>
                                     Mastodon
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_tiktok" value="1" <?php checked($this->settings['hide_user_tiktok']); ?>>
+                                    <input type="checkbox" name="hide_user_tiktok" value="1" <?php checked($this->get_setting('hide_user_tiktok', false)); ?>>
                                     TikTok
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_odnoklassniki" value="1" <?php checked($this->settings['hide_user_odnoklassniki']); ?>>
+                                    <input type="checkbox" name="hide_user_odnoklassniki" value="1" <?php checked($this->get_setting('hide_user_odnoklassniki', false)); ?>>
                                     Odnoklassniki
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_vkontakte" value="1" <?php checked($this->settings['hide_user_vkontakte']); ?>>
+                                    <input type="checkbox" name="hide_user_vkontakte" value="1" <?php checked($this->get_setting('hide_user_vkontakte', false)); ?>>
                                     VKontakte
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_vimeo" value="1" <?php checked($this->settings['hide_user_vimeo']); ?>>
+                                    <input type="checkbox" name="hide_user_vimeo" value="1" <?php checked($this->get_setting('hide_user_vimeo', false)); ?>>
                                     Vimeo
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_youtube" value="1" <?php checked($this->settings['hide_user_youtube']); ?>>
+                                    <input type="checkbox" name="hide_user_youtube" value="1" <?php checked($this->get_setting('hide_user_youtube', false)); ?>>
                                     YouTube
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_medium" value="1" <?php checked($this->settings['hide_user_medium']); ?>>
+                                    <input type="checkbox" name="hide_user_medium" value="1" <?php checked($this->get_setting('hide_user_medium', false)); ?>>
                                     Medium
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_github" value="1" <?php checked($this->settings['hide_user_github']); ?>>
+                                    <input type="checkbox" name="hide_user_github" value="1" <?php checked($this->get_setting('hide_user_github', false)); ?>>
                                     GitHub
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_wordpress" value="1" <?php checked($this->settings['hide_user_wordpress']); ?>>
+                                    <input type="checkbox" name="hide_user_wordpress" value="1" <?php checked($this->get_setting('hide_user_wordpress', false)); ?>>
                                     WordPress.org
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_pinterest" value="1" <?php checked($this->settings['hide_user_pinterest']); ?>>
+                                    <input type="checkbox" name="hide_user_pinterest" value="1" <?php checked($this->get_setting('hide_user_pinterest', false)); ?>>
                                     Pinterest
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_instagram" value="1" <?php checked($this->settings['hide_user_instagram']); ?>>
+                                    <input type="checkbox" name="hide_user_instagram" value="1" <?php checked($this->get_setting('hide_user_instagram', false)); ?>>
                                     Instagram
                                 </label>
                                 <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_dribbble" value="1" <?php checked($this->settings['hide_user_dribbble']); ?>>
+                                    <input type="checkbox" name="hide_user_dribbble" value="1" <?php checked($this->get_setting('hide_user_dribbble', false)); ?>>
                                     Dribbble
                                 </label>
                             </div>
@@ -448,7 +468,7 @@ class WU_Enhanced_User_List {
                         <th scope="row">啟用用戶匯出</th>
                         <td>
                             <label>
-                                <input type="checkbox" name="enable_user_export" value="1" <?php checked($this->settings['enable_user_export']); ?>>
+                                <input type="checkbox" name="enable_user_export" value="1" <?php checked($this->get_setting('enable_user_export', false)); ?>>
                                 啟用用戶資料匯出功能
                             </label>
                             <p class="description">在用戶列表中新增匯出選項，支援單個和批量匯出</p>
@@ -459,7 +479,9 @@ class WU_Enhanced_User_List {
                         <td>
                             <fieldset>
                                 <legend class="screen-reader-text"><span>匯出欄位</span></legend>
-                                <?php foreach ($this->settings['export_fields'] as $field => $enabled): ?>
+                                <?php 
+                                $export_fields = $this->get_setting('export_fields', array());
+                                foreach ($export_fields as $field => $enabled): ?>
                                 <label style="display: block; margin: 5px 0;">
                                     <input type="checkbox" name="export_fields[<?php echo $field; ?>]" value="1" <?php checked($enabled); ?>>
                                     <?php echo ucfirst(str_replace('_', ' ', $field)); ?>
@@ -472,11 +494,11 @@ class WU_Enhanced_User_List {
                         <th scope="row">匯出中繼資料</th>
                         <td>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="include_meta" value="1" <?php checked($this->settings['include_meta']); ?>>
+                                <input type="checkbox" name="include_meta" value="1" <?php checked($this->get_setting('include_meta', true)); ?>>
                                 包含用戶中繼資料
                             </label>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="include_roles" value="1" <?php checked($this->settings['include_roles']); ?>>
+                                <input type="checkbox" name="include_roles" value="1" <?php checked($this->get_setting('include_roles', true)); ?>>
                                 包含用戶角色資訊
                             </label>
                         </td>
@@ -489,7 +511,7 @@ class WU_Enhanced_User_List {
                         <th scope="row">啟用自訂頭像</th>
                         <td>
                             <label>
-                                <input type="checkbox" name="enable_custom_avatar" value="1" <?php checked($this->settings['enable_custom_avatar']); ?>>
+                                <input type="checkbox" name="enable_custom_avatar" value="1" <?php checked($this->get_setting('enable_custom_avatar', false)); ?>>
                                 允許使用 WordPress 媒體庫中的任何圖像作為使用者頭像
                             </label>
                             <p class="description">用戶可以從媒體庫選擇或上傳新圖片作為頭像</p>
@@ -498,7 +520,7 @@ class WU_Enhanced_User_List {
                     <tr>
                         <th scope="row">檔案大小限制</th>
                         <td>
-                            <input type="number" name="avatar_size_limit" value="<?php echo esc_attr($this->settings['avatar_size_limit']); ?>" min="512" max="10240" class="small-text">
+                            <input type="number" name="avatar_size_limit" value="<?php echo esc_attr($this->get_setting('avatar_size_limit', 2048)); ?>" min="512" max="10240" class="small-text">
                             KB
                             <p class="description">頭像檔案大小上限</p>
                         </td>
@@ -506,7 +528,7 @@ class WU_Enhanced_User_List {
                     <tr>
                         <th scope="row">允許的檔案類型</th>
                         <td>
-                            <?php $allowed_types = $this->settings['allowed_avatar_types']; ?>
+                            <?php $allowed_types = $this->get_setting('allowed_avatar_types', array('jpg', 'jpeg', 'png', 'gif', 'webp')); ?>
                             <label style="display: block; margin: 5px 0;">
                                 <input type="checkbox" name="allowed_avatar_types[]" value="jpg" <?php checked(in_array('jpg', $allowed_types)); ?>>
                                 JPG
@@ -586,11 +608,11 @@ class WU_Enhanced_User_List {
                             <td><?php echo esc_html($user->display_name); ?></td>
                             <td><?php echo esc_html($user->user_email); ?></td>
                             <td><?php echo esc_html(implode(', ', $user->roles)); ?></td>
-                            <td><?php echo esc_html(date($this->settings['date_format'], strtotime($user->user_registered))); ?></td>
+                            <td><?php echo esc_html(date($this->get_setting('date_format', 'Y-m-d H:i:s'), strtotime($user->user_registered))); ?></td>
                             <td>
                                 <?php 
                                 $last_login = get_user_meta($user->ID, 'wu_last_login', true);
-                                echo $last_login ? esc_html(date($this->settings['date_format'], $last_login)) : '從未登入';
+                                echo $last_login ? esc_html(date($this->get_setting('date_format', 'Y-m-d H:i:s'), $last_login)) : '從未登入';
                                 ?>
                             </td>
                         </tr>
@@ -673,7 +695,7 @@ class WU_Enhanced_User_List {
             wp_die('安全驗證失敗');
         }
         
-        $settings = array(
+        $settings = array_merge($this->get_default_settings(), array(
             'enabled' => isset($_POST['enabled']),
             'show_last_login' => isset($_POST['show_last_login']),
             'show_registration_date' => isset($_POST['show_registration_date']),
@@ -721,7 +743,7 @@ class WU_Enhanced_User_List {
             'enable_custom_avatar' => isset($_POST['enable_custom_avatar']),
             'avatar_size_limit' => intval($_POST['avatar_size_limit']),
             'allowed_avatar_types' => isset($_POST['allowed_avatar_types']) ? $_POST['allowed_avatar_types'] : array('jpg', 'jpeg', 'png', 'webp')
-        );
+        ));
         
         update_option('wu_enhanced_user_list_settings', $settings);
         $this->settings = $settings;
@@ -730,7 +752,7 @@ class WU_Enhanced_User_List {
     }
     
     public function add_user_columns($columns) {
-        if (!$this->settings['enabled']) {
+        if (!$this->get_setting('enabled', false)) {
             return $columns;
         }
         
@@ -740,30 +762,30 @@ class WU_Enhanced_User_List {
             $new_columns[$key] = $value;
             
             // 在用戶名後添加用戶 ID
-            if ($key === 'username' && $this->settings['show_user_id']) {
+            if ($key === 'username' && $this->get_setting('show_user_id', false)) {
                 $new_columns['wu_user_id'] = '用戶 ID';
             }
             
             // 在電子郵件後添加註冊日期
-            if ($key === 'email' && $this->settings['show_registration_date']) {
+            if ($key === 'email' && $this->get_setting('show_registration_date', true)) {
                 $new_columns['wu_registration_date'] = '註冊日期';
             }
         }
         
         // 添加其他欄位
-        if ($this->settings['show_last_login']) {
+        if ($this->get_setting('show_last_login', true)) {
             $new_columns['wu_last_login'] = '上次登入';
         }
         
-        if ($this->settings['show_post_count']) {
+        if ($this->get_setting('show_post_count', false)) {
             $new_columns['wu_post_count'] = '文章數量';
         }
         
-        if ($this->settings['show_role_since']) {
+        if ($this->get_setting('show_role_since', false)) {
             $new_columns['wu_role_since'] = '角色指派時間';
         }
         
-        if ($this->settings['show_woo_total']) {
+        if ($this->get_setting('show_woo_total', false)) {
             $new_columns['wu_woo_total'] = 'WooCommerce 總購買金額';
         }
         
@@ -771,7 +793,7 @@ class WU_Enhanced_User_List {
     }
     
     public function show_user_column_content($value, $column_name, $user_id) {
-        if (!$this->settings['enabled']) {
+        if (!$this->get_setting('enabled', false)) {
             return $value;
         }
         
@@ -786,15 +808,16 @@ class WU_Enhanced_User_List {
                 
             case 'wu_registration_date':
                 $registration_date = strtotime($user->user_registered);
-                return date($this->settings['date_format'], $registration_date);
+                return date($this->get_setting('date_format', 'Y-m-d H:i:s'), $registration_date);
                 
             case 'wu_last_login':
                 $last_login = get_user_meta($user_id, 'wu_last_login', true);
                 if ($last_login) {
-                    $login_time = date($this->settings['date_format'], $last_login);
+                    $login_time = date($this->get_setting('date_format', 'Y-m-d H:i:s'), $last_login);
                     $days_ago = floor((time() - $last_login) / DAY_IN_SECONDS);
                     
-                    if ($days_ago > $this->settings['highlight_inactive_users'] && $this->settings['highlight_inactive_users'] > 0) {
+                    $highlight_days = $this->get_setting('highlight_inactive_users', 30);
+                    if ($days_ago > $highlight_days && $highlight_days > 0) {
                         return '<span style="color: #dc3232;">' . $login_time . ' <small>(' . $days_ago . ' 天前)</small></span>';
                     } else {
                         return $login_time;
@@ -810,10 +833,10 @@ class WU_Enhanced_User_List {
             case 'wu_role_since':
                 $role_since = get_user_meta($user_id, 'wu_role_assigned_date', true);
                 if ($role_since) {
-                    return date($this->settings['date_format'], $role_since);
+                    return date($this->get_setting('date_format', 'Y-m-d H:i:s'), $role_since);
                 } else {
                     // 如果沒有記錄，使用註冊日期
-                    return date($this->settings['date_format'], strtotime($user->user_registered));
+                    return date($this->get_setting('date_format', 'Y-m-d H:i:s'), strtotime($user->user_registered));
                 }
                 
             case 'wu_woo_total':
@@ -833,7 +856,7 @@ class WU_Enhanced_User_List {
     }
     
     public function make_columns_sortable($columns) {
-        if (!$this->settings['enabled']) {
+        if (!$this->get_setting('enabled', false)) {
             return $columns;
         }
         
@@ -850,7 +873,7 @@ class WU_Enhanced_User_List {
     }
     
     public function handle_column_sorting($user_query) {
-        if (!is_admin() || !$this->settings['enabled']) {
+        if (!is_admin() || !$this->get_setting('enabled', false)) {
             return;
         }
         
@@ -903,7 +926,7 @@ class WU_Enhanced_User_List {
     }
     
     public function record_user_last_login($user_login, $user) {
-        if (!$this->settings['enabled']) {
+        if (!$this->get_setting('enabled', false)) {
             return;
         }
         
@@ -911,7 +934,7 @@ class WU_Enhanced_User_List {
     }
     
     public function add_user_filters() {
-        if (!$this->settings['enabled'] || !$this->settings['show_filters']) {
+        if (!$this->get_setting('enabled', false) || !$this->get_setting('show_filters', true)) {
             return;
         }
         
@@ -942,7 +965,7 @@ class WU_Enhanced_User_List {
     }
     
     public function filter_users_by_login_date($user_query) {
-        if (!is_admin() || !$this->settings['enabled']) {
+        if (!is_admin() || !$this->get_setting('enabled', false)) {
             return;
         }
         
@@ -1061,7 +1084,7 @@ class WU_Enhanced_User_List {
     }
     
     public function show_additional_user_info($user) {
-        if (!$this->settings['enabled']) {
+        if (!$this->get_setting('enabled', false)) {
             return;
         }
         
@@ -1076,13 +1099,13 @@ class WU_Enhanced_User_List {
             </tr>
             <tr>
                 <th><label>註冊日期</label></th>
-                <td><?php echo date($this->settings['date_format'], strtotime($user->user_registered)); ?></td>
+                <td><?php echo date($this->get_setting('date_format', 'Y-m-d H:i:s'), strtotime($user->user_registered)); ?></td>
             </tr>
             <tr>
                 <th><label>上次登入</label></th>
                 <td>
                     <?php if ($last_login): ?>
-                        <?php echo date($this->settings['date_format'], $last_login); ?>
+                        <?php echo date($this->get_setting('date_format', 'Y-m-d H:i:s'), $last_login); ?>
                         <small>(<?php echo floor((time() - $last_login) / DAY_IN_SECONDS); ?> 天前)</small>
                     <?php else: ?>
                         從未登入
@@ -1093,7 +1116,7 @@ class WU_Enhanced_User_List {
                 <th><label>角色指派時間</label></th>
                 <td>
                     <?php if ($role_since): ?>
-                        <?php echo date($this->settings['date_format'], $role_since); ?>
+                        <?php echo date($this->get_setting('date_format', 'Y-m-d H:i:s'), $role_since); ?>
                     <?php else: ?>
                         未記錄（可能為註冊時指派）
                     <?php endif; ?>
@@ -1131,7 +1154,7 @@ class WU_Enhanced_User_List {
     }
     
     public function show_user_statistics() {
-        if (!$this->settings['enabled'] || !$this->settings['show_statistics']) {
+        if (!$this->get_setting('enabled', false) || !$this->get_setting('show_statistics', true)) {
             return;
         }
         
@@ -1154,7 +1177,7 @@ class WU_Enhanced_User_List {
             </p>
         </div>
         
-        <?php if ($this->settings['highlight_inactive_users'] > 0): ?>
+        <?php if ($this->get_setting('highlight_inactive_users', 30) > 0): ?>
         <style>
         .users-php .wp-list-table tbody tr {
             background: #fff;
@@ -1441,22 +1464,22 @@ class WU_Enhanced_User_List {
         if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
             $hide_fields = array();
             
-            if ($this->settings['hide_user_url']) $hide_fields[] = '.user-url-wrap';
-            if ($this->settings['hide_user_facebook']) $hide_fields[] = '.user-facebook-wrap';
-            if ($this->settings['hide_user_twitter']) $hide_fields[] = '.user-twitter-wrap';
-            if ($this->settings['hide_user_linkedin']) $hide_fields[] = '.user-linkedin-wrap';
-            if ($this->settings['hide_user_mastodon']) $hide_fields[] = '.user-mastodon-wrap';
-            if ($this->settings['hide_user_tiktok']) $hide_fields[] = '.user-tiktok-wrap';
-            if ($this->settings['hide_user_odnoklassniki']) $hide_fields[] = '.user-odnoklassniki-wrap';
-            if ($this->settings['hide_user_vkontakte']) $hide_fields[] = '.user-vkontakte-wrap';
-            if ($this->settings['hide_user_vimeo']) $hide_fields[] = '.user-vimeo-wrap';
-            if ($this->settings['hide_user_youtube']) $hide_fields[] = '.user-youtube-wrap';
-            if ($this->settings['hide_user_medium']) $hide_fields[] = '.user-medium-wrap';
-            if ($this->settings['hide_user_github']) $hide_fields[] = '.user-github-wrap';
-            if ($this->settings['hide_user_wordpress']) $hide_fields[] = '.user-wordpress-wrap';
-            if ($this->settings['hide_user_pinterest']) $hide_fields[] = '.user-pinterest-wrap';
-            if ($this->settings['hide_user_instagram']) $hide_fields[] = '.user-instagram-wrap';
-            if ($this->settings['hide_user_dribbble']) $hide_fields[] = '.user-dribbble-wrap';
+            if ($this->get_setting('hide_user_url', false)) $hide_fields[] = '.user-url-wrap';
+            if ($this->get_setting('hide_user_facebook', false)) $hide_fields[] = '.user-facebook-wrap';
+            if ($this->get_setting('hide_user_twitter', false)) $hide_fields[] = '.user-twitter-wrap';
+            if ($this->get_setting('hide_user_linkedin', false)) $hide_fields[] = '.user-linkedin-wrap';
+            if ($this->get_setting('hide_user_mastodon', false)) $hide_fields[] = '.user-mastodon-wrap';
+            if ($this->get_setting('hide_user_tiktok', false)) $hide_fields[] = '.user-tiktok-wrap';
+            if ($this->get_setting('hide_user_odnoklassniki', false)) $hide_fields[] = '.user-odnoklassniki-wrap';
+            if ($this->get_setting('hide_user_vkontakte', false)) $hide_fields[] = '.user-vkontakte-wrap';
+            if ($this->get_setting('hide_user_vimeo', false)) $hide_fields[] = '.user-vimeo-wrap';
+            if ($this->get_setting('hide_user_youtube', false)) $hide_fields[] = '.user-youtube-wrap';
+            if ($this->get_setting('hide_user_medium', false)) $hide_fields[] = '.user-medium-wrap';
+            if ($this->get_setting('hide_user_github', false)) $hide_fields[] = '.user-github-wrap';
+            if ($this->get_setting('hide_user_wordpress', false)) $hide_fields[] = '.user-wordpress-wrap';
+            if ($this->get_setting('hide_user_pinterest', false)) $hide_fields[] = '.user-pinterest-wrap';
+            if ($this->get_setting('hide_user_instagram', false)) $hide_fields[] = '.user-instagram-wrap';
+            if ($this->get_setting('hide_user_dribbble', false)) $hide_fields[] = '.user-dribbble-wrap';
             
             if (!empty($hide_fields)) {
                 echo '<style>';
@@ -1598,18 +1621,20 @@ class WU_Enhanced_User_List {
         
         // 建立標題行
         $headers = array();
-        foreach ($this->settings['export_fields'] as $field => $enabled) {
+        $export_fields = $this->get_setting('export_fields', array());
+        foreach ($export_fields as $field => $enabled) {
             if ($enabled) {
                 $headers[] = ucfirst(str_replace('_', ' ', $field));
             }
         }
         
-        if ($this->settings['include_roles']) {
+        if ($this->get_setting('include_roles', true)) {
             $headers[] = 'Roles';
         }
         
-        if ($this->settings['include_meta']) {
-            foreach ($this->settings['export_meta_fields'] as $meta_field => $enabled) {
+        if ($this->get_setting('include_meta', true)) {
+            $export_meta_fields = $this->get_setting('export_meta_fields', array());
+            foreach ($export_meta_fields as $meta_field => $enabled) {
                 if ($enabled) {
                     $headers[] = ucfirst(str_replace('_', ' ', $meta_field));
                 }
@@ -1626,25 +1651,26 @@ class WU_Enhanced_User_List {
             $row = array();
             
             // 基本欄位
-            foreach ($this->settings['export_fields'] as $field => $enabled) {
+            foreach ($export_fields as $field => $enabled) {
                 if ($enabled) {
                     $value = isset($user->$field) ? $user->$field : '';
                     if ($field === 'user_registered') {
-                        $value = date($this->settings['date_format'], strtotime($value));
+                        $value = date($this->get_setting('date_format', 'Y-m-d H:i:s'), strtotime($value));
                     }
                     $row[] = $value;
                 }
             }
             
             // 角色資訊
-            if ($this->settings['include_roles']) {
+            if ($this->get_setting('include_roles', true)) {
                 $roles = implode(', ', $user->roles);
                 $row[] = $roles;
             }
             
             // 中繼資料
-            if ($this->settings['include_meta']) {
-                foreach ($this->settings['export_meta_fields'] as $meta_field => $enabled) {
+            if ($this->get_setting('include_meta', true)) {
+                $export_meta_fields = $this->get_setting('export_meta_fields', array());
+                foreach ($export_meta_fields as $meta_field => $enabled) {
                     if ($enabled) {
                         $meta_value = get_user_meta($user_id, $meta_field, true);
                         $row[] = $meta_value;
@@ -1685,8 +1711,8 @@ class WU_Enhanced_User_List {
                     
                     <p class="description">
                         點擊「選擇圖片」從媒體庫選擇頭像，或上傳新圖片。<br>
-                        建議尺寸：至少 96x96 像素，檔案大小不超過 <?php echo $this->settings['avatar_size_limit']; ?> KB<br>
-                        支援格式：<?php echo implode(', ', array_map('strtoupper', $this->settings['allowed_avatar_types'])); ?>
+                        建議尺寸：至少 96x96 像素，檔案大小不超過 <?php echo $this->get_setting('avatar_size_limit', 2048); ?> KB<br>
+                        支援格式：<?php echo implode(', ', array_map('strtoupper', $this->get_setting('allowed_avatar_types', array('jpg', 'jpeg', 'png', 'gif', 'webp')))); ?>
                     </p>
                 </td>
             </tr>
@@ -1719,13 +1745,13 @@ class WU_Enhanced_User_List {
                     var attachment = frame.state().get('selection').first().toJSON();
                     
                     // 檢查檔案大小
-                    if (attachment.filesizeInBytes > <?php echo $this->settings['avatar_size_limit'] * 1024; ?>) {
-                        alert('檔案太大！請選擇小於 <?php echo $this->settings['avatar_size_limit']; ?> KB 的圖片。');
+                    if (attachment.filesizeInBytes > <?php echo $this->get_setting('avatar_size_limit', 2048) * 1024; ?>) {
+                        alert('檔案太大！請選擇小於 <?php echo $this->get_setting('avatar_size_limit', 2048); ?> KB 的圖片。');
                         return;
                     }
                     
                     // 檢查檔案類型
-                    var allowedTypes = <?php echo json_encode($this->settings['allowed_avatar_types']); ?>;
+                    var allowedTypes = <?php echo json_encode($this->get_setting('allowed_avatar_types', array('jpg', 'jpeg', 'png', 'gif', 'webp'))); ?>;
                     var fileExtension = attachment.filename.split('.').pop().toLowerCase();
                     if (allowedTypes.indexOf(fileExtension) === -1) {
                         alert('不支援的檔案格式！請選擇 ' + allowedTypes.join(', ').toUpperCase() + ' 格式的圖片。');
