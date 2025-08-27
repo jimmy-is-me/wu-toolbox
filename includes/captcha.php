@@ -6,6 +6,8 @@ if (!defined('ABSPATH')) exit;
  * - No sessions, cookies, IP, or images
  * - Uses HMAC token with timestamp for validation
  * - Hidden for logged-in users
+ * - Admin toggle: wu_captcha_enabled (default off)
+ * - GDPR-friendly: no tracking, no external requests
  */
 
 function wu_captcha_secret_key() {
@@ -38,6 +40,7 @@ function wu_captcha_validate_token($token, $user_input) {
 }
 
 function wu_captcha_render_field() {
+	if (!get_option('wu_captcha_enabled', 0)) return; // disabled globally
 	if (is_user_logged_in()) return; // hide for logged-in users
 	$code = str_pad((string) wp_rand(0, 9999), 4, '0', STR_PAD_LEFT);
 	$ts = time();
@@ -65,6 +68,7 @@ add_action('woocommerce_lostpassword_form', 'wu_captcha_render_field');
 // ===== Validations =====
 function wu_captcha_validate_login($user) {
 	if (is_wp_error($user)) return $user;
+	if (!get_option('wu_captcha_enabled', 0)) return $user;
 	if (is_user_logged_in()) return $user;
 	$token = isset($_POST['wu_captcha_token']) ? sanitize_text_field(wp_unslash($_POST['wu_captcha_token'])) : '';
 	$input = isset($_POST['wu_captcha_input']) ? sanitize_text_field(wp_unslash($_POST['wu_captcha_input'])) : '';
@@ -75,6 +79,7 @@ function wu_captcha_validate_login($user) {
 add_filter('authenticate', 'wu_captcha_validate_login', 30, 1);
 
 function wu_captcha_validate_registration($errors, $sanitized_user_login, $user_email) {
+	if (!get_option('wu_captcha_enabled', 0)) return $errors;
 	if (is_user_logged_in()) return $errors;
 	$token = isset($_POST['wu_captcha_token']) ? sanitize_text_field(wp_unslash($_POST['wu_captcha_token'])) : '';
 	$input = isset($_POST['wu_captcha_input']) ? sanitize_text_field(wp_unslash($_POST['wu_captcha_input'])) : '';
@@ -87,6 +92,7 @@ function wu_captcha_validate_registration($errors, $sanitized_user_login, $user_
 add_filter('registration_errors', 'wu_captcha_validate_registration', 30, 3);
 
 function wu_captcha_validate_lostpassword($errors) {
+	if (!get_option('wu_captcha_enabled', 0)) return $errors;
 	if (is_user_logged_in()) return $errors;
 	$token = isset($_POST['wu_captcha_token']) ? sanitize_text_field(wp_unslash($_POST['wu_captcha_token'])) : '';
 	$input = isset($_POST['wu_captcha_input']) ? sanitize_text_field(wp_unslash($_POST['wu_captcha_input'])) : '';
@@ -100,6 +106,7 @@ add_filter('lostpassword_errors', 'wu_captcha_validate_lostpassword');
 
 // WooCommerce specific error hooks
 function wu_captcha_validate_wc_login($error, $user) {
+	if (!get_option('wu_captcha_enabled', 0)) return $error;
 	if (is_user_logged_in()) return $error;
 	$token = isset($_POST['wu_captcha_token']) ? sanitize_text_field(wp_unslash($_POST['wu_captcha_token'])) : '';
 	$input = isset($_POST['wu_captcha_input']) ? sanitize_text_field(wp_unslash($_POST['wu_captcha_input'])) : '';
@@ -112,6 +119,7 @@ function wu_captcha_validate_wc_login($error, $user) {
 add_filter('woocommerce_process_login_errors', 'wu_captcha_validate_wc_login', 30, 2);
 
 function wu_captcha_validate_wc_registration($errors, $username, $password, $email) {
+	if (!get_option('wu_captcha_enabled', 0)) return $errors;
 	if (is_user_logged_in()) return $errors;
 	$token = isset($_POST['wu_captcha_token']) ? sanitize_text_field(wp_unslash($_POST['wu_captcha_token'])) : '';
 	$input = isset($_POST['wu_captcha_input']) ? sanitize_text_field(wp_unslash($_POST['wu_captcha_input'])) : '';
@@ -122,4 +130,34 @@ function wu_captcha_validate_wc_registration($errors, $username, $password, $ema
 	return $errors;
 }
 add_filter('woocommerce_process_registration_errors', 'wu_captcha_validate_wc_registration', 30, 4);
+
+// Settings page
+add_action('admin_init', function(){
+	add_option('wu_captcha_enabled', 0);
+});
+
+add_action('admin_menu', function(){
+	add_submenu_page(
+		'wumetax-toolkit',
+		'驗證碼設定',
+		'登入/註冊驗證碼',
+		'manage_options',
+		'wu-captcha-settings',
+		function(){
+			if (isset($_POST['submit'])) {
+				check_admin_referer('wu_captcha_settings');
+				update_option('wu_captcha_enabled', isset($_POST['wu_captcha_enabled']) ? 1 : 0);
+				echo '<div class="notice notice-success"><p>設定已儲存。</p></div>';
+			}
+			echo '<div class="wrap"><h1>登入/註冊驗證碼</h1>';
+			echo '<form method="post">';
+			wp_nonce_field('wu_captcha_settings');
+			echo '<table class="form-table">';
+			echo '<tr><th scope="row">啟用驗證碼</th><td><label><input type="checkbox" name="wu_captcha_enabled" value="1" ' . checked(1, get_option('wu_captcha_enabled',0), false) . '> 啟用於登入、註冊、密碼重設與 WooCommerce 帳戶表單</label><p class="description">符合 GDPR，無外部請求與追蹤。</p></td></tr>';
+			echo '</table>';
+			submit_button();
+			echo '</form></div>';
+		}
+	);
+});
 
