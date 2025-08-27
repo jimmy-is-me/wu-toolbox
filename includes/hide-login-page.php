@@ -3,7 +3,6 @@
  * Hide Login Page Module
  * 隱藏WordPress後台登入位置工具
  */
-
 if (!defined('ABSPATH')) exit;
 
 class WU_Hide_Login_Page {
@@ -116,7 +115,7 @@ class WU_Hide_Login_Page {
                     <li>如果忘記新網址，可以通過資料庫或FTP停用此功能</li>
                 </ul>
                 
-                <?php if ($this->options['enabled']): ?>
+                <?php if (!empty($this->options['enabled'])): ?>
                 <div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 4px; margin-top: 15px;">
                     <h3 style="margin-top: 0; color: #155724;">功能已啟用</h3>
                     <p><strong>新的登入網址：</strong> <code><?php echo home_url('/' . $this->options['custom_slug'] . '/'); ?></code></p>
@@ -171,7 +170,7 @@ class WU_Hide_Login_Page {
      * 啟用功能回調
      */
     public function enabled_callback() {
-        $enabled = isset($this->options['enabled']) ? $this->options['enabled'] : false;
+        $enabled = !empty($this->options['enabled']) ? $this->options['enabled'] : false;
         ?>
         <label>
             <input type="checkbox" name="<?php echo $this->option_name; ?>[enabled]" value="1" <?php checked(1, $enabled); ?> />
@@ -184,7 +183,7 @@ class WU_Hide_Login_Page {
      * 自定義網址回調
      */
     public function custom_slug_callback() {
-        $custom_slug = isset($this->options['custom_slug']) ? $this->options['custom_slug'] : 'loginwu';
+        $custom_slug = !empty($this->options['custom_slug']) ? $this->options['custom_slug'] : 'loginwu';
         ?>
         <input type="text" name="<?php echo $this->option_name; ?>[custom_slug]" value="<?php echo esc_attr($custom_slug); ?>" class="regular-text wu-termius-input" />
         <p class="description">自定義登入頁面的網址結尾，預設為 "loginwu"。新的登入網址將是：<?php echo home_url('/'); ?><strong><?php echo esc_html($custom_slug); ?></strong>/</p>
@@ -195,7 +194,7 @@ class WU_Hide_Login_Page {
      * 重定向網址回調 - 修改為下拉式選擇器
      */
     public function redirect_url_callback() {
-        $redirect_url = isset($this->options['redirect_url']) ? $this->options['redirect_url'] : home_url();
+        $redirect_url = !empty($this->options['redirect_url']) ? $this->options['redirect_url'] : home_url();
         
         // 獲取所有已發布的頁面
         $pages = get_pages(array(
@@ -306,9 +305,9 @@ class WU_Hide_Login_Page {
     public function sanitize_options($input) {
         $sanitized = array();
         
-        $sanitized['enabled'] = isset($input['enabled']) ? true : false;
-        $sanitized['custom_slug'] = sanitize_text_field($input['custom_slug']);
-        $sanitized['redirect_url'] = esc_url_raw($input['redirect_url']);
+        $sanitized['enabled'] = !empty($input['enabled']) ? true : false;
+        $sanitized['custom_slug'] = !empty($input['custom_slug']) ? sanitize_text_field($input['custom_slug']) : 'loginwu';
+        $sanitized['redirect_url'] = !empty($input['redirect_url']) ? esc_url_raw($input['redirect_url']) : home_url();
         
         // 確保custom_slug不為空
         if (empty($sanitized['custom_slug'])) {
@@ -327,7 +326,7 @@ class WU_Hide_Login_Page {
      * 初始化隱藏登入功能
      */
     public function init_hide_login() {
-        if (!$this->options['enabled']) {
+        if (empty($this->options['enabled'])) {
             return;
         }
         
@@ -361,7 +360,7 @@ class WU_Hide_Login_Page {
      * 重定向登入頁面
      */
     public function redirect_login_pages() {
-        if (!$this->options['enabled']) {
+        if (empty($this->options['enabled'])) {
             return;
         }
         
@@ -416,7 +415,7 @@ class WU_Hide_Login_Page {
      * 修改登入URL
      */
     public function modify_login_url($url, $path = '', $scheme = null, $blog_id = null) {
-        if (!$this->options['enabled']) {
+        if (empty($this->options['enabled'])) {
             return $url;
         }
         
@@ -431,7 +430,7 @@ class WU_Hide_Login_Page {
      * 修改重定向URL
      */
     public function modify_redirect_url($location, $status) {
-        if (!$this->options['enabled']) {
+        if (empty($this->options['enabled'])) {
             return $location;
         }
         
@@ -454,15 +453,16 @@ function wu_hide_login_query_vars($vars) {
 }
 add_filter('query_vars', 'wu_hide_login_query_vars');
 
-// 處理自定義登入頁面
+// 處理自定義登入頁面 - 修復錯誤
 function wu_hide_login_template_redirect() {
     $options = get_option('wu_hide_login_page_options', array());
     
-    if (!$options['enabled']) {
+    // 修復：安全檢查 enabled 選項
+    if (empty($options['enabled'])) {
         return;
     }
     
-    $custom_slug = isset($options['custom_slug']) ? $options['custom_slug'] : 'loginwu';
+    $custom_slug = !empty($options['custom_slug']) ? $options['custom_slug'] : 'loginwu';
     
     if (strpos($_SERVER['REQUEST_URI'], '/' . $custom_slug) !== false) {
         // 載入WordPress登入頁面
