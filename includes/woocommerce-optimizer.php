@@ -19,6 +19,9 @@ class WU_WooCommerce_Optimizer {
         
         // 載入優化功能
         $this->load_optimizations();
+
+        // 購買量顯示與短代碼
+        add_action('init', array($this, 'register_sales_features'));
     }
     
     /**
@@ -47,7 +50,9 @@ class WU_WooCommerce_Optimizer {
             'wu_woo_disable_stripe_scripts',
             'wu_woo_disable_guide_emails',
             'wu_woo_disable_woocom_notifications',
-            'wu_woo_hide_payment_providers_link'
+            'wu_woo_hide_payment_providers_link',
+            // 新增：購買量顯示與調整
+            'wu_woo_show_sales_with_offset'
         );
         
         foreach ($settings as $setting) {
@@ -117,6 +122,15 @@ class WU_WooCommerce_Optimizer {
             'wu_woocommerce_settings',
             'wu_woocommerce_section'
         );
+
+        // 顯示商品購買量（真實+調整）
+        add_settings_field(
+            'wu_woo_show_sales_with_offset',
+            '顯示商品購買量（含管理員調整）',
+            array($this, 'sales_with_offset_callback'),
+            'wu_woocommerce_settings',
+            'wu_woocommerce_section'
+        );
     }
     
     /**
@@ -124,6 +138,53 @@ class WU_WooCommerce_Optimizer {
      */
     public function settings_section_callback() {
         echo '<p>配置 WooCommerce 優化選項，清理管理介面並提高效能。</p>';
+    }
+
+    public function register_sales_features() {
+        if (!get_option('wu_woo_show_sales_with_offset')) return;
+        // 單品頁顯示
+        add_action('woocommerce_single_product_summary', function(){
+            global $product; if (!$product) return;
+            $count = $this->get_product_sales_with_offset($product->get_id());
+            echo '<div class="wu-sales-count" style="opacity:.85;font-size:.9em;">已售出：' . intval($count) . '</div>';
+        }, 11);
+        // 短代碼
+        add_shortcode('wu_sales', function($atts){
+            $atts = shortcode_atts(array('id'=>0), $atts, 'wu_sales');
+            $id = intval($atts['id']);
+            if (!$id && function_exists('wc_get_product')) { $prod = wc_get_product(); if ($prod) $id = $prod->get_id(); }
+            if (!$id) return '0';
+            return intval($this->get_product_sales_with_offset($id));
+        });
+        // 後台商品欄位
+        add_action('woocommerce_product_options_general_product_data', function(){
+            woocommerce_wp_text_input(array(
+                'id' => '_wu_sales_offset',
+                'label' => '購買量調整',
+                'type' => 'number',
+                'desc_tip' => true,
+                'description' => '顯示購買量 = 真實購買量 + 調整',
+                'custom_attributes' => array('step' => '1')
+            ));
+        });
+        add_action('woocommerce_admin_process_product_object', function($product){
+            $offset = isset($_POST['_wu_sales_offset']) ? intval($_POST['_wu_sales_offset']) : 0;
+            $product->update_meta_data('_wu_sales_offset', $offset);
+        });
+        // 後台清單欄位
+        add_filter('manage_edit-product_columns', function($columns){ $columns['wu_sales'] = '購買量'; return $columns; });
+        add_action('manage_product_posts_custom_column', function($column, $post_id){
+            if ($column !== 'wu_sales') return;
+            echo intval($this->get_product_sales_with_offset($post_id));
+        }, 10, 2);
+    }
+
+    private function get_product_sales_with_offset($product_id) {
+        $product = wc_get_product($product_id);
+        if (!$product) return 0;
+        $real = intval($product->get_total_sales());
+        $offset = intval(get_post_meta($product_id, '_wu_sales_offset', true));
+        return max(0, $real + $offset);
     }
     
     /**
@@ -195,6 +256,13 @@ class WU_WooCommerce_Optimizer {
         echo '<label for="wu_woo_hide_payment_providers_link">隱藏「發現其他付款提供者」鏈接</label>';
         echo '<p class="description">發現其他支付提供者連結顯示在您的支付網關下方，並透過付費擴充將使用者引導至外部市場。</p>';
     }
+
+    public function sales_with_offset_callback() {
+        $value = get_option('wu_woo_show_sales_with_offset', false);
+        echo '<input type="checkbox" id="wu_woo_show_sales_with_offset" name="wu_woo_show_sales_with_offset" value="1" ' . checked(1, $value, false) . ' />';
+        echo '<label for="wu_woo_show_sales_with_offset"> 在商品頁顯示購買量（真實購買量 + 管理員調整）</label>';
+        echo '<p class="description">可透過商品自訂欄位「_wu_sales_offset」設定調整值；亦提供短代碼 [wu_sales id=""]。</p>';
+    }
     
     /**
      * 管理頁面
@@ -219,7 +287,8 @@ class WU_WooCommerce_Optimizer {
                 'wu_woo_disable_stripe_scripts',
                 'wu_woo_disable_guide_emails',
                 'wu_woo_disable_woocom_notifications',
-                'wu_woo_hide_payment_providers_link'
+                'wu_woo_hide_payment_providers_link',
+                'wu_woo_show_sales_with_offset'
             );
             
             foreach ($settings as $setting) {

@@ -61,6 +61,8 @@ class WU_Enhanced_User_List {
             add_action('edit_user_profile_update', array($this, 'save_custom_avatar'));
             add_filter('get_avatar', array($this, 'custom_avatar'), 10, 5);
             add_filter('get_avatar_url', array($this, 'custom_avatar_url'), 10, 3);
+            // 確保媒體選擇器可用
+            add_action('admin_enqueue_scripts', array($this, 'enqueue_media_assets'));
         }
     }
     
@@ -1490,6 +1492,12 @@ class WU_Enhanced_User_List {
         } else {
             delete_user_meta($user_id, 'wu_custom_avatar');
         }
+    }
+
+    public function enqueue_media_assets($hook) {
+        // 僅在個人資料與用戶編輯頁面載入
+        if ($hook !== 'profile.php' && $hook !== 'user-edit.php') return;
+        wp_enqueue_media();
     }
     
     public function custom_avatar($avatar, $id_or_email, $size, $default, $alt) {

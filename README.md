@@ -1,6 +1,6 @@
 # WU工具箱 (WU Toolbox)
 
-![Version](https://img.shields.io/badge/version-3.0-blue.svg)
+![Version](https://img.shields.io/badge/version-3.1-blue.svg)
 ![License](https://img.shields.io/badge/license-GPL--2.0-green.svg)
 ![WordPress](https://img.shields.io/badge/WordPress-5.0%2B-blue.svg)
 
@@ -22,7 +22,7 @@
 - **稽核日誌**：記錄重要的系統活動
 
 ### WooCommerce 優化
-- **WooCommerce 優化器**：清理和優化 WooCommerce 設定
+- **WooCommerce 優化器**：清理和優化 WooCommerce 設定，顯示商品購買量（真實 + 調整），短代碼 [wu_sales]
 - **移除不必要的功能**：停用行銷中心、市場建議等
 - **效能提升**：減少不必要的腳本載入
 
@@ -30,7 +30,8 @@
 - **評論管理器**：批量管理和清理評論
 - **版本管理器**：控制文章修訂版本數量
 - **內容複製器**：快速複製文章和頁面
-- **媒體編碼器**：JPEG/PNG → WebP 自動轉換，包含智能回退機制和縮圖生成
+- **媒體編碼器**：JPEG/PNG → WebP 自動轉換，包含智能回退機制與縮圖管理（重新產生縮圖、停用尺寸、清理未使用圖像）
+- **文章瀏覽量**：真實瀏覽量與管理員調整，短代碼 [wu_views]，後台欄位顯示
 
 ### 系統管理
 - **更新管理器**：控制 WordPress 核心、主題和外掛更新
@@ -86,6 +87,14 @@
 - 適當的權限檢查
 
 ## 🔄 更新日誌
+
+### 版本 3.1
+- 新增 4 位數字驗證碼於登入/註冊/重設密碼/WooCommerce 帳戶表單（無 Session、無 Cookie、隱私友善）
+- 媒體編碼器：新增縮圖尺寸管理（停用尺寸）、重新產生縮圖、掃描/刪除未使用圖像
+- 後台介面：新增內容複製保護（禁用右鍵與常見快捷鍵，提示訊息）
+- 使用者：修正自訂頭像選擇器（確保媒體庫彈窗可用），強化隱藏個人設定
+- 文章：新增瀏覽量統計（真實 + 調整），短代碼與後台欄顯示
+- WooCommerce：商品購買量（真實 + 調整），商品頁顯示與短代碼、後台欄位
 
 ### 版本 3.0
 - **新增 WebP 自動回退功能**：媒體編碼器現在支援智能圖片回退，當請求 PNG/JPG 但只有 WebP 存在時自動重新導向
