@@ -453,11 +453,10 @@ function wu_hide_login_query_vars($vars) {
 }
 add_filter('query_vars', 'wu_hide_login_query_vars');
 
-// 處理自定義登入頁面 - 修復錯誤
+// 處理自定義登入頁面 - 完整修復版本
 function wu_hide_login_template_redirect() {
     $options = get_option('wu_hide_login_page_options', array());
     
-    // 修復：安全檢查 enabled 選項
     if (empty($options['enabled'])) {
         return;
     }
@@ -465,9 +464,28 @@ function wu_hide_login_template_redirect() {
     $custom_slug = !empty($options['custom_slug']) ? $options['custom_slug'] : 'loginwu';
     
     if (strpos($_SERVER['REQUEST_URI'], '/' . $custom_slug) !== false) {
+        // 完整的變數初始化
+        global $error, $interim_login, $action, $user_login, $user_email, 
+               $redirect_to, $rememberme, $user_id, $errors;
+        
+        // WordPress 登入頁面需要的所有變數
+        $error = '';
+        $errors = new WP_Error();
+        $interim_login = isset($_REQUEST['interim-login']);
+        $action = isset($_REQUEST['action']) ? $_REQUEST['action'] : 'login';
+        $user_login = isset($_POST['log']) ? wp_unslash($_POST['log']) : '';
+        $user_email = isset($_POST['user_email']) ? wp_unslash($_POST['user_email']) : '';
+        $redirect_to = isset($_REQUEST['redirect_to']) ? $_REQUEST['redirect_to'] : admin_url();
+        $rememberme = !empty($_POST['rememberme']);
+        $user_id = 0;
+        
+        // 模擬正常的 wp-login.php 請求
+        $_SERVER['REQUEST_URI'] = str_replace('/' . $custom_slug, '/wp-login.php', $_SERVER['REQUEST_URI']);
+        
         // 載入WordPress登入頁面
         require_once(ABSPATH . 'wp-login.php');
         exit;
     }
 }
 add_action('template_redirect', 'wu_hide_login_template_redirect');
+
