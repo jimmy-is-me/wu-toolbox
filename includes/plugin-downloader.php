@@ -55,27 +55,6 @@ function get_popular_plugins_list() {
             'wp_url' => 'https://wordpress.org/plugins/user-role-editor/',
             'category' => '用戶管理'
         ),
-        'user-switching' => array(
-            'name' => 'User Switching',
-            'description' => '更改使用者權限後會希望能夠預覽該使用者權限的設定是否正確，使用這外掛快速切換。',
-            'slug' => 'user-switching',
-            'wp_url' => 'https://wordpress.org/plugins/user-switching/',
-            'category' => '用戶管理'
-        ),
-        'username-changer' => array(
-            'name' => 'Username Changer',
-            'description' => '更改使用者名稱的小工具。',
-            'slug' => 'username-changer',
-            'wp_url' => 'https://wordpress.org/plugins/username-changer/',
-            'category' => '用戶管理'
-        ),
-        'prevent-concurrent-logins' => array(
-            'name' => 'Loggedin – Limit Active Logins',
-            'description' => '限制同一帳號的併發登入數量，提升網站安全性。',
-            'slug' => 'prevent-concurrent-logins',
-            'wp_url' => 'https://wordpress.org/plugins/prevent-concurrent-logins/',
-            'category' => '用戶管理'
-        ),
         'heateor-social-login' => array(
             'name' => 'Heateor Social Login WordPress',
             'description' => '提供社群媒體登入功能，支援多種社群平台。',
@@ -106,13 +85,6 @@ function get_popular_plugins_list() {
             'wp_url' => 'https://wordpress.org/plugins/auto-upload-images/',
             'category' => '效能優化'
         ),
-        'image-sizes' => array(
-            'name' => 'ThumbPress',
-            'description' => '重新產生縮圖，優化圖片顯示和載入效能。',
-            'slug' => 'image-sizes',
-            'wp_url' => 'https://wordpress.org/plugins/image-sizes/',
-            'category' => '效能優化'
-        ),
 
         // 郵件管理
         'fluent-smtp' => array(
@@ -137,15 +109,6 @@ function get_popular_plugins_list() {
             'slug' => 'breadcrumb-navxt',
             'wp_url' => 'https://wordpress.org/plugins/breadcrumb-navxt/',
             'category' => 'SEO優化'
-        ),
-
-        // 功能管理
-        'disable-comments' => array(
-            'name' => 'Disable Comments',
-            'description' => '徹底停用網站評論功能，清理相關選單和數據。',
-            'slug' => 'disable-comments',
-            'wp_url' => 'https://wordpress.org/plugins/disable-comments/',
-            'category' => '功能管理'
         ),
 
         // 電商功能

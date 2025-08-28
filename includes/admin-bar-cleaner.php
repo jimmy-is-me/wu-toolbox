@@ -416,44 +416,54 @@ class WU_Admin_Bar_Cleaner {
     public function user_roles_management_callback() {
         $disabled_roles = get_option('wu_disabled_user_roles', array());
         
-        $roles = array(
-            'contributor' => array(
-                'name' => '投稿者',
-                'description' => '可以撰寫和編輯自己的文章，但無法發布'
-            ),
-            'author' => array(
-                'name' => '作者',
-                'description' => '可以發布和管理自己的文章'
-            ),
-            'editor' => array(
-                'name' => '編輯',
-                'description' => '可以發布和管理所有文章，包括其他人的文章'
-            ),
-            'shop_manager' => array(
-                'name' => '商店管理員',
-                'description' => 'WooCommerce 商店管理員角色'
-            ),
-            'customer' => array(
-                'name' => '顧客',
-                'description' => 'WooCommerce 顧客角色'
-            )
-        );
+        // 自動偵測當前所有的使用者角色
+        global $wp_roles;
+        if (!isset($wp_roles)) {
+            $wp_roles = new WP_Roles();
+        }
+        
+        $all_roles = $wp_roles->get_names();
+        $protected_roles = array('subscriber', 'administrator'); // 不可停用的角色
         
         echo '<div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">';
         echo '<h4 style="margin-top: 0; color: #d63638;">使用者角色管理</h4>';
-        echo '<p>選擇要停用的使用者角色。停用後，這些角色將無法在網站註冊或被指派給使用者。</p>';
+        echo '<p>自動偵測當前所有的使用者角色，可選擇停用除了 <strong>subscriber</strong> 和 <strong>administrator</strong> 之外的所有角色。停用後，這些角色將無法在網站註冊或被指派給使用者。</p>';
+        echo '<p><strong>偵測到 ' . count($all_roles) . ' 個使用者角色</strong></p>';
         echo '</div>';
         
         echo '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-top: 15px;">';
         
-        foreach ($roles as $role_key => $role_info) {
+        foreach ($all_roles as $role_key => $role_name) {
+            $is_protected = in_array($role_key, $protected_roles);
             $checked = isset($disabled_roles[$role_key]) ? checked(1, $disabled_roles[$role_key], false) : '';
             
-            echo '<div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">';
-            echo '<label style="display: block; cursor: pointer;">';
-            echo '<input type="checkbox" name="wu_disabled_user_roles[' . $role_key . ']" value="1" ' . $checked . ' style="margin-right: 12px; transform: scale(1.2);" />';
-            echo '<strong style="font-size: 16px; color: #333;">' . esc_html($role_info['name']) . '</strong>';
-            echo '<div style="margin-top: 8px; color: #666; font-size: 14px; line-height: 1.4;">' . esc_html($role_info['description']) . '</div>';
+            // 取得角色物件來獲取更多資訊
+            $role_obj = get_role($role_key);
+            $capabilities_count = $role_obj ? count($role_obj->capabilities) : 0;
+            
+            $card_style = $is_protected ? 
+                'background: #f0f6ff; padding: 20px; border: 2px solid #0073aa; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,115,170,0.1);' : 
+                'background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);';
+            
+            echo '<div style="' . $card_style . '">';
+            
+            if ($is_protected) {
+                echo '<div style="margin-bottom: 10px; padding: 8px 12px; background: #0073aa; color: white; border-radius: 4px; font-size: 12px; text-align: center;">受保護角色</div>';
+                echo '<label style="display: block; cursor: not-allowed; opacity: 0.6;">';
+                echo '<input type="checkbox" disabled style="margin-right: 12px; transform: scale(1.2);" />';
+            } else {
+                echo '<label style="display: block; cursor: pointer;">';
+                echo '<input type="checkbox" name="wu_disabled_user_roles[' . $role_key . ']" value="1" ' . $checked . ' style="margin-right: 12px; transform: scale(1.2);" />';
+            }
+            
+            echo '<strong style="font-size: 16px; color: #333;">' . esc_html($role_name) . '</strong>';
+            echo '<div style="margin-top: 5px; color: #999; font-size: 12px;">角色代碼: ' . esc_html($role_key) . '</div>';
+            echo '<div style="margin-top: 8px; color: #666; font-size: 14px; line-height: 1.4;">權限數量: ' . $capabilities_count . ' 個</div>';
+            
+            if ($is_protected) {
+                echo '<div style="margin-top: 8px; color: #0073aa; font-size: 12px; font-style: italic;">此角色受到保護，無法停用</div>';
+            }
+            
             echo '</label>';
             echo '</div>';
         }
@@ -461,7 +471,12 @@ class WU_Admin_Bar_Cleaner {
         echo '</div>';
         
         echo '<div style="margin-top: 20px; padding: 15px; background: #d1ecf1; border-left: 4px solid #bee5eb; border-radius: 4px;">';
-        echo '<p style="margin: 0; color: #0c5460;"><strong>注意：</strong>停用角色不會影響現有使用者，只會阻止新建立該角色的使用者。現有使用者需要手動更改角色。</p>';
+        echo '<p style="margin: 0; color: #0c5460;"><strong>注意：</strong></p>';
+        echo '<ul style="margin: 5px 0 0 20px; color: #0c5460;">';
+        echo '<li>停用角色不會影響現有使用者，只會阻止新建立該角色的使用者</li>';
+        echo '<li>受保護角色 (subscriber, administrator) 無法停用，確保網站基本功能正常運作</li>';
+        echo '<li>自動偵測功能會顯示所有註冊的使用者角色，包括外掛新增的自訂角色</li>';
+        echo '</ul>';
         echo '</div>';
     }
     

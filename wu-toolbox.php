@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WumetaxToolkit
  * Description: Wumetax 工具箱，整合多個功能模組。包含管理列清理、評論管理、WooCommerce優化器、更新管理等強大功能。
- * Version: 3.0
+ * Version: 3.2
  * Author: Wumetax
  * Author URI: https://wumetax.com/
  * License: GPL-2.0+
