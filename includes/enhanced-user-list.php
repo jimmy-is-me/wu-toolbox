@@ -84,11 +84,13 @@ class WU_Enhanced_User_List {
             .user-comment-shortcuts-wrap,
             .user-admin-bar-front-wrap,
             .user-locale-wrap,
+            .user-language-wrap,
             tr.user-admin-color-wrap,
             tr.user-syntax-highlighting-wrap,
             tr.user-comment-shortcuts-wrap,
             tr.user-admin-bar-front-wrap,
             tr.user-locale-wrap,
+            tr.user-language-wrap,
             /* 隱藏 About the user */
             .user-description-wrap,
             tr.user-description-wrap,
@@ -97,6 +99,11 @@ class WU_Enhanced_User_List {
             .application-passwords-section,
             .user-application-passwords-wrap,
             tr.application-passwords,
+            /* 隱藏 Elementor AI */
+            .elementor-ai-wrap,
+            .elementor-ai-settings,
+            tr.elementor-ai-wrap,
+            tr.elementor-ai-settings,
             /* 隱藏社交媒體設定 */
             .user-url-wrap,
             .user-facebook-wrap,
@@ -121,18 +128,46 @@ class WU_Enhanced_User_List {
             echo '<script>
             jQuery(document).ready(function($) {
                 // 隱藏包含特定標題的區塊
-                $("h2, h3").each(function() {
+                $("h2, h3, label").each(function() {
                     var text = $(this).text().trim().toLowerCase();
                     if (text.includes("personal options") || 
                         text.includes("about the user") || 
                         text.includes("application passwords") ||
                         text.includes("elementor") ||
+                        text.includes("ai") ||
                         text.includes("個人選項") ||
                         text.includes("關於使用者") ||
-                        text.includes("應用程式密碼")) {
+                        text.includes("應用程式密碼") ||
+                        text.includes("使用者自我介紹") ||
+                        text.includes("biographical") ||
+                        text.includes("biography")) {
                         $(this).hide();
                         $(this).nextUntil("h2, h3").hide();
+                        $(this).closest("tr").hide();
+                        $(this).parent().hide();
                     }
+                });
+                
+                // 隱藏特定的表格行和區塊
+                $(".form-table tr").each(function() {
+                    var text = $(this).text().toLowerCase();
+                    if (text.includes("elementor") || 
+                        text.includes("ai") ||
+                        text.includes("biographical") ||
+                        text.includes("biography") ||
+                        text.includes("使用者自我介紹")) {
+                        $(this).hide();
+                    }
+                });
+                
+                // 隱藏 Elementor AI 相關所有內容
+                $("*").filter(function() {
+                    var text = $(this).text().toLowerCase();
+                    return text.includes("elementor") && text.includes("ai");
+                }).each(function() {
+                    $(this).hide();
+                    $(this).closest("tr").hide();
+                    $(this).parent().hide();
                 });
             });
             </script>';
@@ -146,7 +181,6 @@ class WU_Enhanced_User_List {
             'show_registration_date' => true,
             'show_user_id' => false,
             'show_role_since' => false,
-            'show_woo_orders' => false, // 改為訂單數量
             'date_format' => 'Y-m-d H:i:s',
             'show_filters' => true,
             'show_statistics' => true,
@@ -202,7 +236,6 @@ class WU_Enhanced_User_List {
                     <li><strong>註冊日期</strong>：以自訂格式顯示用戶註冊時間</li>
                     <li><strong>用戶 ID</strong>：顯示用戶的數據庫 ID</li>
                     <li><strong>角色指派時間</strong>：顯示用戶獲得當前角色的時間</li>
-                    <li><strong>已完成訂單數</strong>：顯示 WooCommerce 已完成的訂單數量</li>
                 </ul>
                 
                 <h4>增強功能：</h4>
@@ -246,10 +279,6 @@ class WU_Enhanced_User_List {
                             <label style="display: block; margin: 5px 0;">
                                 <input type="checkbox" name="show_role_since" value="1" <?php checked($this->get_setting('show_role_since', false)); ?>>
                                 顯示角色指派時間
-                            </label>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="show_woo_orders" value="1" <?php checked($this->get_setting('show_woo_orders', false)); ?>>
-                                顯示 WooCommerce 已完成訂單數
                             </label>
                         </td>
                     </tr>
@@ -304,7 +333,7 @@ class WU_Enhanced_User_List {
                                 <input type="checkbox" name="hide_profile_options" value="1" <?php checked($this->get_setting('hide_profile_options', false)); ?>>
                                 <strong>隱藏所有用戶設定選項</strong>
                             </label>
-                            <p class="description">包含：Personal Options、About the user、Application Passwords、Elementor AI、社交媒體設定等</p>
+                            <p class="description">包含：Personal Options、About the user（含使用者自我介紹）、Application Passwords、Elementor AI、社交媒體設定、語言設定等</p>
                         </td>
                     </tr>
                 </table>
@@ -487,7 +516,6 @@ class WU_Enhanced_User_List {
             'show_registration_date' => isset($_POST['show_registration_date']),
             'show_user_id' => isset($_POST['show_user_id']),
             'show_role_since' => isset($_POST['show_role_since']),
-            'show_woo_orders' => isset($_POST['show_woo_orders']),
             'date_format' => sanitize_text_field($_POST['date_format']),
             'show_filters' => isset($_POST['show_filters']),
             'show_statistics' => isset($_POST['show_statistics']),
@@ -543,10 +571,6 @@ class WU_Enhanced_User_List {
             $new_columns['wu_role_since'] = '角色指派時間';
         }
         
-        if ($this->get_setting('show_woo_orders', false)) {
-            $new_columns['wu_woo_orders'] = '已完成訂單';
-        }
-        
         return $new_columns;
     }
     
@@ -590,14 +614,6 @@ class WU_Enhanced_User_List {
                 } else {
                     return date($this->get_setting('date_format', 'Y-m-d H:i:s'), strtotime($user->user_registered));
                 }
-                
-            case 'wu_woo_orders':
-                if (class_exists('WooCommerce')) {
-                    $order_count = $this->get_user_woo_orders($user_id);
-                    return $order_count > 0 ? $order_count : '0';
-                } else {
-                    return '未安裝 WooCommerce';
-                }
         }
         
         return $value;
@@ -612,8 +628,7 @@ class WU_Enhanced_User_List {
             'wu_user_id' => 'wu_user_id',
             'wu_registration_date' => 'wu_registration_date',
             'wu_last_login' => 'wu_last_login',
-            'wu_role_since' => 'wu_role_since',
-            'wu_woo_orders' => 'wu_woo_orders'
+            'wu_role_since' => 'wu_role_since'
         );
         
         return array_merge($columns, $sortable_columns);
@@ -655,12 +670,6 @@ class WU_Enhanced_User_List {
                 
             case 'wu_role_since':
                 $user_query->set('meta_key', 'wu_role_assigned_date');
-                $user_query->set('orderby', 'meta_value_num');
-                $user_query->set('order', $order);
-                break;
-                
-            case 'wu_woo_orders':
-                $user_query->set('meta_key', 'wu_woo_order_count');
                 $user_query->set('orderby', 'meta_value_num');
                 $user_query->set('order', $order);
                 break;
@@ -864,20 +873,6 @@ class WU_Enhanced_User_List {
                     <?php endif; ?>
                 </td>
             </tr>
-            <?php if (class_exists('WooCommerce')): ?>
-            <tr>
-                <th><label>WooCommerce 已完成訂單</label></th>
-                <td>
-                    <?php 
-                    $woo_orders = $this->get_user_woo_orders($user->ID);
-                    if ($woo_orders > 0): ?>
-                        <strong><?php echo $woo_orders; ?> 個訂單</strong>
-                    <?php else: ?>
-                        0 個訂單
-                    <?php endif; ?>
-                </td>
-            </tr>
-            <?php endif; ?>
         </table>
         <?php
     }
@@ -1345,74 +1340,8 @@ class WU_Enhanced_User_List {
         
         return $url;
     }
-    
-    /**
-     * 計算用戶 WooCommerce 已完成訂單數量
-     */
-    private function get_user_woo_orders($user_id) {
-        if (!class_exists('WooCommerce')) {
-            return 0;
-        }
-        
-        // 先從暫存中取得
-        $cached_count = get_user_meta($user_id, 'wu_woo_order_count', true);
-        $last_calculated = get_user_meta($user_id, 'wu_woo_order_calculated', true);
-        
-        // 如果暫存存在且未過期（24小時），直接返回
-        if ($cached_count !== '' && $last_calculated && (time() - $last_calculated) < 86400) {
-            return intval($cached_count);
-        }
-        
-        global $wpdb;
-        
-        // 查詢已完成的訂單數量
-        $order_count = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(p.ID) 
-             FROM {$wpdb->posts} p
-             INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
-             WHERE p.post_type = 'shop_order'
-             AND p.post_status = 'wc-completed'
-             AND pm.meta_key = '_customer_user'
-             AND pm.meta_value = %d",
-            $user_id
-        ));
-        
-        $order_count = intval($order_count);
-        
-        // 儲存暫存
-        update_user_meta($user_id, 'wu_woo_order_count', $order_count);
-        update_user_meta($user_id, 'wu_woo_order_calculated', time());
-        
-        return $order_count;
-    }
-    
-    /**
-     * 更新用戶訂單數量（當訂單狀態改變時）
-     */
-    public function update_user_woo_orders($order_id, $old_status, $new_status) {
-        if (!class_exists('WooCommerce')) {
-            return;
-        }
-        
-        $order = wc_get_order($order_id);
-        if (!$order) {
-            return;
-        }
-        
-        $customer_id = $order->get_customer_id();
-        if ($customer_id) {
-            // 清除暫存，強制重新計算
-            delete_user_meta($customer_id, 'wu_woo_order_count');
-            delete_user_meta($customer_id, 'wu_woo_order_calculated');
-        }
-    }
 }
 
 // 初始化模組
 $wu_enhanced_user_list = new WU_Enhanced_User_List();
-
-// 新增 Hook 來更新訂單數量
-if (class_exists('WooCommerce')) {
-    add_action('woocommerce_order_status_changed', array($wu_enhanced_user_list, 'update_user_woo_orders'), 10, 3);
-}
 ?>
