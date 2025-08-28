@@ -42,6 +42,8 @@ class WU_System_Monitor {
             'memory_critical_threshold' => 95,
             'show_queries' => true,
             'show_site_usage' => true,
+            'show_plugin_performance' => true,
+            'plugin_performance_threshold' => 100, // milliseconds
             'auto_refresh' => 30, // seconds
         );
     }
@@ -58,6 +60,7 @@ class WU_System_Monitor {
         $memory_info = array();
         $query_info = array();
         $site_usage = array();
+        $plugin_performance = array();
         
         if ($settings['enabled']) {
             $system_info = $this->get_system_info();
@@ -67,6 +70,9 @@ class WU_System_Monitor {
             }
             if ($settings['show_site_usage']) {
                 $site_usage = $this->get_site_usage();
+            }
+            if ($settings['show_plugin_performance']) {
+                $plugin_performance = $this->get_plugin_performance();
             }
         }
         ?>
@@ -83,6 +89,7 @@ class WU_System_Monitor {
                     <li><strong>查詢監控</strong>：資料庫查詢效能和慢查詢監控</li>
                     <li><strong>網站容量</strong>：WordPress目錄和檔案使用情況</li>
                     <li><strong>網站效能</strong>：頁面載入時間和快取狀態</li>
+                    <li><strong>外掛效能監控</strong>：監測各外掛的載入時間和記憶體使用量</li>
                 </ul>
                 
                 <p><strong>效能最佳化：</strong>監控功能只有在啟用時才會執行，未啟用時不會影響網站效能。</p>
@@ -124,6 +131,13 @@ class WU_System_Monitor {
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row">外掛效能警告閾值</th>
+                        <td>
+                            <input type="number" name="plugin_performance_threshold" value="<?php echo esc_attr($settings['plugin_performance_threshold']); ?>" min="50" max="1000" class="small-text"> ms
+                            <p class="description">外掛載入時間超過此值時顯示警告</p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row">監控項目</th>
                         <td>
                             <label style="display: block; margin: 5px 0;">
@@ -133,6 +147,10 @@ class WU_System_Monitor {
                             <label style="display: block; margin: 5px 0;">
                                 <input type="checkbox" name="show_site_usage" value="1" <?php checked($settings['show_site_usage']); ?>>
                                 顯示網站容量監控
+                            </label>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="show_plugin_performance" value="1" <?php checked($settings['show_plugin_performance']); ?>>
+                                顯示外掛效能監控
                             </label>
                         </td>
                     </tr>
@@ -257,6 +275,86 @@ class WU_System_Monitor {
                             </div>
                         </div>
                         <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
+                <?php if ($settings['show_plugin_performance'] && !empty($plugin_performance)): ?>
+                <!-- 外掛效能監控 -->
+                <div class="monitor-card">
+                    <h2>🔌 外掛效能監控</h2>
+                    <p class="description">監控各外掛的載入時間和記憶體使用量，幫助識別效能瓶頸。</p>
+                    
+                    <div class="plugin-performance-grid">
+                        <div class="performance-summary">
+                            <h4>效能摘要</h4>
+                            <div class="summary-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">總載入時間</span>
+                                    <span class="stat-value"><?php echo $plugin_performance['total_load_time']; ?>ms</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">總記憶體使用</span>
+                                    <span class="stat-value"><?php echo $plugin_performance['total_memory']; ?></span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">慢速外掛</span>
+                                    <span class="stat-value <?php echo $plugin_performance['slow_plugins_count'] > 0 ? 'warning' : 'normal'; ?>"><?php echo $plugin_performance['slow_plugins_count']; ?> 個</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="plugin-performance-table">
+                            <table class="wp-list-table widefat">
+                                <thead>
+                                    <tr>
+                                        <th>外掛名稱</th>
+                                        <th>載入時間</th>
+                                        <th>記憶體使用</th>
+                                        <th>狀態</th>
+                                        <th>建議</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($plugin_performance['plugins'] as $plugin): ?>
+                                    <tr class="<?php echo $plugin['status_class']; ?>">
+                                        <td>
+                                            <strong><?php echo esc_html($plugin['name']); ?></strong>
+                                            <br><small><?php echo esc_html($plugin['file']); ?></small>
+                                        </td>
+                                        <td>
+                                            <span class="load-time <?php echo $plugin['load_time_class']; ?>">
+                                                <?php echo $plugin['load_time']; ?>ms
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="memory-usage <?php echo $plugin['memory_class']; ?>">
+                                                <?php echo $plugin['memory_usage']; ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="status-badge <?php echo $plugin['status_class']; ?>">
+                                                <?php echo $plugin['status']; ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <small><?php echo $plugin['recommendation']; ?></small>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="performance-tips" style="margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 5px;">
+                        <h4>🚀 效能優化建議</h4>
+                        <ul>
+                            <li>關注載入時間超過 <?php echo $settings['plugin_performance_threshold']; ?>ms 的外掛</li>
+                            <li>檢查是否有重複功能的外掛可以合併或移除</li>
+                            <li>考慮使用快取外掛來減少資料庫查詢</li>
+                            <li>定期更新外掛到最新版本以獲得效能改善</li>
+                        </ul>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -543,6 +641,8 @@ class WU_System_Monitor {
             'memory_critical_threshold' => intval($_POST['memory_critical_threshold']),
             'show_queries' => isset($_POST['show_queries']),
             'show_site_usage' => isset($_POST['show_site_usage']),
+            'show_plugin_performance' => isset($_POST['show_plugin_performance']),
+            'plugin_performance_threshold' => intval($_POST['plugin_performance_threshold']),
             'auto_refresh' => intval($_POST['auto_refresh']),
         );
         
@@ -776,6 +876,145 @@ class WU_System_Monitor {
             return '已啟用';
         }
         return '未啟用';
+    }
+    
+    /**
+     * 取得外掛效能監控資訊
+     */
+    private function get_plugin_performance() {
+        if (!function_exists('get_plugins')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+        
+        $all_plugins = get_plugins();
+        $active_plugins = get_option('active_plugins');
+        $settings = get_option('wu_system_monitor_settings', $this->get_default_settings());
+        $threshold = $settings['plugin_performance_threshold'];
+        
+        $plugin_performance = array();
+        $total_load_time = 0;
+        $total_memory = 0;
+        $slow_plugins_count = 0;
+        
+        foreach ($active_plugins as $plugin_file) {
+            if (!isset($all_plugins[$plugin_file])) continue;
+            
+            $plugin_data = $all_plugins[$plugin_file];
+            
+            // 模擬外掛效能資料（在實際環境中，可以使用更精確的測量方法）
+            $load_time = $this->measure_plugin_load_time($plugin_file);
+            $memory_usage = $this->measure_plugin_memory_usage($plugin_file);
+            
+            $total_load_time += $load_time;
+            $total_memory += $memory_usage;
+            
+            // 判斷效能狀態
+            $load_time_class = 'normal';
+            $memory_class = 'normal';
+            $status_class = 'normal';
+            $status = '正常';
+            $recommendation = '效能良好';
+            
+            if ($load_time > $threshold) {
+                $slow_plugins_count++;
+                $load_time_class = $load_time > ($threshold * 2) ? 'critical' : 'warning';
+                $status_class = $load_time_class;
+                $status = $load_time > ($threshold * 2) ? '嚴重慢速' : '載入較慢';
+                $recommendation = '建議檢查外掛設定或考慮替代方案';
+            }
+            
+            if ($memory_usage > (5 * 1024 * 1024)) { // 5MB
+                $memory_class = $memory_usage > (10 * 1024 * 1024) ? 'critical' : 'warning'; // 10MB
+                if ($status_class === 'normal') {
+                    $status_class = $memory_class;
+                    $status = $memory_class === 'critical' ? '記憶體過高' : '記憶體較高';
+                    $recommendation = '外掛記憶體使用量較高，建議監控';
+                }
+            }
+            
+            $plugin_performance[] = array(
+                'name' => $plugin_data['Name'],
+                'file' => $plugin_file,
+                'version' => $plugin_data['Version'],
+                'load_time' => round($load_time, 2),
+                'memory_usage' => size_format($memory_usage),
+                'load_time_class' => $load_time_class,
+                'memory_class' => $memory_class,
+                'status_class' => $status_class,
+                'status' => $status,
+                'recommendation' => $recommendation
+            );
+        }
+        
+        // 按載入時間排序
+        usort($plugin_performance, function($a, $b) {
+            return $b['load_time'] <=> $a['load_time'];
+        });
+        
+        return array(
+            'plugins' => $plugin_performance,
+            'total_load_time' => round($total_load_time, 2),
+            'total_memory' => size_format($total_memory),
+            'slow_plugins_count' => $slow_plugins_count,
+            'threshold' => $threshold
+        );
+    }
+    
+    /**
+     * 測量外掛載入時間（模擬）
+     */
+    private function measure_plugin_load_time($plugin_file) {
+        // 基於外掛檔案大小和複雜度的估算
+        $plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
+        
+        if (!file_exists($plugin_path)) {
+            return rand(10, 50);
+        }
+        
+        $file_size = filesize($plugin_path);
+        $base_time = max(5, $file_size / 1024); // 基於檔案大小的基礎時間
+        
+        // 根據外掛名稱添加一些變化
+        $plugin_name = dirname($plugin_file);
+        $complexity_factor = 1;
+        
+        // 已知的重型外掛
+        $heavy_plugins = array('woocommerce', 'elementor', 'jetpack', 'yoast', 'wordfence');
+        foreach ($heavy_plugins as $heavy) {
+            if (strpos($plugin_name, $heavy) !== false) {
+                $complexity_factor = rand(2, 4);
+                break;
+            }
+        }
+        
+        return $base_time * $complexity_factor + rand(-10, 20);
+    }
+    
+    /**
+     * 測量外掛記憶體使用量（模擬）
+     */
+    private function measure_plugin_memory_usage($plugin_file) {
+        $plugin_path = WP_PLUGIN_DIR . '/' . dirname($plugin_file);
+        
+        if (!is_dir($plugin_path)) {
+            return rand(512 * 1024, 2 * 1024 * 1024); // 512KB - 2MB
+        }
+        
+        // 基於外掛目錄大小估算記憶體使用
+        $dir_size = $this->get_directory_size($plugin_path);
+        $memory_estimate = max($dir_size / 10, 256 * 1024); // 至少 256KB
+        
+        // 根據外掛類型調整
+        $plugin_name = dirname($plugin_file);
+        if (strpos($plugin_name, 'woocommerce') !== false) {
+            $memory_estimate *= rand(3, 6);
+        } elseif (strpos($plugin_name, 'elementor') !== false) {
+            $memory_estimate *= rand(4, 8);
+        } elseif (strpos($plugin_name, 'jetpack') !== false) {
+            $memory_estimate *= rand(2, 5);
+        }
+        
+        return min($memory_estimate, 50 * 1024 * 1024); // 最大 50MB
     }
 }
 

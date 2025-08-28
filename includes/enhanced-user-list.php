@@ -331,6 +331,93 @@ class WU_Enhanced_User_List {
                 <h2>隱藏用戶設定選項</h2>
                 <p class="description">選擇要隱藏的用戶個人設定選項，讓用戶介面更簡潔。</p>
                 
+                <div style="background: #f0f8ff; border: 1px solid #0073aa; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                    <h3 style="margin-top: 0; color: #0073aa;">🚀 一鍵隱藏功能</h3>
+                    <p>快速隱藏常用的使用者設定選項組合，點擊按鈕即可批量啟用相關隱藏設定。</p>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
+                        <button type="button" class="button button-secondary" onclick="hidePersonalOptions()">
+                            🔒 隱藏 Personal Options
+                        </button>
+                        <button type="button" class="button button-secondary" onclick="hideAboutUser()">
+                            👤 隱藏 About the user
+                        </button>
+                        <button type="button" class="button button-secondary" onclick="hideApplicationPasswords()">
+                            🔑 隱藏 Application Passwords
+                        </button>
+                        <button type="button" class="button button-secondary" onclick="hideElementorAI()">
+                            🤖 隱藏 Elementor AI
+                        </button>
+                        <button type="button" class="button button-secondary" onclick="hideSocialMedia()">
+                            📱 隱藏所有社交媒體設定
+                        </button>
+                        <button type="button" class="button button-primary" onclick="hideAllOptions()">
+                            ✨ 一鍵隱藏全部選項
+                        </button>
+                        <button type="button" class="button button-tertiary" onclick="showAllOptions()">
+                            👁️ 顯示全部選項
+                        </button>
+                    </div>
+                </div>
+                
+                <script>
+                function hidePersonalOptions() {
+                    document.querySelector('input[name="hide_personal_options"]').checked = true;
+                    document.querySelector('input[name="hide_admin_color_scheme"]').checked = true;
+                    document.querySelector('input[name="hide_syntax_highlighting"]').checked = true;
+                    document.querySelector('input[name="hide_keyboard_shortcuts"]').checked = true;
+                    document.querySelector('input[name="hide_toolbar"]').checked = true;
+                    document.querySelector('input[name="hide_language"]').checked = true;
+                    alert('✅ 已選取所有 Personal Options 隱藏選項！');
+                }
+
+                function hideAboutUser() {
+                    document.querySelector('input[name="hide_biographical_info"]').checked = true;
+                    alert('✅ 已選取 About the user 隱藏選項！');
+                }
+
+                function hideApplicationPasswords() {
+                    document.querySelector('input[name="hide_application_passwords"]').checked = true;
+                    alert('✅ 已選取 Application Passwords 隱藏選項！');
+                }
+
+                function hideElementorAI() {
+                    document.querySelector('input[name="hide_elementor_ai"]').checked = true;
+                    alert('✅ 已選取 Elementor AI 隱藏選項！');
+                }
+
+                function hideSocialMedia() {
+                    const socialFields = [
+                        'hide_user_url', 'hide_user_facebook', 'hide_user_twitter', 'hide_user_linkedin',
+                        'hide_user_mastodon', 'hide_user_tiktok', 'hide_user_odnoklassniki', 'hide_user_vkontakte',
+                        'hide_user_vimeo', 'hide_user_youtube', 'hide_user_medium', 'hide_user_github',
+                        'hide_user_wordpress', 'hide_user_pinterest', 'hide_user_instagram', 'hide_user_dribbble'
+                    ];
+                    
+                    socialFields.forEach(field => {
+                        const element = document.querySelector(`input[name="${field}"]`);
+                        if (element) element.checked = true;
+                    });
+                    alert('✅ 已選取所有社交媒體設定隱藏選項！');
+                }
+
+                function hideAllOptions() {
+                    hidePersonalOptions();
+                    hideAboutUser();
+                    hideApplicationPasswords();
+                    hideElementorAI();
+                    hideSocialMedia();
+                    alert('🎉 已選取所有隱藏選項！記得點擊「儲存設定」來套用變更。');
+                }
+
+                function showAllOptions() {
+                    if (confirm('確定要取消所有隱藏設定嗎？')) {
+                        const checkboxes = document.querySelectorAll('input[type="checkbox"][name^="hide_"]');
+                        checkboxes.forEach(checkbox => checkbox.checked = false);
+                        alert('👁️ 已取消所有隱藏選項！記得點擊「儲存設定」來套用變更。');
+                    }
+                }
+                </script>
+                
                 <table class="form-table">
                     <tr>
                         <th scope="row">Personal Options</th>

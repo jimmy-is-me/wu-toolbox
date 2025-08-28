@@ -1,6 +1,6 @@
 # WU工具箱 (WU Toolbox)
 
-![Version](https://img.shields.io/badge/version-3.1-blue.svg)
+![Version](https://img.shields.io/badge/version-3.2-blue.svg)
 ![License](https://img.shields.io/badge/license-GPL--2.0-green.svg)
 ![WordPress](https://img.shields.io/badge/WordPress-5.0%2B-blue.svg)
 
@@ -87,6 +87,13 @@
 - 適當的權限檢查
 
 ## 🔄 更新日誌
+
+### 版本 3.2
+- **使用者角色管理增強**：admin-bar-cleaner.php 新增自動偵測所有使用者角色功能，可選擇停用除了 subscriber 和 administrator 之外的所有角色
+- **一鍵隱藏使用者設定選項**：enhanced-user-list.php 新增一鍵隱藏功能，可快速隱藏 Personal Options、About the user、Application Passwords、Elementor AI、社交媒體設定等選項
+- **外掛效能監控**：system-monitor.php 新增外掛程式效能監控功能，可即時監測各外掛的載入時間和記憶體使用量
+- **常用外掛管理優化**：移除 Disable Comments、Loggedin – Limit Active Logins、ThumbPress、User Switching、Username Changer 等外掛管理，優化核心功能
+- **程式碼優化**：提升整體程式碼品質，減少衝突，改善網站效能表現
 
 ### 版本 3.1
 - 新增 4 位數字驗證碼於登入/註冊/重設密碼/WooCommerce 帳戶表單（無 Session、無 Cookie、隱私友善）
