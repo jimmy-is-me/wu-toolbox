@@ -137,7 +137,7 @@ class WU_System_Monitor {
                         <th scope="row">外掛效能警告閾值</th>
                         <td>
                             <input type="number" name="plugin_performance_threshold" value="<?php echo esc_attr($settings['plugin_performance_threshold']); ?>" min="50" max="1000" class="small-text"> ms
-                            <p class="description">外掛載入時間超過此值時顯示警告</p>
+                            <p class="description">外掛載入時間超過此值時顯示警告（100ms 以上視為嚴重慢速）</p>
                         </td>
                     </tr>
                     <tr>
@@ -974,6 +974,9 @@ class WU_System_Monitor {
         $all_plugins = get_plugins();
         $active_plugins = get_option('active_plugins');
         $settings = get_option('wu_system_monitor_settings', $this->get_default_settings());
+        
+        // 確保設定陣列包含所有必要的鍵
+        $settings = array_merge($this->get_default_settings(), $settings);
         $threshold = $settings['plugin_performance_threshold'];
         
         $plugin_performance = array();
@@ -993,26 +996,40 @@ class WU_System_Monitor {
             $total_load_time += $load_time;
             $total_memory += $memory_usage;
             
-            // 判斷效能狀態
+            // 判斷效能狀態 - 修正邏輯：100ms 以上才是嚴重慢速
             $load_time_class = 'normal';
             $memory_class = 'normal';
             $status_class = 'normal';
             $status = '正常';
             $recommendation = '效能良好';
             
-            if ($load_time > $threshold) {
+            // 載入時間判斷邏輯調整
+            if ($load_time >= 100) { // 100ms 以上視為嚴重慢速
                 $slow_plugins_count++;
-                $load_time_class = $load_time > ($threshold * 2) ? 'critical' : 'warning';
-                $status_class = $load_time_class;
-                $status = $load_time > ($threshold * 2) ? '嚴重慢速' : '載入較慢';
-                $recommendation = '建議檢查外掛設定或考慮替代方案';
+                $load_time_class = 'critical';
+                $status_class = 'critical';
+                $status = '嚴重慢速';
+                $recommendation = '建議立即檢查外掛設定或考慮替代方案';
+            } elseif ($load_time > $threshold) { // 超過設定閾值但未達100ms為警告
+                $load_time_class = 'warning';
+                $status_class = 'warning';
+                $status = '載入較慢';
+                $recommendation = '建議檢查外掛設定或考慮優化';
             }
             
-            if ($memory_usage > (5 * 1024 * 1024)) { // 5MB
-                $memory_class = $memory_usage > (10 * 1024 * 1024) ? 'critical' : 'warning'; // 10MB
+            // 記憶體使用量判斷
+            if ($memory_usage > (10 * 1024 * 1024)) { // 10MB 以上為嚴重
+                $memory_class = 'critical';
+                if ($status_class !== 'critical') {
+                    $status_class = 'critical';
+                    $status = '記憶體過高';
+                    $recommendation = '外掛記憶體使用量過高，建議立即處理';
+                }
+            } elseif ($memory_usage > (5 * 1024 * 1024)) { // 5MB 以上為警告
+                $memory_class = 'warning';
                 if ($status_class === 'normal') {
-                    $status_class = $memory_class;
-                    $status = $memory_class === 'critical' ? '記憶體過高' : '記憶體較高';
+                    $status_class = 'warning';
+                    $status = '記憶體較高';
                     $recommendation = '外掛記憶體使用量較高，建議監控';
                 }
             }
