@@ -55,6 +55,9 @@ class WU_System_Monitor {
         
         $settings = get_option('wu_system_monitor_settings', $this->get_default_settings());
         
+        // 確保所有設定項目都存在，避免未定義的陣列鍵錯誤
+        $settings = array_merge($this->get_default_settings(), $settings);
+        
         // 只有在啟用時才載入監控資料，節省效能
         $system_info = array();
         $memory_info = array();
@@ -625,6 +628,78 @@ class WU_System_Monitor {
         .notice-warning {
             border-left-color: #f39c12;
         }
+        
+        /* 外掛效能監控樣式 */
+        .plugin-performance-grid {
+            margin-top: 20px;
+        }
+        
+        .performance-summary {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+        
+        .stat-label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #23282d;
+        }
+        
+        .stat-value.warning {
+            color: #f39c12;
+        }
+        
+        .load-time.warning, .memory-usage.warning {
+            color: #f39c12;
+        }
+        
+        .load-time.critical, .memory-usage.critical {
+            color: #e74c3c;
+        }
+        
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .status-badge.normal {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-badge.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-badge.critical {
+            background: #f8d7da;
+            color: #721c24;
+        }
         </style>
         <?php
     }
@@ -820,12 +895,17 @@ class WU_System_Monitor {
         }
         
         $size = 0;
-        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS));
-        
-        foreach ($iterator as $file) {
-            if ($file->isFile()) {
-                $size += $file->getSize();
+        try {
+            $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS));
+            
+            foreach ($iterator as $file) {
+                if ($file->isFile()) {
+                    $size += $file->getSize();
+                }
             }
+        } catch (Exception $e) {
+            // 如果無法遍歷目錄，返回 0
+            return 0;
         }
         
         return $size;
@@ -837,12 +917,17 @@ class WU_System_Monitor {
         }
         
         $count = 0;
-        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS));
-        
-        foreach ($iterator as $file) {
-            if ($file->isFile()) {
-                $count++;
+        try {
+            $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS));
+            
+            foreach ($iterator as $file) {
+                if ($file->isFile()) {
+                    $count++;
+                }
             }
+        } catch (Exception $e) {
+            // 如果無法遍歷目錄，返回 0
+            return 0;
         }
         
         return $count;
@@ -1020,3 +1105,4 @@ class WU_System_Monitor {
 
 // 初始化模組
 new WU_System_Monitor();
+?>
