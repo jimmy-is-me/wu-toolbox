@@ -39,12 +39,9 @@ class WU_Enhanced_User_List {
         // 統計資訊
         add_action('admin_notices', array($this, 'show_user_statistics'));
         
-        // 隱藏用戶設定選項
-        if ($this->get_setting('enabled', false)) {
-            $this->hide_user_profile_options();
-            // 添加更強力的隱藏功能
-            add_action('admin_head', array($this, 'hide_profile_sections'));
-            add_action('admin_head', array($this, 'hide_social_fields'));
+        // 隱藏用戶設定選項（新的管理方式）
+        if ($this->get_setting('hide_profile_options', false)) {
+            add_action('admin_head', array($this, 'hide_user_profile_options'));
         }
         
         // 用戶匯出功能
@@ -53,7 +50,6 @@ class WU_Enhanced_User_List {
             add_filter('bulk_actions-users', array($this, 'add_bulk_export_action'));
             add_filter('handle_bulk_actions-users', array($this, 'handle_bulk_export'), 10, 3);
             add_action('admin_action_wu_export_user', array($this, 'export_single_user'));
-            add_action('wp_ajax_wu_export_users', array($this, 'ajax_export_users'));
         }
         
         // 自訂頭像功能
@@ -64,7 +60,6 @@ class WU_Enhanced_User_List {
             add_action('edit_user_profile_update', array($this, 'save_custom_avatar'));
             add_filter('get_avatar', array($this, 'custom_avatar'), 10, 5);
             add_filter('get_avatar_url', array($this, 'custom_avatar_url'), 10, 3);
-            // 確保媒體選擇器可用
             add_action('admin_enqueue_scripts', array($this, 'enqueue_media_assets'));
         }
     }
@@ -77,48 +72,70 @@ class WU_Enhanced_User_List {
     }
     
     /**
-     * 隱藏用戶設定選項
+     * 隱藏用戶設定選項（統一管理）
      */
-    private function hide_user_profile_options() {
-        // 一鍵隱藏 Personal Options 整個區塊
-        if ($this->get_setting('hide_personal_options', false)) {
-            add_action('admin_head', array($this, 'hide_personal_options_section'));
-        }
-        
-        // 隱藏 Personal Options 中的選項
-        if ($this->get_setting('hide_admin_color_scheme', false)) {
-            add_action('admin_head', array($this, 'hide_admin_color_scheme'));
-        }
-        
-        if ($this->get_setting('hide_syntax_highlighting', false)) {
-            add_action('admin_head', array($this, 'hide_syntax_highlighting'));
-        }
-        
-        if ($this->get_setting('hide_keyboard_shortcuts', false)) {
-            add_action('admin_head', array($this, 'hide_keyboard_shortcuts'));
-        }
-        
-        if ($this->get_setting('hide_toolbar', false)) {
-            add_action('admin_head', array($this, 'hide_toolbar'));
-        }
-        
-        if ($this->get_setting('hide_language', false)) {
-            add_action('admin_head', array($this, 'hide_language'));
-        }
-        
-        // 隱藏 About the user 中的選項
-        if ($this->get_setting('hide_biographical_info', false)) {
-            add_action('admin_head', array($this, 'hide_biographical_info'));
-        }
-        
-        // 隱藏 Application Passwords
-        if ($this->get_setting('hide_application_passwords', false)) {
-            add_action('admin_head', array($this, 'hide_application_passwords'));
-        }
-        
-        // 隱藏 Elementor AI
-        if ($this->get_setting('hide_elementor_ai', false)) {
-            add_action('admin_head', array($this, 'hide_elementor_ai'));
+    public function hide_user_profile_options() {
+        global $pagenow;
+        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
+            echo '<style>
+            /* 隱藏 Personal Options */
+            .user-admin-color-wrap,
+            .user-syntax-highlighting-wrap,
+            .user-comment-shortcuts-wrap,
+            .user-admin-bar-front-wrap,
+            .user-locale-wrap,
+            tr.user-admin-color-wrap,
+            tr.user-syntax-highlighting-wrap,
+            tr.user-comment-shortcuts-wrap,
+            tr.user-admin-bar-front-wrap,
+            tr.user-locale-wrap,
+            /* 隱藏 About the user */
+            .user-description-wrap,
+            tr.user-description-wrap,
+            /* 隱藏 Application Passwords */
+            .application-passwords,
+            .application-passwords-section,
+            .user-application-passwords-wrap,
+            tr.application-passwords,
+            /* 隱藏社交媒體設定 */
+            .user-url-wrap,
+            .user-facebook-wrap,
+            .user-twitter-wrap,
+            .user-linkedin-wrap,
+            .user-mastodon-wrap,
+            .user-tiktok-wrap,
+            .user-odnoklassniki-wrap,
+            .user-vkontakte-wrap,
+            .user-vimeo-wrap,
+            .user-youtube-wrap,
+            .user-medium-wrap,
+            .user-github-wrap,
+            .user-wordpress-wrap,
+            .user-pinterest-wrap,
+            .user-instagram-wrap,
+            .user-dribbble-wrap {
+                display: none !important;
+            }
+            </style>';
+            
+            echo '<script>
+            jQuery(document).ready(function($) {
+                // 隱藏包含特定標題的區塊
+                $("h2, h3").each(function() {
+                    var text = $(this).text().trim().toLowerCase();
+                    if (text.includes("personal options") || 
+                        text.includes("about the user") || 
+                        text.includes("application passwords") ||
+                        text.includes("elementor") ||
+                        text.includes("個人選項") ||
+                        text.includes("關於使用者") ||
+                        text.includes("應用程式密碼")) {
+                        $(this).hide();
+                        $(this).nextUntil("h2, h3").hide();
+                    }
+                });
+            });
+            </script>';
         }
     }
     
@@ -128,69 +145,22 @@ class WU_Enhanced_User_List {
             'show_last_login' => true,
             'show_registration_date' => true,
             'show_user_id' => false,
-            'show_post_count' => false,
             'show_role_since' => false,
-            'show_woo_total' => false,
+            'show_woo_orders' => false, // 改為訂單數量
             'date_format' => 'Y-m-d H:i:s',
             'show_filters' => true,
             'show_statistics' => true,
             'highlight_inactive_users' => 30, // 天數
             
-            // Personal Options 隱藏選項
-            'hide_personal_options' => false,
-            'hide_admin_color_scheme' => false,
-            'hide_syntax_highlighting' => false,
-            'hide_keyboard_shortcuts' => false,
-            'hide_toolbar' => false,
-            'hide_language' => false,
-            
-            // About the user 隱藏選項
-            'hide_biographical_info' => false,
-            
-            // Application Passwords 隱藏選項
-            'hide_application_passwords' => false,
-            
-            // Elementor AI 隱藏選項
-            'hide_elementor_ai' => false,
-            
-            // 社交媒體相關隱藏選項
-            'hide_user_url' => false,
-            'hide_user_facebook' => false,
-            'hide_user_twitter' => false,
-            'hide_user_linkedin' => false,
-            'hide_user_mastodon' => false,
-            'hide_user_tiktok' => false,
-            'hide_user_odnoklassniki' => false,
-            'hide_user_vkontakte' => false,
-            'hide_user_vimeo' => false,
-            'hide_user_youtube' => false,
-            'hide_user_medium' => false,
-            'hide_user_github' => false,
-            'hide_user_wordpress' => false,
-            'hide_user_pinterest' => false,
-            'hide_user_instagram' => false,
-            'hide_user_dribbble' => false,
+            // 新的隱藏選項（統一管理）
+            'hide_profile_options' => false,
             
             // 用戶匯出功能
             'enable_user_export' => false,
             'include_meta' => true,
             'include_roles' => true,
-            'export_fields' => array(
-                'ID' => true,
-                'user_login' => true,
-                'user_email' => true,
-                'user_nicename' => true,
-                'display_name' => true,
-                'user_registered' => true,
-                'user_status' => false,
-                'user_url' => false
-            ),
-            'export_meta_fields' => array(
-                'first_name' => true,
-                'last_name' => true,
-                'nickname' => true,
-                'description' => false
-            ),
+            'export_fields' => array(), // 動態獲取所有欄位
+            'export_meta_fields' => array(), // 動態獲取所有中繼欄位
             
             // 自訂頭像功能
             'enable_custom_avatar' => false,
@@ -231,8 +201,8 @@ class WU_Enhanced_User_List {
                     <li><strong>上次登入</strong>：顯示用戶最後一次登入的時間</li>
                     <li><strong>註冊日期</strong>：以自訂格式顯示用戶註冊時間</li>
                     <li><strong>用戶 ID</strong>：顯示用戶的數據庫 ID</li>
-                    <li><strong>文章數量</strong>：顯示用戶發表的文章數量</li>
                     <li><strong>角色指派時間</strong>：顯示用戶獲得當前角色的時間</li>
+                    <li><strong>已完成訂單數</strong>：顯示 WooCommerce 已完成的訂單數量</li>
                 </ul>
                 
                 <h4>增強功能：</h4>
@@ -241,6 +211,7 @@ class WU_Enhanced_User_List {
                     <li>登入日期篩選器</li>
                     <li>用戶活動統計</li>
                     <li>非活躍用戶高亮顯示</li>
+                    <li>統一隱藏用戶設定選項</li>
                 </ul>
             </div>
             
@@ -273,16 +244,12 @@ class WU_Enhanced_User_List {
                                 顯示用戶 ID
                             </label>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="show_post_count" value="1" <?php checked($this->get_setting('show_post_count', false)); ?>>
-                                顯示文章數量
-                            </label>
-                            <label style="display: block; margin: 5px 0;">
                                 <input type="checkbox" name="show_role_since" value="1" <?php checked($this->get_setting('show_role_since', false)); ?>>
                                 顯示角色指派時間
                             </label>
                             <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="show_woo_total" value="1" <?php checked($this->get_setting('show_woo_total', false)); ?>>
-                                顯示 WooCommerce 總購買金額（已完成訂單）
+                                <input type="checkbox" name="show_woo_orders" value="1" <?php checked($this->get_setting('show_woo_orders', false)); ?>>
+                                顯示 WooCommerce 已完成訂單數
                             </label>
                         </td>
                     </tr>
@@ -329,222 +296,15 @@ class WU_Enhanced_User_List {
                 </table>
                 
                 <h2>隱藏用戶設定選項</h2>
-                <p class="description">選擇要隱藏的用戶個人設定選項，讓用戶介面更簡潔。</p>
-                
-                <div style="background: #f0f8ff; border: 1px solid #0073aa; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                    <h3 style="margin-top: 0; color: #0073aa;">🚀 一鍵隱藏功能</h3>
-                    <p>快速隱藏常用的使用者設定選項組合，點擊按鈕即可批量啟用相關隱藏設定。</p>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
-                        <button type="button" class="button button-secondary" onclick="hidePersonalOptions()">
-                            🔒 隱藏 Personal Options
-                        </button>
-                        <button type="button" class="button button-secondary" onclick="hideAboutUser()">
-                            👤 隱藏 About the user
-                        </button>
-                        <button type="button" class="button button-secondary" onclick="hideApplicationPasswords()">
-                            🔑 隱藏 Application Passwords
-                        </button>
-                        <button type="button" class="button button-secondary" onclick="hideElementorAI()">
-                            🤖 隱藏 Elementor AI
-                        </button>
-                        <button type="button" class="button button-secondary" onclick="hideSocialMedia()">
-                            📱 隱藏所有社交媒體設定
-                        </button>
-                        <button type="button" class="button button-primary" onclick="hideAllOptions()">
-                            ✨ 一鍵隱藏全部選項
-                        </button>
-                        <button type="button" class="button button-tertiary" onclick="showAllOptions()">
-                            👁️ 顯示全部選項
-                        </button>
-                    </div>
-                </div>
-                
-                <script>
-                function hidePersonalOptions() {
-                    document.querySelector('input[name="hide_personal_options"]').checked = true;
-                    document.querySelector('input[name="hide_admin_color_scheme"]').checked = true;
-                    document.querySelector('input[name="hide_syntax_highlighting"]').checked = true;
-                    document.querySelector('input[name="hide_keyboard_shortcuts"]').checked = true;
-                    document.querySelector('input[name="hide_toolbar"]').checked = true;
-                    document.querySelector('input[name="hide_language"]').checked = true;
-                    alert('✅ 已選取所有 Personal Options 隱藏選項！');
-                }
-
-                function hideAboutUser() {
-                    document.querySelector('input[name="hide_biographical_info"]').checked = true;
-                    alert('✅ 已選取 About the user 隱藏選項！');
-                }
-
-                function hideApplicationPasswords() {
-                    document.querySelector('input[name="hide_application_passwords"]').checked = true;
-                    alert('✅ 已選取 Application Passwords 隱藏選項！');
-                }
-
-                function hideElementorAI() {
-                    document.querySelector('input[name="hide_elementor_ai"]').checked = true;
-                    alert('✅ 已選取 Elementor AI 隱藏選項！');
-                }
-
-                function hideSocialMedia() {
-                    const socialFields = [
-                        'hide_user_url', 'hide_user_facebook', 'hide_user_twitter', 'hide_user_linkedin',
-                        'hide_user_mastodon', 'hide_user_tiktok', 'hide_user_odnoklassniki', 'hide_user_vkontakte',
-                        'hide_user_vimeo', 'hide_user_youtube', 'hide_user_medium', 'hide_user_github',
-                        'hide_user_wordpress', 'hide_user_pinterest', 'hide_user_instagram', 'hide_user_dribbble'
-                    ];
-                    
-                    socialFields.forEach(field => {
-                        const element = document.querySelector(`input[name="${field}"]`);
-                        if (element) element.checked = true;
-                    });
-                    alert('✅ 已選取所有社交媒體設定隱藏選項！');
-                }
-
-                function hideAllOptions() {
-                    hidePersonalOptions();
-                    hideAboutUser();
-                    hideApplicationPasswords();
-                    hideElementorAI();
-                    hideSocialMedia();
-                    alert('🎉 已選取所有隱藏選項！記得點擊「儲存設定」來套用變更。');
-                }
-
-                function showAllOptions() {
-                    if (confirm('確定要取消所有隱藏設定嗎？')) {
-                        const checkboxes = document.querySelectorAll('input[type="checkbox"][name^="hide_"]');
-                        checkboxes.forEach(checkbox => checkbox.checked = false);
-                        alert('👁️ 已取消所有隱藏選項！記得點擊「儲存設定」來套用變更。');
-                    }
-                }
-                </script>
-                
                 <table class="form-table">
                     <tr>
-                        <th scope="row">Personal Options</th>
+                        <th scope="row">統一隱藏設定</th>
                         <td>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_personal_options" value="1" <?php checked($this->get_setting('hide_personal_options', false)); ?>>
-                                <strong>一鍵隱藏 Personal Options 整個區塊</strong>
+                            <label>
+                                <input type="checkbox" name="hide_profile_options" value="1" <?php checked($this->get_setting('hide_profile_options', false)); ?>>
+                                <strong>隱藏所有用戶設定選項</strong>
                             </label>
-                            <hr style="margin: 10px 0;">
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_admin_color_scheme" value="1" <?php checked($this->get_setting('hide_admin_color_scheme', false)); ?>>
-                                隱藏 Admin Color Scheme（後台顏色方案）
-                            </label>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_syntax_highlighting" value="1" <?php checked($this->get_setting('hide_syntax_highlighting', false)); ?>>
-                                隱藏 Syntax Highlighting（語法高亮）
-                            </label>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_keyboard_shortcuts" value="1" <?php checked($this->get_setting('hide_keyboard_shortcuts', false)); ?>>
-                                隱藏 Keyboard Shortcuts（鍵盤快捷鍵）
-                            </label>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_toolbar" value="1" <?php checked($this->get_setting('hide_toolbar', false)); ?>>
-                                隱藏 Toolbar（工具列）
-                            </label>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_language" value="1" <?php checked($this->get_setting('hide_language', false)); ?>>
-                                隱藏 Language（語言設定）
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">About the user</th>
-                        <td>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_biographical_info" value="1" <?php checked($this->get_setting('hide_biographical_info', false)); ?>>
-                                <strong>一鍵隱藏 Biographical Info（個人簡介）</strong>
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Application Passwords</th>
-                        <td>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_application_passwords" value="1" <?php checked($this->get_setting('hide_application_passwords', false)); ?>>
-                                <strong>一鍵隱藏 Application Passwords（應用程式密碼）</strong>
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Elementor AI</th>
-                        <td>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="hide_elementor_ai" value="1" <?php checked($this->get_setting('hide_elementor_ai', false)); ?>>
-                                <strong>隱藏 Elementor AI 設定</strong>
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">社交媒體設定</th>
-                        <td>
-                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_url" value="1" <?php checked($this->get_setting('hide_user_url', false)); ?>>
-                                    Website URL
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_facebook" value="1" <?php checked($this->get_setting('hide_user_facebook', false)); ?>>
-                                    Facebook
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_twitter" value="1" <?php checked($this->get_setting('hide_user_twitter', false)); ?>>
-                                    Twitter
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_linkedin" value="1" <?php checked($this->get_setting('hide_user_linkedin', false)); ?>>
-                                    LinkedIn
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_mastodon" value="1" <?php checked($this->get_setting('hide_user_mastodon', false)); ?>>
-                                    Mastodon
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_tiktok" value="1" <?php checked($this->get_setting('hide_user_tiktok', false)); ?>>
-                                    TikTok
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_odnoklassniki" value="1" <?php checked($this->get_setting('hide_user_odnoklassniki', false)); ?>>
-                                    Odnoklassniki
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_vkontakte" value="1" <?php checked($this->get_setting('hide_user_vkontakte', false)); ?>>
-                                    VKontakte
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_vimeo" value="1" <?php checked($this->get_setting('hide_user_vimeo', false)); ?>>
-                                    Vimeo
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_youtube" value="1" <?php checked($this->get_setting('hide_user_youtube', false)); ?>>
-                                    YouTube
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_medium" value="1" <?php checked($this->get_setting('hide_user_medium', false)); ?>>
-                                    Medium
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_github" value="1" <?php checked($this->get_setting('hide_user_github', false)); ?>>
-                                    GitHub
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_wordpress" value="1" <?php checked($this->get_setting('hide_user_wordpress', false)); ?>>
-                                    WordPress.org
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_pinterest" value="1" <?php checked($this->get_setting('hide_user_pinterest', false)); ?>>
-                                    Pinterest
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_instagram" value="1" <?php checked($this->get_setting('hide_user_instagram', false)); ?>>
-                                    Instagram
-                                </label>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="hide_user_dribbble" value="1" <?php checked($this->get_setting('hide_user_dribbble', false)); ?>>
-                                    Dribbble
-                                </label>
-                            </div>
+                            <p class="description">包含：Personal Options、About the user、Application Passwords、Elementor AI、社交媒體設定等</p>
                         </td>
                     </tr>
                 </table>
@@ -558,27 +318,11 @@ class WU_Enhanced_User_List {
                                 <input type="checkbox" name="enable_user_export" value="1" <?php checked($this->get_setting('enable_user_export', false)); ?>>
                                 啟用用戶資料匯出功能
                             </label>
-                            <p class="description">在用戶列表中新增匯出選項，支援單個和批量匯出</p>
+                            <p class="description">在用戶列表中新增匯出選項，支援單個和批量匯出，自動抓取所有用戶欄位</p>
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row">匯出欄位</th>
-                        <td>
-                            <fieldset>
-                                <legend class="screen-reader-text"><span>匯出欄位</span></legend>
-                                <?php 
-                                $export_fields = $this->get_setting('export_fields', array());
-                                foreach ($export_fields as $field => $enabled): ?>
-                                <label style="display: block; margin: 5px 0;">
-                                    <input type="checkbox" name="export_fields[<?php echo $field; ?>]" value="1" <?php checked($enabled); ?>>
-                                    <?php echo ucfirst(str_replace('_', ' ', $field)); ?>
-                                </label>
-                                <?php endforeach; ?>
-                            </fieldset>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">匯出中繼資料</th>
+                        <th scope="row">匯出選項</th>
                         <td>
                             <label style="display: block; margin: 5px 0;">
                                 <input type="checkbox" name="include_meta" value="1" <?php checked($this->get_setting('include_meta', true)); ?>>
@@ -710,51 +454,6 @@ class WU_Enhanced_User_List {
                 <p>最近沒有新用戶註冊</p>
                 <?php endif; ?>
             </div>
-            
-            <h2>使用說明</h2>
-            <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
-                <h3>新增的功能：</h3>
-                <ol>
-                    <li><strong>增強的欄位</strong>：前往「用戶」→「所有用戶」查看新增的欄位</li>
-                    <li><strong>排序功能</strong>：點擊欄位標題即可排序</li>
-                    <li><strong>篩選功能</strong>：使用頁面上方的篩選器</li>
-                    <li><strong>用戶資料</strong>：在用戶編輯頁面查看詳細資訊</li>
-                </ol>
-                
-                <h3>欄位說明：</h3>
-                <div style="display: flex; gap: 30px; margin-top: 15px;">
-                    <div style="flex: 1;">
-                        <h4>上次登入：</h4>
-                        <ul>
-                            <li>記錄用戶最後登入時間</li>
-                            <li>支援排序和篩選</li>
-                            <li>從未登入顯示「從未登入」</li>
-                        </ul>
-                        
-                        <h4>註冊日期：</h4>
-                        <ul>
-                            <li>自訂格式顯示註冊時間</li>
-                            <li>支援多種日期格式</li>
-                            <li>可按註冊時間排序</li>
-                        </ul>
-                    </div>
-                    <div style="flex: 1;">
-                        <h4>其他欄位：</h4>
-                        <ul>
-                            <li><strong>用戶 ID</strong>：數據庫中的唯一識別碼</li>
-                            <li><strong>文章數量</strong>：用戶發表的文章總數</li>
-                            <li><strong>角色指派時間</strong>：獲得當前角色的時間</li>
-                        </ul>
-                        
-                        <h4>視覺增強：</h4>
-                        <ul>
-                            <li>非活躍用戶背景色變化</li>
-                            <li>統計資訊一目了然</li>
-                            <li>清晰的篩選選項</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
         </div>
         
         <style>
@@ -787,45 +486,21 @@ class WU_Enhanced_User_List {
             'show_last_login' => isset($_POST['show_last_login']),
             'show_registration_date' => isset($_POST['show_registration_date']),
             'show_user_id' => isset($_POST['show_user_id']),
-            'show_post_count' => isset($_POST['show_post_count']),
             'show_role_since' => isset($_POST['show_role_since']),
-            'show_woo_total' => isset($_POST['show_woo_total']),
+            'show_woo_orders' => isset($_POST['show_woo_orders']),
             'date_format' => sanitize_text_field($_POST['date_format']),
             'show_filters' => isset($_POST['show_filters']),
             'show_statistics' => isset($_POST['show_statistics']),
             'highlight_inactive_users' => intval($_POST['highlight_inactive_users']),
+            
             // 隱藏選項
-            'hide_personal_options' => isset($_POST['hide_personal_options']),
-            'hide_admin_color_scheme' => isset($_POST['hide_admin_color_scheme']),
-            'hide_syntax_highlighting' => isset($_POST['hide_syntax_highlighting']),
-            'hide_keyboard_shortcuts' => isset($_POST['hide_keyboard_shortcuts']),
-            'hide_toolbar' => isset($_POST['hide_toolbar']),
-            'hide_language' => isset($_POST['hide_language']),
-            'hide_biographical_info' => isset($_POST['hide_biographical_info']),
-            'hide_application_passwords' => isset($_POST['hide_application_passwords']),
-            'hide_elementor_ai' => isset($_POST['hide_elementor_ai']),
-            // 社交媒體相關隱藏選項
-            'hide_user_url' => isset($_POST['hide_user_url']),
-            'hide_user_facebook' => isset($_POST['hide_user_facebook']),
-            'hide_user_twitter' => isset($_POST['hide_user_twitter']),
-            'hide_user_linkedin' => isset($_POST['hide_user_linkedin']),
-            'hide_user_mastodon' => isset($_POST['hide_user_mastodon']),
-            'hide_user_tiktok' => isset($_POST['hide_user_tiktok']),
-            'hide_user_odnoklassniki' => isset($_POST['hide_user_odnoklassniki']),
-            'hide_user_vkontakte' => isset($_POST['hide_user_vkontakte']),
-            'hide_user_vimeo' => isset($_POST['hide_user_vimeo']),
-            'hide_user_youtube' => isset($_POST['hide_user_youtube']),
-            'hide_user_medium' => isset($_POST['hide_user_medium']),
-            'hide_user_github' => isset($_POST['hide_user_github']),
-            'hide_user_wordpress' => isset($_POST['hide_user_wordpress']),
-            'hide_user_pinterest' => isset($_POST['hide_user_pinterest']),
-            'hide_user_instagram' => isset($_POST['hide_user_instagram']),
-            'hide_user_dribbble' => isset($_POST['hide_user_dribbble']),
+            'hide_profile_options' => isset($_POST['hide_profile_options']),
+            
             // 用戶匯出功能
             'enable_user_export' => isset($_POST['enable_user_export']),
             'include_meta' => isset($_POST['include_meta']),
             'include_roles' => isset($_POST['include_roles']),
-            'export_fields' => isset($_POST['export_fields']) ? $_POST['export_fields'] : array(),
+            
             // 自訂頭像功能
             'enable_custom_avatar' => isset($_POST['enable_custom_avatar']),
             'avatar_size_limit' => intval($_POST['avatar_size_limit']),
@@ -864,16 +539,12 @@ class WU_Enhanced_User_List {
             $new_columns['wu_last_login'] = '上次登入';
         }
         
-        if ($this->get_setting('show_post_count', false)) {
-            $new_columns['wu_post_count'] = '文章數量';
-        }
-        
         if ($this->get_setting('show_role_since', false)) {
             $new_columns['wu_role_since'] = '角色指派時間';
         }
         
-        if ($this->get_setting('show_woo_total', false)) {
-            $new_columns['wu_woo_total'] = 'WooCommerce 總購買金額';
+        if ($this->get_setting('show_woo_orders', false)) {
+            $new_columns['wu_woo_orders'] = '已完成訂單';
         }
         
         return $new_columns;
@@ -902,7 +573,6 @@ class WU_Enhanced_User_List {
                 if ($last_login) {
                     $login_time = date($this->get_setting('date_format', 'Y-m-d H:i:s'), $last_login);
                     $days_ago = floor((time() - $last_login) / DAY_IN_SECONDS);
-                    
                     $highlight_days = $this->get_setting('highlight_inactive_users', 30);
                     if ($days_ago > $highlight_days && $highlight_days > 0) {
                         return '<span style="color: #dc3232;">' . $login_time . ' <small>(' . $days_ago . ' 天前)</small></span>';
@@ -913,27 +583,18 @@ class WU_Enhanced_User_List {
                     return '<span style="color: #ff8c00;">從未登入</span>';
                 }
                 
-            case 'wu_post_count':
-                $post_count = count_user_posts($user_id);
-                return $post_count > 0 ? '<a href="' . admin_url('edit.php?author=' . $user_id) . '">' . $post_count . '</a>' : '0';
-                
             case 'wu_role_since':
                 $role_since = get_user_meta($user_id, 'wu_role_assigned_date', true);
                 if ($role_since) {
                     return date($this->get_setting('date_format', 'Y-m-d H:i:s'), $role_since);
                 } else {
-                    // 如果沒有記錄，使用註冊日期
                     return date($this->get_setting('date_format', 'Y-m-d H:i:s'), strtotime($user->user_registered));
                 }
                 
-            case 'wu_woo_total':
+            case 'wu_woo_orders':
                 if (class_exists('WooCommerce')) {
-                    $total = $this->get_user_woo_total($user_id);
-                    if ($total > 0) {
-                        return wc_price($total);
-                    } else {
-                        return wc_price(0);
-                    }
+                    $order_count = $this->get_user_woo_orders($user_id);
+                    return $order_count > 0 ? $order_count : '0';
                 } else {
                     return '未安裝 WooCommerce';
                 }
@@ -951,9 +612,8 @@ class WU_Enhanced_User_List {
             'wu_user_id' => 'wu_user_id',
             'wu_registration_date' => 'wu_registration_date',
             'wu_last_login' => 'wu_last_login',
-            'wu_post_count' => 'wu_post_count',
             'wu_role_since' => 'wu_role_since',
-            'wu_woo_total' => 'wu_woo_total'
+            'wu_woo_orders' => 'wu_woo_orders'
         );
         
         return array_merge($columns, $sortable_columns);
@@ -993,19 +653,14 @@ class WU_Enhanced_User_List {
                 $user_query->set('order', $order);
                 break;
                 
-            case 'wu_post_count':
-                $user_query->set('orderby', 'post_count');
-                $user_query->set('order', $order);
-                break;
-                
             case 'wu_role_since':
                 $user_query->set('meta_key', 'wu_role_assigned_date');
                 $user_query->set('orderby', 'meta_value_num');
                 $user_query->set('order', $order);
                 break;
                 
-            case 'wu_woo_total':
-                $user_query->set('meta_key', 'wu_woo_total_amount');
+            case 'wu_woo_orders':
+                $user_query->set('meta_key', 'wu_woo_order_count');
                 $user_query->set('orderby', 'meta_value_num');
                 $user_query->set('order', $order);
                 break;
@@ -1209,29 +864,16 @@ class WU_Enhanced_User_List {
                     <?php endif; ?>
                 </td>
             </tr>
-            <tr>
-                <th><label>發表文章數量</label></th>
-                <td>
-                    <?php 
-                    $post_count = count_user_posts($user->ID);
-                    if ($post_count > 0): ?>
-                        <a href="<?php echo admin_url('edit.php?author=' . $user->ID); ?>"><?php echo $post_count; ?> 篇文章</a>
-                    <?php else: ?>
-                        0 篇文章
-                    <?php endif; ?>
-                </td>
-            </tr>
             <?php if (class_exists('WooCommerce')): ?>
             <tr>
-                <th><label>WooCommerce 總購買金額</label></th>
+                <th><label>WooCommerce 已完成訂單</label></th>
                 <td>
                     <?php 
-                    $woo_total = $this->get_user_woo_total($user->ID);
-                    if ($woo_total > 0): ?>
-                        <strong><?php echo wc_price($woo_total); ?></strong>
-                        <small>（已完成訂單）</small>
+                    $woo_orders = $this->get_user_woo_orders($user->ID);
+                    if ($woo_orders > 0): ?>
+                        <strong><?php echo $woo_orders; ?> 個訂單</strong>
                     <?php else: ?>
-                        <?php echo wc_price(0); ?>
+                        0 個訂單
                     <?php endif; ?>
                 </td>
             </tr>
@@ -1376,261 +1018,6 @@ class WU_Enhanced_User_List {
         return $users;
     }
     
-    /**
-     * 隱藏 Admin Color Scheme 選項
-     */
-    public function hide_admin_color_scheme() {
-        global $pagenow;
-        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
-            echo '<style>
-            .user-admin-color-wrap,
-            .user-admin-color-wrap + br,
-            tr.user-admin-color-wrap,
-            tr.user-admin-color-wrap + tr { display: none !important; }
-            </style>';
-        }
-    }
-    
-    /**
-     * 隱藏 Syntax Highlighting 選項
-     */
-    public function hide_syntax_highlighting() {
-        global $pagenow;
-        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
-            echo '<style>
-            .user-syntax-highlighting-wrap,
-            .user-syntax-highlighting-wrap + br,
-            tr.user-syntax-highlighting-wrap,
-            tr.user-syntax-highlighting-wrap + tr { display: none !important; }
-            </style>';
-        }
-    }
-    
-    /**
-     * 隱藏 Keyboard Shortcuts 選項
-     */
-    public function hide_keyboard_shortcuts() {
-        global $pagenow;
-        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
-            echo '<style>
-            .user-comment-shortcuts-wrap,
-            .user-comment-shortcuts-wrap + br,
-            tr.user-comment-shortcuts-wrap,
-            tr.user-comment-shortcuts-wrap + tr { display: none !important; }
-            </style>';
-        }
-    }
-    
-    /**
-     * 隱藏 Toolbar 選項
-     */
-    public function hide_toolbar() {
-        global $pagenow;
-        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
-            echo '<style>
-            .user-admin-bar-front-wrap,
-            .user-admin-bar-front-wrap + br,
-            tr.user-admin-bar-front-wrap,
-            tr.user-admin-bar-front-wrap + tr { display: none !important; }
-            </style>';
-        }
-    }
-    
-    /**
-     * 隱藏 Language 選項
-     */
-    public function hide_language() {
-        global $pagenow;
-        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
-            echo '<style>
-            .user-locale-wrap,
-            .user-locale-wrap + br,
-            tr.user-locale-wrap,
-            tr.user-locale-wrap + tr { display: none !important; }
-            </style>';
-        }
-    }
-    
-    /**
-     * 隱藏 Biographical Info 選項
-     */
-    public function hide_biographical_info() {
-        global $pagenow;
-        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
-            echo '<style>
-            .user-description-wrap,
-            .user-description-wrap + br,
-            tr.user-description-wrap,
-            tr.user-description-wrap + tr { display: none !important; }
-            </style>';
-        }
-    }
-    
-    /**
-     * 隱藏 Application Passwords 選項
-     */
-    public function hide_application_passwords() {
-        global $pagenow;
-        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
-            echo '<style>
-            .application-passwords,
-            .application-passwords + br,
-            .application-passwords-section,
-            .user-application-passwords-wrap,
-            tr.application-passwords,
-            tr.application-passwords + tr { display: none !important; }
-            </style>';
-        }
-    }
-    
-    /**
-     * 一鍵隱藏 Personal Options 整個區塊
-     */
-    public function hide_personal_options_section() {
-        global $pagenow;
-        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
-            echo '<script>
-            jQuery(document).ready(function($) {
-                $("h2").each(function() {
-                    var text = $(this).text().trim();
-                    if (text === "Personal Options" || text === "個人選項") {
-                        $(this).hide();
-                        $(this).next("table").hide();
-                    }
-                });
-            });
-            </script>';
-        }
-    }
-    
-    /**
-     * 隱藏 Elementor AI 設定
-     */
-    public function hide_elementor_ai() {
-        global $pagenow;
-        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
-            echo '<style>
-            /* 隱藏 Elementor AI 相關設定 */
-            .elementor-ai-wrap,
-            .elementor-ai-settings,
-            tr:has(.elementor-ai-wrap),
-            h2:contains("Elementor AI"),
-            h3:contains("Elementor AI") {
-                display: none !important;
-            }
-            </style>';
-            
-            echo '<script>
-            jQuery(document).ready(function($) {
-                // 隱藏 Elementor AI 相關元素
-                $("h2, h3").each(function() {
-                    var text = $(this).text().trim();
-                    if (text.indexOf("Elementor") !== -1 && text.indexOf("AI") !== -1) {
-                        $(this).hide();
-                        $(this).nextUntil("h2, h3").hide();
-                    }
-                });
-                
-                // 隱藏包含 elementor 或 ai 的表格行
-                $(".form-table tr").each(function() {
-                    var text = $(this).text().toLowerCase();
-                    if (text.indexOf("elementor") !== -1 && text.indexOf("ai") !== -1) {
-                        $(this).hide();
-                    }
-                });
-            });
-            </script>';
-        }
-    }
-    
-    /**
-     * 隱藏社交媒體欄位
-     */
-    public function hide_social_fields() {
-        global $pagenow;
-        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
-            $hide_fields = array();
-            
-            if ($this->get_setting('hide_user_url', false)) $hide_fields[] = '.user-url-wrap';
-            if ($this->get_setting('hide_user_facebook', false)) $hide_fields[] = '.user-facebook-wrap';
-            if ($this->get_setting('hide_user_twitter', false)) $hide_fields[] = '.user-twitter-wrap';
-            if ($this->get_setting('hide_user_linkedin', false)) $hide_fields[] = '.user-linkedin-wrap';
-            if ($this->get_setting('hide_user_mastodon', false)) $hide_fields[] = '.user-mastodon-wrap';
-            if ($this->get_setting('hide_user_tiktok', false)) $hide_fields[] = '.user-tiktok-wrap';
-            if ($this->get_setting('hide_user_odnoklassniki', false)) $hide_fields[] = '.user-odnoklassniki-wrap';
-            if ($this->get_setting('hide_user_vkontakte', false)) $hide_fields[] = '.user-vkontakte-wrap';
-            if ($this->get_setting('hide_user_vimeo', false)) $hide_fields[] = '.user-vimeo-wrap';
-            if ($this->get_setting('hide_user_youtube', false)) $hide_fields[] = '.user-youtube-wrap';
-            if ($this->get_setting('hide_user_medium', false)) $hide_fields[] = '.user-medium-wrap';
-            if ($this->get_setting('hide_user_github', false)) $hide_fields[] = '.user-github-wrap';
-            if ($this->get_setting('hide_user_wordpress', false)) $hide_fields[] = '.user-wordpress-wrap';
-            if ($this->get_setting('hide_user_pinterest', false)) $hide_fields[] = '.user-pinterest-wrap';
-            if ($this->get_setting('hide_user_instagram', false)) $hide_fields[] = '.user-instagram-wrap';
-            if ($this->get_setting('hide_user_dribbble', false)) $hide_fields[] = '.user-dribbble-wrap';
-            
-            if (!empty($hide_fields)) {
-                echo '<style>';
-                echo implode(',\n', $hide_fields) . ' {';
-                echo '    display: none !important;';
-                echo '}';
-                echo '</style>';
-            }
-        }
-    }
-    
-    /**
-     * 隱藏整個 profile 頁面區塊
-     */
-    public function hide_profile_sections() {
-        global $pagenow;
-        if (is_admin() && ($pagenow == 'profile.php' || $pagenow == 'user-edit.php')) {
-            echo '<style>
-            /* 隱藏 Personal Options 整個區塊 */
-            h2:contains("Personal Options"),
-            .form-table tr:has(.user-admin-color-wrap),
-            .form-table tr:has(.user-syntax-highlighting-wrap), 
-            .form-table tr:has(.user-comment-shortcuts-wrap),
-            .form-table tr:has(.user-admin-bar-front-wrap),
-            .form-table tr:has(.user-locale-wrap) { display: none !important; }
-            
-            /* 隱藏 About the user 整個區塊 */
-            h2:contains("About the user"),
-            .form-table tr:has(.user-description-wrap) { display: none !important; }
-            
-            /* 隱藏 Application Passwords 整個區塊 */
-            h2:contains("Application Passwords"),
-            .application-passwords-section,
-            .application-passwords { display: none !important; }
-            </style>';
-            
-            // 使用 JavaScript 進行更可靠的隱藏
-            echo '<script>
-            jQuery(document).ready(function($) {
-                // 隱藏包含特定文字的標題及其後續內容
-                $("h2").each(function() {
-                    var text = $(this).text().trim();
-                    if (text === "Personal Options" || text === "個人選項") {
-                        $(this).hide();
-                        $(this).next("table").hide();
-                    }
-                    if (text === "About the user" || text === "關於使用者") {
-                        $(this).hide(); 
-                        $(this).next("table").hide();
-                    }
-                    if (text === "Application Passwords" || text === "應用程式密碼") {
-                        $(this).hide();
-                        $(this).nextUntil("h2").hide();
-                    }
-                });
-                
-                // 額外隱藏特定的表格行
-                $(".user-admin-color-wrap, .user-syntax-highlighting-wrap, .user-comment-shortcuts-wrap, .user-admin-bar-front-wrap, .user-locale-wrap, .user-description-wrap").closest("tr").hide();
-                $(".application-passwords").hide();
-            });
-            </script>';
-        }
-    }
-    
     // === 用戶匯出功能 ===
     
     public function add_export_link($actions, $user_object) {
@@ -1678,18 +1065,38 @@ class WU_Enhanced_User_List {
         exit;
     }
     
-    public function ajax_export_users() {
-        if (!current_user_can('manage_options')) {
-            wp_die('權限不足');
+    /**
+     * 自動獲取所有用戶欄位
+     */
+    private function get_all_user_fields() {
+        global $wpdb;
+        
+        // 獲取用戶表的所有欄位
+        $user_fields = array();
+        $results = $wpdb->get_results("DESCRIBE {$wpdb->users}", ARRAY_A);
+        foreach ($results as $field) {
+            $user_fields[] = $field['Field'];
         }
         
-        $user_ids = isset($_POST['user_ids']) ? array_map('intval', $_POST['user_ids']) : array();
-        if (empty($user_ids)) {
-            wp_die('沒有選擇用戶');
-        }
+        return $user_fields;
+    }
+    
+    /**
+     * 自動獲取所有用戶中繼欄位
+     */
+    private function get_all_user_meta_fields() {
+        global $wpdb;
         
-        $this->export_users($user_ids);
-        exit;
+        // 獲取前 20 個最常用的中繼欄位
+        $meta_keys = $wpdb->get_col("
+            SELECT DISTINCT meta_key 
+            FROM {$wpdb->usermeta} 
+            WHERE meta_key NOT LIKE '\_%' 
+            ORDER BY meta_key 
+            LIMIT 20
+        ");
+        
+        return $meta_keys;
     }
     
     private function export_users($user_ids) {
@@ -1708,23 +1115,23 @@ class WU_Enhanced_User_List {
         
         // 建立標題行
         $headers = array();
-        $export_fields = $this->get_setting('export_fields', array());
-        foreach ($export_fields as $field => $enabled) {
-            if ($enabled) {
-                $headers[] = ucfirst(str_replace('_', ' ', $field));
-            }
+        
+        // 基本用戶欄位
+        $user_fields = $this->get_all_user_fields();
+        foreach ($user_fields as $field) {
+            $headers[] = ucfirst(str_replace('_', ' ', $field));
         }
         
+        // 角色資訊
         if ($this->get_setting('include_roles', true)) {
             $headers[] = 'Roles';
         }
         
+        // 中繼資料
         if ($this->get_setting('include_meta', true)) {
-            $export_meta_fields = $this->get_setting('export_meta_fields', array());
-            foreach ($export_meta_fields as $meta_field => $enabled) {
-                if ($enabled) {
-                    $headers[] = ucfirst(str_replace('_', ' ', $meta_field));
-                }
+            $meta_fields = $this->get_all_user_meta_fields();
+            foreach ($meta_fields as $meta_field) {
+                $headers[] = ucfirst(str_replace('_', ' ', $meta_field));
             }
         }
         
@@ -1738,14 +1145,12 @@ class WU_Enhanced_User_List {
             $row = array();
             
             // 基本欄位
-            foreach ($export_fields as $field => $enabled) {
-                if ($enabled) {
-                    $value = isset($user->$field) ? $user->$field : '';
-                    if ($field === 'user_registered') {
-                        $value = date($this->get_setting('date_format', 'Y-m-d H:i:s'), strtotime($value));
-                    }
-                    $row[] = $value;
+            foreach ($user_fields as $field) {
+                $value = isset($user->$field) ? $user->$field : '';
+                if ($field === 'user_registered') {
+                    $value = date($this->get_setting('date_format', 'Y-m-d H:i:s'), strtotime($value));
                 }
+                $row[] = $value;
             }
             
             // 角色資訊
@@ -1756,12 +1161,10 @@ class WU_Enhanced_User_List {
             
             // 中繼資料
             if ($this->get_setting('include_meta', true)) {
-                $export_meta_fields = $this->get_setting('export_meta_fields', array());
-                foreach ($export_meta_fields as $meta_field => $enabled) {
-                    if ($enabled) {
-                        $meta_value = get_user_meta($user_id, $meta_field, true);
-                        $row[] = $meta_value;
-                    }
+                $meta_fields = $this->get_all_user_meta_fields();
+                foreach ($meta_fields as $meta_field) {
+                    $meta_value = get_user_meta($user_id, $meta_field, true);
+                    $row[] = $meta_value;
                 }
             }
             
@@ -1944,54 +1347,49 @@ class WU_Enhanced_User_List {
     }
     
     /**
-     * 計算用戶 WooCommerce 總購買金額（已完成訂單）
+     * 計算用戶 WooCommerce 已完成訂單數量
      */
-    private function get_user_woo_total($user_id) {
+    private function get_user_woo_orders($user_id) {
         if (!class_exists('WooCommerce')) {
             return 0;
         }
         
         // 先從暫存中取得
-        $cached_total = get_user_meta($user_id, 'wu_woo_total_amount', true);
-        $last_calculated = get_user_meta($user_id, 'wu_woo_total_calculated', true);
+        $cached_count = get_user_meta($user_id, 'wu_woo_order_count', true);
+        $last_calculated = get_user_meta($user_id, 'wu_woo_order_calculated', true);
         
         // 如果暫存存在且未過期（24小時），直接返回
-        if ($cached_total !== '' && $last_calculated && (time() - $last_calculated) < 86400) {
-            return floatval($cached_total);
+        if ($cached_count !== '' && $last_calculated && (time() - $last_calculated) < 86400) {
+            return intval($cached_count);
         }
         
         global $wpdb;
         
-        // 查詢已完成的訂單
-        $completed_orders = $wpdb->get_results($wpdb->prepare(
-            "SELECT p.ID, pm.meta_value as total 
+        // 查詢已完成的訂單數量
+        $order_count = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(p.ID) 
              FROM {$wpdb->posts} p
              INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
-             INNER JOIN {$wpdb->postmeta} pm2 ON p.ID = pm2.post_id
              WHERE p.post_type = 'shop_order'
              AND p.post_status = 'wc-completed'
-             AND pm.meta_key = '_order_total'
-             AND pm2.meta_key = '_customer_user'
-             AND pm2.meta_value = %d",
+             AND pm.meta_key = '_customer_user'
+             AND pm.meta_value = %d",
             $user_id
         ));
         
-        $total_amount = 0;
-        foreach ($completed_orders as $order) {
-            $total_amount += floatval($order->total);
-        }
+        $order_count = intval($order_count);
         
         // 儲存暫存
-        update_user_meta($user_id, 'wu_woo_total_amount', $total_amount);
-        update_user_meta($user_id, 'wu_woo_total_calculated', time());
+        update_user_meta($user_id, 'wu_woo_order_count', $order_count);
+        update_user_meta($user_id, 'wu_woo_order_calculated', time());
         
-        return $total_amount;
+        return $order_count;
     }
     
     /**
-     * 更新用戶購買總金額（當訂單狀態改變時）
+     * 更新用戶訂單數量（當訂單狀態改變時）
      */
-    public function update_user_woo_total($order_id, $old_status, $new_status) {
+    public function update_user_woo_orders($order_id, $old_status, $new_status) {
         if (!class_exists('WooCommerce')) {
             return;
         }
@@ -2004,8 +1402,8 @@ class WU_Enhanced_User_List {
         $customer_id = $order->get_customer_id();
         if ($customer_id) {
             // 清除暫存，強制重新計算
-            delete_user_meta($customer_id, 'wu_woo_total_amount');
-            delete_user_meta($customer_id, 'wu_woo_total_calculated');
+            delete_user_meta($customer_id, 'wu_woo_order_count');
+            delete_user_meta($customer_id, 'wu_woo_order_calculated');
         }
     }
 }
@@ -2013,8 +1411,8 @@ class WU_Enhanced_User_List {
 // 初始化模組
 $wu_enhanced_user_list = new WU_Enhanced_User_List();
 
-// 新增 Hook 來更新購買總金額
+// 新增 Hook 來更新訂單數量
 if (class_exists('WooCommerce')) {
-    add_action('woocommerce_order_status_changed', array($wu_enhanced_user_list, 'update_user_woo_total'), 10, 3);
+    add_action('woocommerce_order_status_changed', array($wu_enhanced_user_list, 'update_user_woo_orders'), 10, 3);
 }
 ?>
