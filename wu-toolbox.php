@@ -23,6 +23,10 @@ function wumetax_toolkit_activation_redirect() {
 add_action('admin_init', 'wumetax_toolkit_check_redirect');
 
 function wumetax_toolkit_check_redirect() {
+    // 避免在 AJAX / Cron / REST 期間做任何重定向
+    if ( ( function_exists('wp_doing_ajax') && wp_doing_ajax() ) || ( defined('DOING_AJAX') && DOING_AJAX ) ) { return; }
+    if ( defined('WP_CLI') && WP_CLI ) { return; }
+    if ( function_exists('wp_is_json_request') && wp_is_json_request() ) { return; }
     if (get_option('wumetax_toolkit_activation_redirect', false)) {
         delete_option('wumetax_toolkit_activation_redirect');
         // 重定向到常用外掛管理頁面
