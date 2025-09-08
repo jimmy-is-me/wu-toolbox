@@ -368,7 +368,27 @@ class WU_Hide_Login_Page {
         if (is_user_logged_in()) {
             return;
         }
-        
+
+        // 防護：避免影響 AJAX / Cron / REST 等特殊請求
+        if ( ( function_exists('wp_doing_ajax') && wp_doing_ajax() ) || ( defined('DOING_AJAX') && DOING_AJAX ) ) {
+            return;
+        }
+        if ( function_exists('wp_is_json_request') && wp_is_json_request() ) {
+            return;
+        }
+        if ( defined('XMLRPC_REQUEST') && XMLRPC_REQUEST ) {
+            return;
+        }
+        // 額外保險：明確排除 admin-ajax / wp-cron / async-upload
+        $req_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+        if ( strpos($req_uri, 'admin-ajax.php') !== false || strpos($req_uri, 'wp-cron.php') !== false || strpos($req_uri, 'async-upload.php') !== false ) {
+            return;
+        }
+        // CORS 預檢請求
+        if ( isset($_SERVER['REQUEST_METHOD']) && strtoupper($_SERVER['REQUEST_METHOD']) === 'OPTIONS' ) {
+            return;
+        }
+
         // 檢查是否與404重定向功能衝突
         if ($this->is_404_redirector_handling()) {
             return; // 讓404重定向功能處理
