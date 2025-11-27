@@ -1,18 +1,15 @@
 <?php
-// 防呆
+/**
+ * UpdraftPlus 備份打包下載模組
+ * 功能：
+ * - 在 WumetaxToolkit 底下新增「備份檔案下載功能」子選單
+ * - 掃描 wp-content/updraft 目錄
+ * - 將「最新一組」UpdraftPlus 備份檔打包成 zip 下載
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-
-/**
- * WU Toolbox: UpdraftPlus 備份打包下載模組
- *
- * 功能：
- * - 掃描 wp-content/updraft 目錄
- * - 將「最新一組」UpdraftPlus 備份檔（同一個 key）打包成 zip 下載
- *
- * 建議：在 WU 工具箱的後台設定頁呼叫 WU_Updraft_Bundle_Download_Module::render_section()
- */
 
 class WU_Updraft_Bundle_Download_Module {
 
@@ -21,23 +18,49 @@ class WU_Updraft_Bundle_Download_Module {
     const NONCE_ACTION           = 'wu_upbd_download_latest';
 
     public function __construct() {
+        // 後台子選單
+        add_action( 'admin_menu', [ $this, 'add_admin_menu' ], 20 );
         // 後台表單處理
         add_action( 'admin_post_' . self::ACTION_DOWNLOAD_LATEST, [ $this, 'handle_download_latest' ] );
     }
 
     /**
-     * 由主外掛的設定頁呼叫，輸出這個模組的區塊 HTML。
+     * 新增「備份檔案下載功能」子選單
      */
-    public function render_section() {
+    public function add_admin_menu() {
+        add_submenu_page(
+            'wumetax-toolkit',
+            'Updraft 備份打包下載',   // 頁面標題
+            '備份檔案下載功能',       // 左側子選單文字（你可以改）
+            'manage_options',
+            'wu-updraft-bundle-download',
+            [ $this, 'admin_page' ]
+        );
+    }
+
+    /**
+     * 子選單頁面：包一層外框再呼叫原本的 render_section()
+     */
+    public function admin_page() {
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
         }
 
+        echo '<div class="wrap">';
+        echo '<h1>UpdraftPlus 備份打包下載</h1>';
+        $this->render_section();
+        echo '</div>';
+    }
+
+    /**
+     * 原本的區塊輸出（保留：方便未來要內嵌到其他頁）
+     */
+    public function render_section() {
         $dir    = $this->get_updraft_dir();
         $groups = $this->scan_backups();
 
         ?>
-        <div class="wu-card">
+        <div class="card" style="max-width:900px;">
             <h2>UpdraftPlus 備份打包下載</h2>
             <p class="description">
                 掃描 <code>wp-content/updraft</code> 目錄，將「最新一組」UpdraftPlus 備份檔（db / plugins / themes / uploads / others）打包成一個 zip 檔，直接下載到你的電腦或 NAS 開的瀏覽器。
@@ -213,12 +236,5 @@ class WU_Updraft_Bundle_Download_Module {
     }
 }
 
-// 由主外掛在適當時機 new 一次（或這裡直接 new）
-function wu_toolbox_init_updraft_bundle_download_module() {
-    static $instance = null;
-    if ( null === $instance ) {
-        $instance = new WU_Updraft_Bundle_Download_Module();
-    }
-    return $instance;
-}
-wu_toolbox_init_updraft_bundle_download_module();
+// 初始化模組（跟 404 模組一樣，在檔案最後 new 一次）
+new WU_Updraft_Bundle_Download_Module();
