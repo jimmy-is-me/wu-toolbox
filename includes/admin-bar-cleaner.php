@@ -2,7 +2,7 @@
 /**
  * 後台設定模組
  * 功能:後台設定、WordPress 登入頁面美化、安全性強化版本
- * 版本:4.0 - 安全性強化、架構優化
+ * 版本:4.0 - 安全性強化、架構優化、AJAX 修正版
  */
 
 if (!defined('ABSPATH')) exit;
@@ -21,6 +21,16 @@ class WU_Admin_Bar_Cleaner {
      * 設定組名稱
      */
     private $settings_group = 'wu_admin_bar_settings';
+    
+    /**
+     * Nonce action 名稱
+     */
+    private $nonce_action = 'wu_admin_bar_save_action';
+    
+    /**
+     * Nonce 欄位名稱
+     */
+    private $nonce_field = 'wu_admin_bar_nonce';
     
     /**
      * 建構函數
@@ -66,6 +76,12 @@ class WU_Admin_Bar_Cleaner {
             '4.0',
             true
         );
+        
+        // 傳遞 nonce 到 JavaScript
+        wp_localize_script('wu-admin-bar-cleaner-js', 'wuAdminBarAjax', array(
+            'ajaxurl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce($this->nonce_action)
+        ));
         
         // 內聯 JavaScript
         wp_add_inline_script('wu-admin-bar-cleaner-js', $this->get_admin_js());
@@ -118,8 +134,9 @@ class WU_Admin_Bar_Cleaner {
                 saveTimeout = setTimeout(function() {
                     var formData = $("#wu-admin-bar-form").serialize();
                     formData += "&action=wu_admin_bar_save";
+                    formData += "&" + wuAdminBarAjax.nonce_field + "=" + wuAdminBarAjax.nonce;
                     
-                    $.post(ajaxurl, formData, function(response) {
+                    $.post(wuAdminBarAjax.ajaxurl, formData, function(response) {
                         // 移除舊通知
                         $(".notice").remove();
                         
@@ -130,8 +147,9 @@ class WU_Admin_Bar_Cleaner {
                                 "</p></div>"
                             );
                         } else {
+                            var errorMsg = response.data && response.data.message ? response.data.message : "儲存失敗,請重試。";
                             $(".wrap h1").after(
-                                "<div class=\"notice notice-error is-dismissible\"><p>儲存失敗,請重試。</p></div>"
+                                "<div class=\"notice notice-error is-dismissible\"><p>" + errorMsg + "</p></div>"
                             );
                         }
                         
@@ -141,10 +159,10 @@ class WU_Admin_Bar_Cleaner {
                                 $(this).remove();
                             });
                         }, 3000);
-                    }).fail(function() {
+                    }).fail(function(xhr, status, error) {
                         $(".notice").remove();
                         $(".wrap h1").after(
-                            "<div class=\"notice notice-error is-dismissible\"><p>網路錯誤,請重試。</p></div>"
+                            "<div class=\"notice notice-error is-dismissible\"><p>網路錯誤,請重試。(" + error + ")</p></div>"
                         );
                     });
                 }, 800);
@@ -874,8 +892,10 @@ class WU_Admin_Bar_Cleaner {
             return;
         }
         
-        // 驗證 nonce
-        if (!isset($_POST['wu_admin_bar_nonce']) || !wp_verify_nonce($_POST['wu_admin_bar_nonce'], 'wu_admin_bar_settings-options')) {
+        // 驗證 nonce (修正欄位名稱)
+        $nonce_value = isset($_POST[$this->nonce_field]) ? sanitize_text_field(wp_unslash($_POST[$this->nonce_field])) : '';
+        
+        if (empty($nonce_value) || !wp_verify_nonce($nonce_value, $this->nonce_action)) {
             wp_send_json_error(array('message' => '安全驗證失敗'));
             return;
         }
@@ -939,17 +959,6 @@ class WU_Admin_Bar_Cleaner {
             wp_die(esc_html__('您沒有足夠的權限訪問此頁面。', 'wumetax-toolkit'));
         }
         
-        // 處理表單提交
-        if (isset($_POST['submit'])) {
-            // 驗證 nonce
-            check_admin_referer('wu_admin_bar_settings-options');
-            
-            // 使用 AJAX 保存邏輯
-            $this->ajax_save_settings();
-            
-            echo '<div class="notice notice-success"><p>' . esc_html__('設定已儲存!變更已立即生效。', 'wumetax-toolkit') . '</p></div>';
-        }
-        
         // 取得所有當前設定值 (使用 esc_html 輸出)
         $settings = $this->get_all_current_settings();
         
@@ -964,12 +973,11 @@ class WU_Admin_Bar_Cleaner {
                 </table>
             </div>
             
-            <form method="post" action="">
+            <form method="post" action="options.php" id="wu-admin-bar-form">
                 <?php
                 settings_fields($this->settings_group);
                 do_settings_sections($this->settings_group);
-                wp_nonce_field('wu_admin_bar_settings-options');
-                submit_button();
+                submit_button('儲存設定', 'primary', 'submit', false);
                 ?>
             </form>
             
