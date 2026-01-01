@@ -12,326 +12,286 @@
 
 if (!defined('ABSPATH')) exit;
 
-/**
- * 外掛主類別
- */
-class WumetaxToolkit {
-    
-    /**
-     * 外掛版本
-     */
-    const VERSION = '3.3';
-    
-    /**
-     * 外掛路徑
-     */
-    private $plugin_path;
-    
-    /**
-     * 除錯模式（開發用）
-     */
-    private $debug_mode;
-    
-    /**
-     * 已載入的模組記錄
-     */
-    private $loaded_modules = array();
-    
-    /**
-     * 單例實例
-     */
-    private static $instance = null;
-    
-    /**
-     * 取得單例實例
-     */
-    public static function get_instance() {
-        if (null === self::$instance) {
-            self::$instance = new self();
-        }
-        return self::$instance;
-    }
-    
-    /**
-     * 建構子
-     */
-    private function __construct() {
-        $this->plugin_path = plugin_dir_path(__FILE__);
-        $this->debug_mode = defined('WP_DEBUG') && WP_DEBUG;
-        
-        // 根據請求類型載入對應模組
-        $this->load_modules();
-        
-        // 註冊後台選單（僅後台）
-        if (is_admin()) {
-            add_action('admin_menu', array($this, 'register_admin_menu'));
-            add_action('admin_init', array($this, 'check_activation_redirect'));
-        }
-    }
-    
-    /**
-     * 根據環境載入對應模組
-     */
-    private function load_modules() {
-        $includes_dir = $this->plugin_path . 'includes/';
-        
-        // 檢查目錄是否存在且可讀
-        if (!is_dir($includes_dir) || !is_readable($includes_dir)) {
-            if ($this->debug_mode) {
-                error_log('WumetaxToolkit: includes 目錄不存在或無法讀取');
-            }
-            return;
-        }
-        
-        // 共用模組（所有請求都載入）
-        $this->load_module_group($includes_dir, 'common');
-        
-        // 後台專用模組
-        if (is_admin()) {
-            // 排除 AJAX 與 Cron
-            if (!$this->is_ajax_request() && !$this->is_cron_request()) {
-                $this->load_module_group($includes_dir, 'admin');
-            }
-            
-            // Admin AJAX 專用模組
-            if ($this->is_ajax_request()) {
-                $this->load_module_group($includes_dir, 'admin-ajax');
-            }
-        }
-        
-        // 前台專用模組
-        if (!is_admin()) {
-            $this->load_module_group($includes_dir, 'frontend');
-            
-            // 前台 AJAX 專用模組
-            if ($this->is_ajax_request()) {
-                $this->load_module_group($includes_dir, 'frontend-ajax');
-            }
-        }
-        
-        // REST API 專用模組
-        if ($this->is_rest_request()) {
-            $this->load_module_group($includes_dir, 'rest');
-        }
-        
-        // WooCommerce 專用模組（僅在 WooCommerce 啟用時載入）
-        if ($this->is_woocommerce_active()) {
-            $this->load_module_group($includes_dir, 'woocommerce');
-        }
-        
-        // 除錯模式：記錄已載入模組
-        if ($this->debug_mode && !empty($this->loaded_modules)) {
-            error_log('WumetaxToolkit 已載入模組: ' . implode(', ', $this->loaded_modules));
-        }
-    }
-    
-    /**
-     * 載入特定群組的模組
-     * 
-     * @param string $dir 模組目錄路徑
-     * @param string $group 模組群組名稱
-     */
-    private function load_module_group($dir, $group) {
-        $pattern = $dir . $group . '-*.php';
-        $files = glob($pattern);
-        
-        if (empty($files)) {
-            return;
-        }
-        
-        foreach ($files as $file) {
-            if (!is_readable($file)) {
-                if ($this->debug_mode) {
-                    error_log("WumetaxToolkit: 無法讀取模組檔案 {$file}");
-                }
-                continue;
-            }
-            
-            require_once $file;
-            $this->loaded_modules[] = basename($file);
-            
-            if ($this->debug_mode) {
-                error_log("WumetaxToolkit: 已載入 [{$group}] " . basename($file));
-            }
-        }
-    }
-    
-    /**
-     * 判斷是否為 AJAX 請求
-     * 
-     * @return bool
-     */
-    private function is_ajax_request() {
-        if (function_exists('wp_doing_ajax')) {
-            return wp_doing_ajax();
-        }
-        return (defined('DOING_AJAX') && DOING_AJAX);
-    }
-    
-    /**
-     * 判斷是否為 Cron 請求
-     * 
-     * @return bool
-     */
-    private function is_cron_request() {
-        if (function_exists('wp_doing_cron')) {
-            return wp_doing_cron();
-        }
-        return (defined('DOING_CRON') && DOING_CRON);
-    }
-    
-    /**
-     * 判斷是否為 REST API 請求
-     * 
-     * @return bool
-     */
-    private function is_rest_request() {
-        // WordPress 5.0+ 方法
-        if (function_exists('wp_is_json_request') && wp_is_json_request()) {
-            return true;
-        }
-        
-        // 檢查 REST_REQUEST 常數
-        if (defined('REST_REQUEST') && REST_REQUEST) {
-            return true;
-        }
-        
-        // 檢查 URL 是否包含 wp-json
-        if (isset($_SERVER['REQUEST_URI'])) {
-            $rest_prefix = rest_get_url_prefix();
-            if (strpos($_SERVER['REQUEST_URI'], $rest_prefix) !== false) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-    
-    /**
-     * 判斷 WooCommerce 是否啟用
-     * 
-     * @return bool
-     */
-    private function is_woocommerce_active() {
-        return class_exists('WooCommerce');
-    }
-    
-    /**
-     * 註冊後台選單
-     */
-    public function register_admin_menu() {
-        add_menu_page(
-            'WumetaxToolkit',                    // 頁面標題
-            'WumetaxToolkit',                    // 選單標題
-            'manage_options',                    // 權限
-            'wumetax-toolkit',                   // slug
-            array($this, 'render_main_page'),    // callback（語意清晰的命名）
-            'dashicons-admin-generic',
-            99
-        );
-    }
-    
-    /**
-     * 渲染主頁面（常用外掛管理）
-     */
-    public function render_main_page() {
-        // 如果模組有定義 plugin_manager_settings_page，則呼叫它
-        if (function_exists('plugin_manager_settings_page')) {
-            plugin_manager_settings_page();
-        } else {
-            echo '<div class="wrap">';
-            echo '<h1>WumetaxToolkit</h1>';
-            echo '<p>歡迎使用 WumetaxToolkit！相關模組尚未載入。</p>';
-            echo '</div>';
-        }
-    }
-    
-    /**
-     * 檢查是否需要啟用後重定向
-     */
-    public function check_activation_redirect() {
-        // 避免在 AJAX / Cron / REST 期間重定向
-        if ($this->is_ajax_request() || $this->is_cron_request() || $this->is_rest_request()) {
-            return;
-        }
-        
-        // 避免在 WP-CLI 執行時重定向
-        if (defined('WP_CLI') && WP_CLI) {
-            return;
-        }
-        
-        // 檢查重定向標記
-        if (!get_option('wumetax_toolkit_activation_redirect', false)) {
-            return;
-        }
-        
-        // 刪除標記
-        delete_option('wumetax_toolkit_activation_redirect');
-        
-        // 避免在多站點網路啟用時重定向
-        if (is_network_admin()) {
-            return;
-        }
-        
-        // 避免在批次啟用多個外掛時重定向
-        if (isset($_GET['activate-multi'])) {
-            return;
-        }
-        
-        // 避免在除錯模式下重定向（方便開發）
-        if ($this->debug_mode) {
-            return;
-        }
-        
-        // 執行重定向
-        wp_safe_redirect(admin_url('admin.php?page=wumetax-toolkit'));
-        exit;
-    }
-    
-    /**
-     * 取得已載入的模組清單（除錯用）
-     * 
-     * @return array
-     */
-    public function get_loaded_modules() {
-        return $this->loaded_modules;
-    }
-}
+// 定義外掛常數
+define('WUMETAX_TOOLKIT_VERSION', '3.3');
+define('WUMETAX_TOOLKIT_PATH', plugin_dir_path(__FILE__));
+define('WUMETAX_TOOLKIT_URL', plugin_dir_url(__FILE__));
+define('WUMETAX_TOOLKIT_DEBUG', defined('WP_DEBUG') && WP_DEBUG);
 
 /**
- * 外掛啟用時的處理
+ * 外掛啟用時的重定向處理
  */
-function wumetax_toolkit_activation() {
+register_activation_hook(__FILE__, 'wumetax_toolkit_activation_redirect');
+
+function wumetax_toolkit_activation_redirect() {
     // 設定重定向標記
     add_option('wumetax_toolkit_activation_redirect', true);
-    
-    // 清除任何快取
-    if (function_exists('wp_cache_flush')) {
-        wp_cache_flush();
-    }
-}
-register_activation_hook(__FILE__, 'wumetax_toolkit_activation');
-
-/**
- * 外掛停用時的處理
- */
-function wumetax_toolkit_deactivation() {
-    // 清理重定向標記（以防萬一）
-    delete_option('wumetax_toolkit_activation_redirect');
     
     // 清除快取
     if (function_exists('wp_cache_flush')) {
         wp_cache_flush();
     }
 }
-register_deactivation_hook(__FILE__, 'wumetax_toolkit_deactivation');
 
 /**
- * 初始化外掛
+ * 外掛停用時的清理
  */
-function wumetax_toolkit_init() {
-    return WumetaxToolkit::get_instance();
+register_deactivation_hook(__FILE__, 'wumetax_toolkit_deactivation');
+
+function wumetax_toolkit_deactivation() {
+    // 清理重定向標記
+    delete_option('wumetax_toolkit_activation_redirect');
 }
 
-// 啟動外掛
-wumetax_toolkit_init();
+/**
+ * 檢查是否需要重定向（僅在後台執行）
+ */
+if (is_admin()) {
+    add_action('admin_init', 'wumetax_toolkit_check_redirect');
+}
+
+function wumetax_toolkit_check_redirect() {
+    // 避免在 AJAX 請求時重定向
+    if ((function_exists('wp_doing_ajax') && wp_doing_ajax()) || (defined('DOING_AJAX') && DOING_AJAX)) {
+        return;
+    }
+    
+    // 避免在 Cron 執行時重定向
+    if ((function_exists('wp_doing_cron') && wp_doing_cron()) || (defined('DOING_CRON') && DOING_CRON)) {
+        return;
+    }
+    
+    // 避免在 WP-CLI 執行時重定向
+    if (defined('WP_CLI') && WP_CLI) {
+        return;
+    }
+    
+    // 避免在 REST API 請求時重定向
+    if (function_exists('wp_is_json_request') && wp_is_json_request()) {
+        return;
+    }
+    
+    // 檢查重定向標記
+    if (!get_option('wumetax_toolkit_activation_redirect', false)) {
+        return;
+    }
+    
+    // 刪除標記
+    delete_option('wumetax_toolkit_activation_redirect');
+    
+    // 避免在多站點網路啟用時重定向
+    if (is_network_admin()) {
+        return;
+    }
+    
+    // 避免在批次啟用多個外掛時重定向
+    if (isset($_GET['activate-multi'])) {
+        return;
+    }
+    
+    // 執行安全重定向到設定頁面
+    wp_safe_redirect(admin_url('admin.php?page=wumetax-toolkit'));
+    exit;
+}
+
+/**
+ * 註冊後台選單（僅在後台執行）
+ */
+if (is_admin()) {
+    add_action('admin_menu', 'wumetax_toolkit_register_menu');
+}
+
+function wumetax_toolkit_register_menu() {
+    add_menu_page(
+        'WumetaxToolkit',                      // 頁面標題
+        'WumetaxToolkit',                      // 選單標題
+        'manage_options',                      // 權限
+        'wumetax-toolkit',                     // slug
+        'wumetax_toolkit_render_settings_page', // 統一命名的 callback
+        'dashicons-admin-generic',
+        99
+    );
+}
+
+/**
+ * 渲染設定頁面（語意清晰的命名）
+ */
+function wumetax_toolkit_render_settings_page() {
+    // 如果模組有定義 plugin_manager_settings_page，則呼叫它
+    if (function_exists('plugin_manager_settings_page')) {
+        plugin_manager_settings_page();
+    } else {
+        echo '<div class="wrap">';
+        echo '<h1>' . esc_html__('WumetaxToolkit', 'wumetax-toolkit') . '</h1>';
+        echo '<p>' . esc_html__('歡迎使用 WumetaxToolkit！相關模組尚未載入或未正確配置。', 'wumetax-toolkit') . '</p>';
+        echo '</div>';
+    }
+}
+
+/**
+ * 智能載入 includes 模組
+ * 根據請求類型條件式載入，降低 PHP 載入成本
+ */
+function wumetax_toolkit_load_modules() {
+    $includes_dir = WUMETAX_TOOLKIT_PATH . 'includes/';
+    
+    // 檢查目錄是否存在且可讀
+    if (!is_dir($includes_dir) || !is_readable($includes_dir)) {
+        if (WUMETAX_TOOLKIT_DEBUG) {
+            error_log('WumetaxToolkit: includes 目錄不存在或無法讀取 - ' . $includes_dir);
+        }
+        return;
+    }
+    
+    // 判斷當前請求類型
+    $is_admin = is_admin();
+    $is_ajax = (function_exists('wp_doing_ajax') && wp_doing_ajax()) || (defined('DOING_AJAX') && DOING_AJAX);
+    $is_rest = (function_exists('wp_is_json_request') && wp_is_json_request()) || (defined('REST_REQUEST') && REST_REQUEST);
+    $is_cron = (function_exists('wp_doing_cron') && wp_doing_cron()) || (defined('DOING_CRON') && DOING_CRON);
+    
+    // 取得所有模組檔案
+    $module_files = glob($includes_dir . '*.php');
+    
+    if (empty($module_files)) {
+        if (WUMETAX_TOOLKIT_DEBUG) {
+            error_log('WumetaxToolkit: includes 目錄下沒有找到任何 PHP 模組');
+        }
+        return;
+    }
+    
+    // 載入模組
+    foreach ($module_files as $file) {
+        $filename = basename($file);
+        
+        // 檢查檔案是否可讀（安全性與權限檢查）
+        if (!is_readable($file)) {
+            if (WUMETAX_TOOLKIT_DEBUG) {
+                error_log('WumetaxToolkit: 無法讀取模組檔案 - ' . $filename);
+            }
+            continue;
+        }
+        
+        // 根據檔案命名規則決定是否載入
+        $should_load = wumetax_toolkit_should_load_module($filename, $is_admin, $is_ajax, $is_rest, $is_cron);
+        
+        if ($should_load) {
+            require_once $file;
+            
+            if (WUMETAX_TOOLKIT_DEBUG) {
+                error_log('WumetaxToolkit: 已載入模組 - ' . $filename);
+            }
+        } else {
+            if (WUMETAX_TOOLKIT_DEBUG) {
+                error_log('WumetaxToolkit: 跳過載入模組 - ' . $filename . ' (不符合當前請求環境)');
+            }
+        }
+    }
+}
+
+/**
+ * 判斷模組是否應該在當前請求中載入
+ * 
+ * 命名規則：
+ * - common-*.php    : 所有請求都載入（共用函數、常數等）
+ * - admin-*.php     : 僅後台載入（排除 AJAX）
+ * - admin-ajax-*.php: 僅後台 AJAX 載入
+ * - frontend-*.php  : 僅前台載入（排除 AJAX）
+ * - frontend-ajax-*.php: 僅前台 AJAX 載入
+ * - rest-*.php      : 僅 REST API 請求載入
+ * - cron-*.php      : 僅 Cron 執行時載入
+ * - woocommerce-*.php: 僅 WooCommerce 啟用時載入
+ * 
+ * @param string $filename 檔案名稱
+ * @param bool $is_admin 是否為後台
+ * @param bool $is_ajax 是否為 AJAX 請求
+ * @param bool $is_rest 是否為 REST 請求
+ * @param bool $is_cron 是否為 Cron 執行
+ * @return bool 是否應該載入
+ */
+function wumetax_toolkit_should_load_module($filename, $is_admin, $is_ajax, $is_rest, $is_cron) {
+    // 共用模組：始終載入
+    if (strpos($filename, 'common-') === 0) {
+        return true;
+    }
+    
+    // Cron 專用模組：僅在 Cron 執行時載入
+    if (strpos($filename, 'cron-') === 0) {
+        return $is_cron;
+    }
+    
+    // REST API 專用模組：僅在 REST 請求時載入
+    if (strpos($filename, 'rest-') === 0) {
+        return $is_rest;
+    }
+    
+    // 後台 AJAX 專用模組
+    if (strpos($filename, 'admin-ajax-') === 0) {
+        return $is_admin && $is_ajax;
+    }
+    
+    // 後台專用模組：僅在後台且非 AJAX 時載入
+    if (strpos($filename, 'admin-') === 0) {
+        return $is_admin && !$is_ajax && !$is_rest;
+    }
+    
+    // 前台 AJAX 專用模組
+    if (strpos($filename, 'frontend-ajax-') === 0) {
+        return !$is_admin && $is_ajax;
+    }
+    
+    // 前台專用模組：僅在前台且非 AJAX 時載入
+    if (strpos($filename, 'frontend-') === 0) {
+        return !$is_admin && !$is_ajax && !$is_rest;
+    }
+    
+    // WooCommerce 專用模組：僅在 WooCommerce 啟用時載入
+    if (strpos($filename, 'woocommerce-') === 0) {
+        return class_exists('WooCommerce');
+    }
+    
+    // 預設：舊有模組（無前綴）僅在後台載入，保持向下相容
+    // 但建議逐步將所有模組加上適當前綴
+    if (WUMETAX_TOOLKIT_DEBUG) {
+        error_log('WumetaxToolkit: 警告 - 模組 "' . $filename . '" 未使用標準命名規則，僅在後台載入');
+    }
+    return $is_admin && !$is_ajax;
+}
+
+/**
+ * 在適當時機載入模組
+ * 使用 plugins_loaded hook 確保在所有外掛載入後執行
+ * 但早於 init、wp_loaded 等效能敏感的 hook
+ */
+add_action('plugins_loaded', 'wumetax_toolkit_load_modules', 5);
+
+/**
+ * 除錯資訊：顯示已載入模組（僅在 WP_DEBUG 開啟時）
+ */
+if (WUMETAX_TOOLKIT_DEBUG && is_admin()) {
+    add_action('admin_footer', 'wumetax_toolkit_debug_info');
+}
+
+function wumetax_toolkit_debug_info() {
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+    
+    $includes_dir = WUMETAX_TOOLKIT_PATH . 'includes/';
+    $loaded_modules = array();
+    
+    if (is_dir($includes_dir)) {
+        foreach (glob($includes_dir . '*.php') as $file) {
+            if (in_array($file, get_included_files())) {
+                $loaded_modules[] = basename($file);
+            }
+        }
+    }
+    
+    echo '<!-- WumetaxToolkit 除錯資訊 -->';
+    echo '<!-- 已載入模組: ' . implode(', ', $loaded_modules) . ' -->';
+    echo '<!-- 請求類型: ';
+    echo is_admin() ? 'Admin' : 'Frontend';
+    echo (function_exists('wp_doing_ajax') && wp_doing_ajax()) ? ' + AJAX' : '';
+    echo (function_exists('wp_is_json_request') && wp_is_json_request()) ? ' + REST' : '';
+    echo ' -->';
+}
