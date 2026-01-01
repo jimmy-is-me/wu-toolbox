@@ -1,7 +1,7 @@
 <?php
 /**
  * 404 錯誤重新導向模組
- * 檔案名稱建議：admin-404-redirector.php（僅後台載入）
+ * 檔案名稱：common-404-redirector.php（前台+後台都載入）
  * 功能：將 404 錯誤透明地重新導向到網站主頁或自訂頁面
  */
 
@@ -25,14 +25,14 @@ class WU_404_Redirector {
     private static $redirect_sent = false;
     
     public function __construct() {
-        // 僅在後台載入管理介面
+        // 後台：載入管理介面
         if (is_admin()) {
             add_action('admin_menu', array($this, 'add_admin_menu'), 20);
             add_action('admin_init', array($this, 'admin_init'));
         }
         
-        // 如果啟用了 404 重新導向，則在前台執行相關動作
-        if ($this->get_option('enabled', false)) {
+        // 前台：如果啟用了 404 重新導向，則執行相關動作
+        if (!is_admin() && $this->get_option('enabled', false)) {
             add_action('template_redirect', array($this, 'handle_404_redirect'), 1);
         }
     }
@@ -58,6 +58,10 @@ class WU_404_Redirector {
     private function update_option($key, $value) {
         return update_option($this->option_prefix . $key, $value);
     }
+    
+    // ========================================
+    // 後台管理介面相關方法
+    // ========================================
     
     /**
      * 添加管理子選單頁面
@@ -560,6 +564,10 @@ class WU_404_Redirector {
         echo '</tbody></table>';
     }
     
+    // ========================================
+    // 前台 404 重新導向執行邏輯
+    // ========================================
+    
     /**
      * 處理 404 重新導向
      */
@@ -598,7 +606,8 @@ class WU_404_Redirector {
         }
         
         // 防止無限重新導向：檢查目標 URL 是否與當前 URL 相同
-        $current_url = home_url($_SERVER['REQUEST_URI'] ?? '');
+        $current_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+        $current_url = home_url($current_uri);
         if (untrailingslashit($redirect_url) === untrailingslashit($current_url)) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('WU_404_Redirector: 偵測到循環重新導向，已阻止');
@@ -683,7 +692,6 @@ class WU_404_Redirector {
         $login_paths = array(
             '/wp-login.php',
             '/wp-admin',
-            '/wp-admin/admin-ajax.php', // 明確排除
             '/' . $custom_slug,
         );
         
