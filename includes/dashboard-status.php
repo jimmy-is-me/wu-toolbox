@@ -2,18 +2,19 @@
 if (!defined('ABSPATH')) exit;
 
 /*
- * WumetaxToolkit - Dashboard Status Overview
- * Version: 1.0
+ * WumetaxToolkit - Client Dashboard Overview
+ * Version: 2.0 - Data-Driven Client Dashboard
  * 
  * PURPOSE:
- * - Client-friendly status dashboard (not technical monitoring)
- * - Show maintenance transparency
- * - Build trust with clear communication
+ * - Show business-understandable metrics (not technical monitoring)
+ * - Display service status & contact info
+ * - SEO basic data (display only, no settings)
+ * - Performance optimized (no heavy queries)
  * 
  * PRINCIPLES:
- * - No technical scores/metrics
- * - Only show status + results (not raw data)
- * - Hide blocks when nothing to report
+ * - Dashboard = Read-only display layer
+ * - Settings page = Management interface
+ * - No technical jargon, no red warnings
  */
 
 // ===== Menu Registration =====
@@ -21,481 +22,659 @@ if (!defined('ABSPATH')) exit;
 add_action('admin_menu', function() {
 	add_submenu_page(
 		'wumetax-toolkit',
-		'儀表板顯示清單',
-		'儀表板顯示清單',
-		'read', // 所有登入者可見
-		'wu-dashboard-overview',
-		'wu_dashboard_overview_page',
-		1 // 置頂
+		'儀表板設定',
+		'儀表板設定',
+		'manage_options',
+		'wu-dashboard-settings',
+		'wu_dashboard_settings_page'
 	);
-});
+}, 999);
 
 // ===== Options Initialization =====
 
 add_action('admin_init', function() {
-	// 1. 網站狀態
-	add_option('wu_dashboard_site_status', 'normal'); // normal / watching / handling
-	add_option('wu_dashboard_site_status_note', '');
-	
-	// 2. 最近維運紀錄
-	add_option('wu_dashboard_last_maintenance_date', '');
-	add_option('wu_dashboard_last_maintenance_note', '');
-	
-	// 3. 管理項目（固定勾選項）
-	add_option('wu_dashboard_management_note', '');
-	
-	// 4. 異常提醒
-	add_option('wu_dashboard_alert_enabled', 0);
-	add_option('wu_dashboard_alert_message', '');
-	
-	// 5. 受管制項目
-	add_option('wu_dashboard_restricted_items', '系統核心設定、外掛更新管理、主機安全防護');
-	add_option('wu_dashboard_contact_note', '如需調整請聯絡管理方');
-	
-	// 6. 網站基本資訊
-	add_option('wu_dashboard_site_note', '');
-	
-	// 7. 管理單位資訊
-	add_option('wu_dashboard_manager_name', '');
-	add_option('wu_dashboard_manager_contact', '');
-	
-	// 8. 服務內容摘要
-	add_option('wu_dashboard_service_items', '系統維護、安全監控、功能更新');
-	add_option('wu_dashboard_service_note', '');
-	
-	// 9. 系統提示
-	add_option('wu_dashboard_system_message', '');
+	add_option('wu_dashboard_site_status', 'normal');
+	add_option('wu_dashboard_last_maintenance', '');
+	add_option('wu_dashboard_service_list', "網站定期備份\n系統安全監控\n功能更新維護\n效能優化調整\n技術支援諮詢");
+	add_option('wu_dashboard_show_traffic', 1);
+	add_option('wu_dashboard_show_woo', 1);
+	add_option('wu_dashboard_show_seo', 1);
 });
 
-// ===== Dashboard Display Page =====
+// ===== Dashboard Widgets =====
 
-function wu_dashboard_overview_page() {
-	$can_edit = current_user_can('manage_options');
+add_action('wp_dashboard_setup', function() {
+	// 1. 網站狀態卡片
+	wp_add_dashboard_widget(
+		'wu_status_card',
+		'網站狀態',
+		'wu_render_status_widget'
+	);
 	
-	// 儲存設定
-	if ($can_edit && isset($_POST['wu_dashboard_submit'])) {
-		check_admin_referer('wu_dashboard_settings');
-		
-		update_option('wu_dashboard_site_status', sanitize_text_field($_POST['site_status'] ?? 'normal'));
-		update_option('wu_dashboard_site_status_note', sanitize_textarea_field($_POST['site_status_note'] ?? ''));
-		
-		update_option('wu_dashboard_last_maintenance_date', sanitize_text_field($_POST['maintenance_date'] ?? ''));
-		update_option('wu_dashboard_last_maintenance_note', sanitize_textarea_field($_POST['maintenance_note'] ?? ''));
-		
-		update_option('wu_dashboard_management_note', sanitize_textarea_field($_POST['management_note'] ?? ''));
-		
-		update_option('wu_dashboard_alert_enabled', isset($_POST['alert_enabled']) ? 1 : 0);
-		update_option('wu_dashboard_alert_message', sanitize_textarea_field($_POST['alert_message'] ?? ''));
-		
-		update_option('wu_dashboard_restricted_items', sanitize_textarea_field($_POST['restricted_items'] ?? ''));
-		update_option('wu_dashboard_contact_note', sanitize_textarea_field($_POST['contact_note'] ?? ''));
-		
-		update_option('wu_dashboard_site_note', sanitize_textarea_field($_POST['site_note'] ?? ''));
-		
-		update_option('wu_dashboard_manager_name', sanitize_text_field($_POST['manager_name'] ?? ''));
-		update_option('wu_dashboard_manager_contact', sanitize_textarea_field($_POST['manager_contact'] ?? ''));
-		
-		update_option('wu_dashboard_service_items', sanitize_textarea_field($_POST['service_items'] ?? ''));
-		update_option('wu_dashboard_service_note', sanitize_textarea_field($_POST['service_note'] ?? ''));
-		
-		update_option('wu_dashboard_system_message', sanitize_textarea_field($_POST['system_message'] ?? ''));
-		
-		echo '<div class="notice notice-success is-dismissible"><p><strong>✅ 設定已儲存</strong></p></div>';
+	// 2. 流量概覽
+	if (get_option('wu_dashboard_show_traffic', 1)) {
+		wp_add_dashboard_widget(
+			'wu_traffic_overview',
+			'流量概覽',
+			'wu_render_traffic_widget'
+		);
 	}
 	
-	// 載入選項
-	$site_status = get_option('wu_dashboard_site_status', 'normal');
-	$site_status_note = get_option('wu_dashboard_site_status_note', '');
+	// 3. WooCommerce 訂單概覽
+	if (get_option('wu_dashboard_show_woo', 1) && class_exists('WooCommerce')) {
+		wp_add_dashboard_widget(
+			'wu_woo_overview',
+			'訂單概覽',
+			'wu_render_woo_widget'
+		);
+	}
 	
-	$maintenance_date = get_option('wu_dashboard_last_maintenance_date', '');
-	$maintenance_note = get_option('wu_dashboard_last_maintenance_note', '');
+	// 4. SEO 基本資料
+	if (get_option('wu_dashboard_show_seo', 1)) {
+		wp_add_dashboard_widget(
+			'wu_seo_overview',
+			'SEO 基本資料',
+			'wu_render_seo_widget'
+		);
+	}
 	
-	$management_note = get_option('wu_dashboard_management_note', '');
+	// 5. 服務內容
+	wp_add_dashboard_widget(
+		'wu_service_list',
+		'目前包含的服務',
+		'wu_render_service_widget'
+	);
 	
-	$alert_enabled = get_option('wu_dashboard_alert_enabled', 0);
-	$alert_message = get_option('wu_dashboard_alert_message', '');
+	// 6. 聯絡資訊
+	wp_add_dashboard_widget(
+		'wu_contact_info',
+		'聯絡我們',
+		'wu_render_contact_widget'
+	);
+});
+
+// ===== Widget: 網站狀態 =====
+
+function wu_render_status_widget() {
+	$status = get_option('wu_dashboard_site_status', 'normal');
+	$maintenance = get_option('wu_dashboard_last_maintenance', '');
 	
-	$restricted_items = get_option('wu_dashboard_restricted_items', '');
-	$contact_note = get_option('wu_dashboard_contact_note', '');
-	
-	$site_note = get_option('wu_dashboard_site_note', '');
-	
-	$manager_name = get_option('wu_dashboard_manager_name', '');
-	$manager_contact = get_option('wu_dashboard_manager_contact', '');
-	
-	$service_items = get_option('wu_dashboard_service_items', '');
-	$service_note = get_option('wu_dashboard_service_note', '');
-	
-	$system_message = get_option('wu_dashboard_system_message', '');
-	
-	// 狀態標籤
-	$status_labels = array(
+	$status_config = array(
 		'normal' => array('label' => '正常運作中', 'color' => '#46b450', 'icon' => '✓'),
 		'watching' => array('label' => '觀察中', 'color' => '#ffb900', 'icon' => '👁'),
 		'handling' => array('label' => '處理中', 'color' => '#00a0d2', 'icon' => '🔧')
 	);
 	
-	$current_status = $status_labels[$site_status] ?? $status_labels['normal'];
+	$current = $status_config[$status] ?? $status_config['normal'];
 	
 	?>
-	<div class="wrap">
-		<h1>📊 儀表板顯示清單</h1>
+	<div style="text-align:center;padding:30px 20px;">
+		<div style="font-size:64px;line-height:1;margin-bottom:15px;"><?php echo $current['icon']; ?></div>
+		<h2 style="margin:0 0 8px;color:<?php echo $current['color']; ?>;font-size:28px;font-weight:600;">
+			<?php echo esc_html($current['label']); ?>
+		</h2>
+		<p style="margin:0;color:#666;font-size:14px;">網站整體狀態</p>
 		
-		<?php if ($can_edit): ?>
-		<div class="notice notice-info" style="padding:15px;">
-			<p style="margin:0;"><strong>💡 設計原則</strong></p>
-			<ul style="margin:8px 0 0 20px;line-height:1.8;">
-				<li>儀表板是給客戶「安心看」,不是給工程師「監控用」</li>
-				<li>只顯示狀態與結果,不顯示技術細節與數字</li>
-				<li>沒狀況 = 不顯示區塊,避免製造焦慮</li>
-			</ul>
-		</div>
-		<?php endif; ?>
-		
-		<!-- 客戶檢視模式 -->
-		<div style="background:#fff;padding:30px;border:1px solid #ddd;border-radius:8px;margin-top:20px;">
-			
-			<!-- 1. 網站整體狀態 -->
-			<div style="margin-bottom:40px;">
-				<div style="display:flex;align-items:center;margin-bottom:15px;">
-					<span style="font-size:32px;margin-right:12px;"><?php echo $current_status['icon']; ?></span>
-					<div>
-						<h2 style="margin:0;font-size:24px;color:<?php echo $current_status['color']; ?>;">
-							<?php echo esc_html($current_status['label']); ?>
-						</h2>
-						<p style="margin:5px 0 0;color:#666;font-size:14px;">網站整體狀態</p>
-					</div>
-				</div>
-				<?php if (!empty($site_status_note)): ?>
-				<div style="background:#f9f9f9;padding:12px 16px;border-left:4px solid <?php echo $current_status['color']; ?>;border-radius:4px;">
-					<p style="margin:0;color:#555;"><?php echo nl2br(esc_html($site_status_note)); ?></p>
-				</div>
-				<?php endif; ?>
-			</div>
-			
-			<!-- 2. 最近維運紀錄 -->
-			<?php if (!empty($maintenance_date) || !empty($maintenance_note)): ?>
-			<div style="margin-bottom:40px;padding-bottom:30px;border-bottom:1px solid #eee;">
-				<h3 style="margin:0 0 15px;font-size:18px;color:#333;">🔄 最近維運紀錄</h3>
-				<?php if (!empty($maintenance_date)): ?>
-				<p style="margin:0 0 8px;color:#666;">
-					<strong>日期:</strong> <?php echo esc_html($maintenance_date); ?>
-				</p>
-				<?php endif; ?>
-				<?php if (!empty($maintenance_note)): ?>
-				<p style="margin:0;color:#555;line-height:1.6;">
-					<?php echo nl2br(esc_html($maintenance_note)); ?>
-				</p>
-				<?php endif; ?>
-			</div>
-			<?php endif; ?>
-			
-			<!-- 3. 管理項目透明化 -->
-			<div style="margin-bottom:40px;padding-bottom:30px;border-bottom:1px solid #eee;">
-				<h3 style="margin:0 0 15px;font-size:18px;color:#333;">🛡️ 持續管理中的項目</h3>
-				<ul style="margin:0;padding-left:20px;line-height:2;color:#555;">
-					<li>✓ 系統更新管理</li>
-					<li>✓ 基本資安防護</li>
-					<li>✓ 核心功能監控</li>
-				</ul>
-				<?php if (!empty($management_note)): ?>
-				<div style="background:#f0f7ff;padding:12px 16px;margin-top:12px;border-radius:4px;">
-					<p style="margin:0;color:#555;font-size:14px;"><?php echo nl2br(esc_html($management_note)); ?></p>
-				</div>
-				<?php endif; ?>
-			</div>
-			
-			<!-- 4. 異常或提醒事項 -->
-			<?php if ($alert_enabled && !empty($alert_message)): ?>
-			<div style="margin-bottom:40px;padding-bottom:30px;border-bottom:1px solid #eee;">
-				<div style="background:#fff3cd;border:1px solid #ffc107;padding:15px 20px;border-radius:6px;">
-					<h3 style="margin:0 0 10px;font-size:18px;color:#856404;">⚠️ 提醒事項</h3>
-					<p style="margin:0;color:#856404;line-height:1.6;">
-						<?php echo nl2br(esc_html($alert_message)); ?>
-					</p>
-				</div>
-			</div>
-			<?php endif; ?>
-			
-			<!-- 5. 受管制項目 -->
-			<?php if (!empty($restricted_items)): ?>
-			<div style="margin-bottom:40px;padding-bottom:30px;border-bottom:1px solid #eee;">
-				<h3 style="margin:0 0 15px;font-size:18px;color:#333;">🔒 受管制項目</h3>
-				<p style="margin:0 0 10px;color:#555;line-height:1.8;">
-					<?php echo nl2br(esc_html($restricted_items)); ?>
-				</p>
-				<?php if (!empty($contact_note)): ?>
-				<p style="margin:10px 0 0;color:#666;font-size:14px;font-style:italic;">
-					<?php echo esc_html($contact_note); ?>
-				</p>
-				<?php endif; ?>
-			</div>
-			<?php endif; ?>
-			
-			<!-- 6. 網站基本資訊 -->
-			<div style="margin-bottom:40px;padding-bottom:30px;border-bottom:1px solid #eee;">
-				<h3 style="margin:0 0 15px;font-size:18px;color:#333;">🌐 網站基本資訊</h3>
-				<p style="margin:0 0 8px;color:#666;">
-					<strong>網址:</strong> <a href="<?php echo esc_url(home_url()); ?>" target="_blank" style="color:#0073aa;"><?php echo esc_html(home_url()); ?></a>
-				</p>
-				<p style="margin:0 0 8px;color:#666;">
-					<strong>上線狀態:</strong> <span style="color:#46b450;">●</span> 運作中
-				</p>
-				<?php if (!empty($site_note)): ?>
-				<p style="margin:10px 0 0;color:#555;font-size:14px;">
-					<?php echo nl2br(esc_html($site_note)); ?>
-				</p>
-				<?php endif; ?>
-			</div>
-			
-			<!-- 7. 管理單位資訊 -->
-			<?php if (!empty($manager_name) || !empty($manager_contact)): ?>
-			<div style="margin-bottom:40px;padding-bottom:30px;border-bottom:1px solid #eee;">
-				<h3 style="margin:0 0 15px;font-size:18px;color:#333;">👤 管理單位資訊</h3>
-				<?php if (!empty($manager_name)): ?>
-				<p style="margin:0 0 8px;color:#666;">
-					<strong>單位名稱:</strong> <?php echo esc_html($manager_name); ?>
-				</p>
-				<?php endif; ?>
-				<?php if (!empty($manager_contact)): ?>
-				<div style="background:#f9f9f9;padding:12px 16px;border-radius:4px;margin-top:10px;">
-					<p style="margin:0;color:#555;font-size:14px;white-space:pre-line;"><?php echo esc_html($manager_contact); ?></p>
-				</div>
-				<?php endif; ?>
-			</div>
-			<?php endif; ?>
-			
-			<!-- 8. 服務內容摘要 -->
-			<?php if (!empty($service_items)): ?>
-			<div style="margin-bottom:40px;padding-bottom:30px;border-bottom:1px solid #eee;">
-				<h3 style="margin:0 0 15px;font-size:18px;color:#333;">📋 服務內容摘要</h3>
-				<p style="margin:0 0 10px;color:#555;line-height:1.8;">
-					<?php echo nl2br(esc_html($service_items)); ?>
-				</p>
-				<?php if (!empty($service_note)): ?>
-				<p style="margin:10px 0 0;color:#666;font-size:13px;font-style:italic;">
-					<?php echo esc_html($service_note); ?>
-				</p>
-				<?php endif; ?>
-			</div>
-			<?php endif; ?>
-			
-			<!-- 9. 系統提示區 -->
-			<?php if (!empty($system_message)): ?>
-			<div style="background:#f0f7ff;padding:15px 20px;border-left:4px solid #0073aa;border-radius:4px;">
-				<p style="margin:0;color:#555;line-height:1.6;">
-					💬 <?php echo nl2br(esc_html($system_message)); ?>
-				</p>
-			</div>
-			<?php endif; ?>
-			
-		</div>
-		
-		<!-- 管理員編輯區 -->
-		<?php if ($can_edit): ?>
-		<div style="margin-top:40px;padding-top:30px;border-top:2px solid #ddd;">
-			<h2>⚙️ 管理員設定區</h2>
-			<p style="color:#666;margin-bottom:20px;">以下設定僅管理員可見,客戶看不到此區域</p>
-			
-			<form method="post" style="background:#fff;padding:25px;border:1px solid #ddd;border-radius:5px;">
-				<?php wp_nonce_field('wu_dashboard_settings'); ?>
-				
-				<table class="form-table">
-					<!-- 1. 網站狀態 -->
-					<tr>
-						<th scope="row">
-							<label>網站整體狀態</label>
-						</th>
-						<td>
-							<select name="site_status" style="min-width:200px;">
-								<option value="normal" <?php selected($site_status, 'normal'); ?>>✓ 正常運作中</option>
-								<option value="watching" <?php selected($site_status, 'watching'); ?>>👁 觀察中</option>
-								<option value="handling" <?php selected($site_status, 'handling'); ?>>🔧 處理中</option>
-							</select>
-							<p class="description">選擇目前網站運作狀態</p>
-							
-							<textarea name="site_status_note" rows="2" class="large-text" style="margin-top:10px;" placeholder="選填:狀態說明(只在異常時填寫)"><?php echo esc_textarea($site_status_note); ?></textarea>
-							<p class="description">例如:「系統更新後觀察中」</p>
-						</td>
-					</tr>
-					
-					<!-- 2. 最近維運紀錄 -->
-					<tr>
-						<th scope="row">
-							<label>最近維運紀錄</label>
-						</th>
-						<td>
-							<input type="text" name="maintenance_date" value="<?php echo esc_attr($maintenance_date); ?>" class="regular-text" placeholder="例如:2026-01-02">
-							<p class="description">維運日期</p>
-							
-							<textarea name="maintenance_note" rows="3" class="large-text" style="margin-top:10px;" placeholder="維運內容摘要(一到兩句話)"><?php echo esc_textarea($maintenance_note); ?></textarea>
-							<p class="description">例如:「已完成外掛更新與安全性檢查」</p>
-						</td>
-					</tr>
-					
-					<!-- 3. 管理項目補充說明 -->
-					<tr>
-						<th scope="row">
-							<label>管理項目補充說明</label>
-						</th>
-						<td>
-							<textarea name="management_note" rows="2" class="large-text" placeholder="選填:補充說明"><?php echo esc_textarea($management_note); ?></textarea>
-							<p class="description">例如:「每週自動備份一次」</p>
-						</td>
-					</tr>
-					
-					<!-- 4. 異常提醒 -->
-					<tr>
-						<th scope="row">
-							<label>異常提醒</label>
-						</th>
-						<td>
-							<label>
-								<input type="checkbox" name="alert_enabled" value="1" <?php checked(1, $alert_enabled); ?>>
-								<strong>顯示提醒區塊</strong>
-							</label>
-							<p class="description">勾選後才會在儀表板顯示提醒訊息</p>
-							
-							<textarea name="alert_message" rows="3" class="large-text" style="margin-top:10px;" placeholder="提醒內容"><?php echo esc_textarea($alert_message); ?></textarea>
-							<p class="description">例如:「近期流量異常,已在觀察」</p>
-						</td>
-					</tr>
-					
-					<!-- 5. 受管制項目 -->
-					<tr>
-						<th scope="row">
-							<label>受管制項目</label>
-						</th>
-						<td>
-							<textarea name="restricted_items" rows="3" class="large-text"><?php echo esc_textarea($restricted_items); ?></textarea>
-							<p class="description">客戶不能自己動的項目清單</p>
-							
-							<input type="text" name="contact_note" value="<?php echo esc_attr($contact_note); ?>" class="large-text" style="margin-top:10px;" placeholder="聯絡說明">
-							<p class="description">例如:「如需調整請聯絡管理方」</p>
-						</td>
-					</tr>
-					
-					<!-- 6. 網站備註 -->
-					<tr>
-						<th scope="row">
-							<label>網站備註</label>
-						</th>
-						<td>
-							<textarea name="site_note" rows="2" class="large-text" placeholder="選填:補充說明"><?php echo esc_textarea($site_note); ?></textarea>
-							<p class="description">補充網站相關說明</p>
-						</td>
-					</tr>
-					
-					<!-- 7. 管理單位 -->
-					<tr>
-						<th scope="row">
-							<label>管理單位資訊</label>
-						</th>
-						<td>
-							<input type="text" name="manager_name" value="<?php echo esc_attr($manager_name); ?>" class="regular-text" placeholder="單位名稱">
-							<p class="description">管理單位或公司名稱</p>
-							
-							<textarea name="manager_contact" rows="3" class="large-text" style="margin-top:10px;" placeholder="聯絡方式"><?php echo esc_textarea($manager_contact); ?></textarea>
-							<p class="description">例如:電話、Email、Line ID 等</p>
-						</td>
-					</tr>
-					
-					<!-- 8. 服務內容 -->
-					<tr>
-						<th scope="row">
-							<label>服務內容摘要</label>
-						</th>
-						<td>
-							<textarea name="service_items" rows="3" class="large-text"><?php echo esc_textarea($service_items); ?></textarea>
-							<p class="description">已包含的服務項目清單</p>
-							
-							<input type="text" name="service_note" value="<?php echo esc_attr($service_note); ?>" class="large-text" style="margin-top:10px;" placeholder="補充說明">
-							<p class="description">例如:「不含內容修改服務」</p>
-						</td>
-					</tr>
-					
-					<!-- 9. 系統提示 -->
-					<tr>
-						<th scope="row">
-							<label>系統提示訊息</label>
-						</th>
-						<td>
-							<textarea name="system_message" rows="2" class="large-text" placeholder="選填:正面或中性的提示訊息"><?php echo esc_textarea($system_message); ?></textarea>
-							<p class="description">例如:「系統運作正常,如有問題請隨時聯絡」</p>
-						</td>
-					</tr>
-				</table>
-				
-				<?php submit_button('儲存設定', 'primary large', 'wu_dashboard_submit'); ?>
-			</form>
-		</div>
-		<?php endif; ?>
-		
-		<!-- 設計原則說明 -->
-		<?php if ($can_edit): ?>
-		<div style="background:#fff;padding:20px;border:1px solid #ddd;border-radius:5px;margin-top:30px;">
-			<h3>📐 儀表板設計原則</h3>
-			<ul style="line-height:2;color:#555;">
-				<li><strong>不顯示技術數據</strong>:沒有效能分數、錯誤數量、資源用量等</li>
-				<li><strong>不顯示紅字警告</strong>:避免製造不必要的焦慮</li>
-				<li><strong>沒狀況就不顯示</strong>:區塊只在有內容時才出現</li>
-				<li><strong>文字簡短清楚</strong>:一句話說完,不要寫報告</li>
-				<li><strong>預設正常狀態</strong>:不需要特別說明「一切正常」</li>
-			</ul>
-			
-			<h4 style="margin-top:20px;">使用時機範例</h4>
-			<ul style="line-height:2;color:#555;">
-				<li><strong>正常時</strong>:狀態選「正常運作中」,其他欄位留空或簡單填寫</li>
-				<li><strong>更新後</strong>:狀態改「觀察中」,填寫「系統更新後觀察中」</li>
-				<li><strong>有異常</strong>:啟用「異常提醒」,填寫具體狀況與處理方式</li>
-				<li><strong>維運完成</strong>:更新「最近維運紀錄」,一句話說明做了什麼</li>
-			</ul>
+		<?php if (!empty($maintenance)): ?>
+		<div style="margin-top:20px;padding:12px;background:#f9f9f9;border-radius:4px;">
+			<p style="margin:0;color:#555;font-size:13px;">
+				<strong>最近維運:</strong> <?php echo esc_html($maintenance); ?>
+			</p>
 		</div>
 		<?php endif; ?>
 	</div>
-	
-	<style>
-	.wrap h2, .wrap h3 {
-		font-weight: 600;
-	}
-	.form-table th {
-		width: 200px;
-		font-weight: 600;
-	}
-	.form-table td {
-		padding: 20px 10px;
-	}
-	</style>
 	<?php
 }
 
-// ===== Dashboard Widget (Optional) =====
+// ===== Widget: 流量概覽 =====
 
-add_action('wp_dashboard_setup', function() {
-	// 只在主儀表板顯示快速狀態
-	$site_status = get_option('wu_dashboard_site_status', 'normal');
+function wu_render_traffic_widget() {
+	// 使用 WordPress 內建統計 (輕量)
+	$today_views = wu_get_post_views_today();
+	$week_views = wu_get_post_views_week();
+	$month_views = wu_get_post_views_month();
 	
-	wp_add_dashboard_widget(
-		'wu_status_widget',
-		'網站狀態',
-		function() use ($site_status) {
-			$status_labels = array(
-				'normal' => array('label' => '正常運作中', 'color' => '#46b450', 'icon' => '✓'),
-				'watching' => array('label' => '觀察中', 'color' => '#ffb900', 'icon' => '👁'),
-				'handling' => array('label' => '處理中', 'color' => '#00a0d2', 'icon' => '🔧')
-			);
+	?>
+	<div style="padding:20px;">
+		<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:15px;">
 			
-			$current = $status_labels[$site_status] ?? $status_labels['normal'];
-			
-			?>
-			<div style="text-align:center;padding:20px 0;">
-				<div style="font-size:48px;margin-bottom:10px;"><?php echo $current['icon']; ?></div>
-				<h3 style="margin:0;color:<?php echo $current['color']; ?>;font-size:20px;"><?php echo esc_html($current['label']); ?></h3>
-				<p style="margin:15px 0 0;font-size:13px;">
-					<a href="<?php echo admin_url('admin.php?page=wu-dashboard-overview'); ?>">查看完整儀表板 →</a>
-				</p>
+			<div style="text-align:center;padding:20px;background:#f0f7ff;border-radius:8px;">
+				<div style="font-size:32px;font-weight:700;color:#0073aa;margin-bottom:5px;">
+					<?php echo number_format($today_views); ?>
+				</div>
+				<div style="color:#666;font-size:13px;">今日瀏覽</div>
 			</div>
-			<?php
-		}
+			
+			<div style="text-align:center;padding:20px;background:#f0fff4;border-radius:8px;">
+				<div style="font-size:32px;font-weight:700;color:#46b450;margin-bottom:5px;">
+					<?php echo number_format($week_views); ?>
+				</div>
+				<div style="color:#666;font-size:13px;">近 7 天</div>
+			</div>
+			
+			<div style="text-align:center;padding:20px;background:#fff9e6;border-radius:8px;">
+				<div style="font-size:32px;font-weight:700;color:#f0b849;margin-bottom:5px;">
+					<?php echo number_format($month_views); ?>
+				</div>
+				<div style="color:#666;font-size:13px;">近 30 天</div>
+			</div>
+			
+		</div>
+		
+		<div style="margin-top:15px;padding:12px;background:#f9f9f9;border-radius:4px;text-align:center;">
+			<p style="margin:0;color:#666;font-size:12px;">
+				💡 數據基於網站內建統計
+			</p>
+		</div>
+	</div>
+	<?php
+}
+
+// ===== Widget: WooCommerce 訂單概覽 =====
+
+function wu_render_woo_widget() {
+	if (!class_exists('WooCommerce')) {
+		echo '<p style="padding:20px;text-align:center;color:#999;">未安裝 WooCommerce</p>';
+		return;
+	}
+	
+	// 輕量查詢 (無效能影響)
+	$today_orders = wu_get_orders_count_today();
+	$week_orders = wu_get_orders_count_week();
+	$month_orders = wu_get_orders_count_month();
+	$processing = wu_get_processing_orders_count();
+	
+	?>
+	<div style="padding:20px;">
+		<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin-bottom:15px;">
+			
+			<div style="text-align:center;padding:20px;background:#f0f7ff;border-radius:8px;">
+				<div style="font-size:32px;font-weight:700;color:#0073aa;margin-bottom:5px;">
+					<?php echo number_format($today_orders); ?>
+				</div>
+				<div style="color:#666;font-size:13px;">今日訂單</div>
+			</div>
+			
+			<div style="text-align:center;padding:20px;background:#fff3cd;border-radius:8px;">
+				<div style="font-size:32px;font-weight:700;color:#856404;margin-bottom:5px;">
+					<?php echo number_format($processing); ?>
+				</div>
+				<div style="color:#666;font-size:13px;">處理中</div>
+			</div>
+			
+		</div>
+		
+		<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:15px;">
+			
+			<div style="padding:15px;background:#f9f9f9;border-radius:4px;text-align:center;">
+				<div style="font-size:20px;font-weight:600;color:#333;margin-bottom:3px;">
+					<?php echo number_format($week_orders); ?>
+				</div>
+				<div style="color:#666;font-size:12px;">近 7 天訂單</div>
+			</div>
+			
+			<div style="padding:15px;background:#f9f9f9;border-radius:4px;text-align:center;">
+				<div style="font-size:20px;font-weight:600;color:#333;margin-bottom:3px;">
+					<?php echo number_format($month_orders); ?>
+				</div>
+				<div style="color:#666;font-size:12px;">近 30 天訂單</div>
+			</div>
+			
+		</div>
+	</div>
+	<?php
+}
+
+// ===== Widget: SEO 基本資料 =====
+
+function wu_render_seo_widget() {
+	$total_posts = wp_count_posts('post')->publish;
+	$total_pages = wp_count_posts('page')->publish;
+	$site_url = home_url();
+	
+	// 檢查是否有 sitemap
+	$has_sitemap = false;
+	$sitemap_url = home_url('/sitemap.xml');
+	$response = wp_remote_head($sitemap_url, array('timeout' => 3));
+	if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) == 200) {
+		$has_sitemap = true;
+	}
+	
+	// 檢查 robots.txt
+	$has_robots = file_exists(ABSPATH . 'robots.txt');
+	
+	?>
+	<div style="padding:20px;">
+		<div style="margin-bottom:15px;">
+			<table style="width:100%;border-collapse:collapse;">
+				<tr>
+					<td style="padding:10px 0;color:#666;font-size:14px;">已發布文章</td>
+					<td style="padding:10px 0;text-align:right;font-weight:600;color:#333;">
+						<?php echo number_format($total_posts); ?> 篇
+					</td>
+				</tr>
+				<tr style="border-top:1px solid #eee;">
+					<td style="padding:10px 0;color:#666;font-size:14px;">已發布頁面</td>
+					<td style="padding:10px 0;text-align:right;font-weight:600;color:#333;">
+						<?php echo number_format($total_pages); ?> 頁
+					</td>
+				</tr>
+				<tr style="border-top:1px solid #eee;">
+					<td style="padding:10px 0;color:#666;font-size:14px;">Sitemap 狀態</td>
+					<td style="padding:10px 0;text-align:right;">
+						<?php if ($has_sitemap): ?>
+							<span style="color:#46b450;font-weight:600;">✓ 已設定</span>
+						<?php else: ?>
+							<span style="color:#999;">未偵測到</span>
+						<?php endif; ?>
+					</td>
+				</tr>
+				<tr style="border-top:1px solid #eee;">
+					<td style="padding:10px 0;color:#666;font-size:14px;">Robots.txt</td>
+					<td style="padding:10px 0;text-align:right;">
+						<?php if ($has_robots): ?>
+							<span style="color:#46b450;font-weight:600;">✓ 已設定</span>
+						<?php else: ?>
+							<span style="color:#999;">未偵測到</span>
+						<?php endif; ?>
+					</td>
+				</tr>
+			</table>
+		</div>
+		
+		<div style="padding:12px;background:#f0f7ff;border-radius:4px;text-align:center;">
+			<p style="margin:0;color:#555;font-size:12px;">
+				💡 SEO 設定由管理方維護
+			</p>
+		</div>
+	</div>
+	<?php
+}
+
+// ===== Widget: 服務內容 =====
+
+function wu_render_service_widget() {
+	$service_list = get_option('wu_dashboard_service_list', '');
+	$items = array_filter(explode("\n", $service_list));
+	
+	?>
+	<div style="padding:20px;">
+		<?php if (!empty($items)): ?>
+		<ul style="margin:0;padding:0;list-style:none;">
+			<?php foreach ($items as $item): ?>
+			<li style="padding:10px 0;border-bottom:1px solid #f0f0f0;color:#555;font-size:14px;">
+				<span style="color:#46b450;margin-right:8px;">✓</span>
+				<?php echo esc_html(trim($item)); ?>
+			</li>
+			<?php endforeach; ?>
+		</ul>
+		<?php else: ?>
+		<p style="margin:0;padding:20px;text-align:center;color:#999;">尚未設定服務項目</p>
+		<?php endif; ?>
+	</div>
+	<?php
+}
+
+// ===== Widget: 聯絡資訊 =====
+
+function wu_render_contact_widget() {
+	?>
+	<div style="padding:20px;">
+		<div style="margin-bottom:20px;text-align:center;">
+			<h3 style="margin:0 0 5px;font-size:18px;color:#333;font-weight:600;">
+				WUMETAX 末特數位科技
+			</h3>
+			<p style="margin:0;color:#666;font-size:13px;">網站維運管理單位</p>
+		</div>
+		
+		<div style="background:#f9f9f9;padding:15px;border-radius:6px;margin-bottom:12px;">
+			<div style="display:flex;align-items:center;margin-bottom:10px;">
+				<span style="color:#0073aa;font-size:18px;margin-right:10px;">🌐</span>
+				<a href="https://wumetax.com/contact-us/" target="_blank" style="color:#0073aa;text-decoration:none;font-size:14px;">
+					聯絡我們表單
+				</a>
+			</div>
+			<div style="display:flex;align-items:center;">
+				<span style="color:#46b450;font-size:18px;margin-right:10px;">💬</span>
+				<a href="https://line.me/R/ti/p/@081pjqol" target="_blank" style="color:#46b450;text-decoration:none;font-size:14px;">
+					LINE 官方帳號
+				</a>
+			</div>
+		</div>
+		
+		<div style="text-align:center;padding:10px;background:#fff3cd;border-radius:4px;">
+			<p style="margin:0;color:#856404;font-size:12px;">
+				有問題隨時與我們聯絡
+			</p>
+		</div>
+	</div>
+	<?php
+}
+
+// ===== Helper Functions (Performance Optimized) =====
+
+// 今日瀏覽 (使用 transient 快取)
+function wu_get_post_views_today() {
+	$cache_key = 'wu_views_today_' . date('Ymd');
+	$cached = get_transient($cache_key);
+	
+	if ($cached !== false) {
+		return $cached;
+	}
+	
+	global $wpdb;
+	$today_start = strtotime('today');
+	
+	// 簡化查詢 (僅計數)
+	$count = $wpdb->get_var($wpdb->prepare("
+		SELECT COUNT(DISTINCT user_ip) 
+		FROM {$wpdb->prefix}statistics_visits 
+		WHERE last_visit >= %d
+	", $today_start));
+	
+	$count = $count ?: 0;
+	set_transient($cache_key, $count, HOUR_IN_SECONDS);
+	
+	return $count;
+}
+
+// 近 7 天瀏覽
+function wu_get_post_views_week() {
+	$cache_key = 'wu_views_week_' . date('W');
+	$cached = get_transient($cache_key);
+	
+	if ($cached !== false) {
+		return $cached;
+	}
+	
+	global $wpdb;
+	$week_start = strtotime('-7 days');
+	
+	$count = $wpdb->get_var($wpdb->prepare("
+		SELECT COUNT(DISTINCT user_ip) 
+		FROM {$wpdb->prefix}statistics_visits 
+		WHERE last_visit >= %d
+	", $week_start));
+	
+	$count = $count ?: 0;
+	set_transient($cache_key, $count, HOUR_IN_SECONDS * 6);
+	
+	return $count;
+}
+
+// 近 30 天瀏覽
+function wu_get_post_views_month() {
+	$cache_key = 'wu_views_month_' . date('Ym');
+	$cached = get_transient($cache_key);
+	
+	if ($cached !== false) {
+		return $cached;
+	}
+	
+	global $wpdb;
+	$month_start = strtotime('-30 days');
+	
+	$count = $wpdb->get_var($wpdb->prepare("
+		SELECT COUNT(DISTINCT user_ip) 
+		FROM {$wpdb->prefix}statistics_visits 
+		WHERE last_visit >= %d
+	", $month_start));
+	
+	$count = $count ?: 0;
+	set_transient($cache_key, $count, HOUR_IN_SECONDS * 12);
+	
+	return $count;
+}
+
+// 今日訂單數 (WooCommerce)
+function wu_get_orders_count_today() {
+	$cache_key = 'wu_orders_today_' . date('Ymd');
+	$cached = get_transient($cache_key);
+	
+	if ($cached !== false) {
+		return $cached;
+	}
+	
+	$args = array(
+		'limit' => -1,
+		'date_created' => '>=' . strtotime('today'),
+		'return' => 'ids'
 	);
+	
+	$orders = wc_get_orders($args);
+	$count = count($orders);
+	
+	set_transient($cache_key, $count, HOUR_IN_SECONDS);
+	
+	return $count;
+}
+
+// 近 7 天訂單數
+function wu_get_orders_count_week() {
+	$cache_key = 'wu_orders_week_' . date('W');
+	$cached = get_transient($cache_key);
+	
+	if ($cached !== false) {
+		return $cached;
+	}
+	
+	$args = array(
+		'limit' => -1,
+		'date_created' => '>=' . strtotime('-7 days'),
+		'return' => 'ids'
+	);
+	
+	$orders = wc_get_orders($args);
+	$count = count($orders);
+	
+	set_transient($cache_key, $count, HOUR_IN_SECONDS * 6);
+	
+	return $count;
+}
+
+// 近 30 天訂單數
+function wu_get_orders_count_month() {
+	$cache_key = 'wu_orders_month_' . date('Ym');
+	$cached = get_transient($cache_key);
+	
+	if ($cached !== false) {
+		return $cached;
+	}
+	
+	$args = array(
+		'limit' => -1,
+		'date_created' => '>=' . strtotime('-30 days'),
+		'return' => 'ids'
+	);
+	
+	$orders = wc_get_orders($args);
+	$count = count($orders);
+	
+	set_transient($cache_key, $count, HOUR_IN_SECONDS * 12);
+	
+	return $count;
+}
+
+// 處理中訂單數
+function wu_get_processing_orders_count() {
+	if (function_exists('wc_processing_order_count')) {
+		return wc_processing_order_count();
+	}
+	
+	global $wpdb;
+	return $wpdb->get_var("
+		SELECT COUNT(ID) 
+		FROM {$wpdb->prefix}posts 
+		WHERE post_status = 'wc-processing' 
+		AND post_type = 'shop_order'
+	");
+}
+
+// ===== Settings Page =====
+
+function wu_dashboard_settings_page() {
+	if (!current_user_can('manage_options')) {
+		wp_die('權限不足');
+	}
+	
+	// 儲存設定
+	if (isset($_POST['wu_dashboard_save'])) {
+		check_admin_referer('wu_dashboard_settings');
+		
+		update_option('wu_dashboard_site_status', sanitize_text_field($_POST['site_status'] ?? 'normal'));
+		update_option('wu_dashboard_last_maintenance', sanitize_text_field($_POST['last_maintenance'] ?? ''));
+		update_option('wu_dashboard_service_list', sanitize_textarea_field($_POST['service_list'] ?? ''));
+		update_option('wu_dashboard_show_traffic', isset($_POST['show_traffic']) ? 1 : 0);
+		update_option('wu_dashboard_show_woo', isset($_POST['show_woo']) ? 1 : 0);
+		update_option('wu_dashboard_show_seo', isset($_POST['show_seo']) ? 1 : 0);
+		
+		// 清除快取
+		delete_transient('wu_views_today_' . date('Ymd'));
+		delete_transient('wu_views_week_' . date('W'));
+		delete_transient('wu_views_month_' . date('Ym'));
+		delete_transient('wu_orders_today_' . date('Ymd'));
+		delete_transient('wu_orders_week_' . date('W'));
+		delete_transient('wu_orders_month_' . date('Ym'));
+		
+		echo '<div class="notice notice-success is-dismissible"><p><strong>✅ 設定已儲存</strong></p></div>';
+	}
+	
+	$site_status = get_option('wu_dashboard_site_status', 'normal');
+	$last_maintenance = get_option('wu_dashboard_last_maintenance', '');
+	$service_list = get_option('wu_dashboard_service_list', '');
+	$show_traffic = get_option('wu_dashboard_show_traffic', 1);
+	$show_woo = get_option('wu_dashboard_show_woo', 1);
+	$show_seo = get_option('wu_dashboard_show_seo', 1);
+	
+	?>
+	<div class="wrap">
+		<h1>⚙️ 儀表板設定</h1>
+		
+		<div class="notice notice-info" style="padding:15px;">
+			<p style="margin:0;"><strong>💡 說明</strong></p>
+			<ul style="margin:8px 0 0 20px;line-height:1.8;">
+				<li>此頁面為管理設定介面,客戶看不到</li>
+				<li>儀表板會直接顯示在 WordPress 管理後台首頁</li>
+				<li>所有數據使用快取機制,不影響網站效能</li>
+			</ul>
+		</div>
+		
+		<form method="post" style="background:#fff;padding:25px;border:1px solid #ddd;border-radius:5px;margin-top:20px;">
+			<?php wp_nonce_field('wu_dashboard_settings'); ?>
+			
+			<table class="form-table">
+				
+				<!-- 網站狀態 -->
+				<tr>
+					<th scope="row">
+						<label>網站狀態</label>
+					</th>
+					<td>
+						<select name="site_status" style="min-width:200px;">
+							<option value="normal" <?php selected($site_status, 'normal'); ?>>✓ 正常運作中</option>
+							<option value="watching" <?php selected($site_status, 'watching'); ?>>👁 觀察中</option>
+							<option value="handling" <?php selected($site_status, 'handling'); ?>>🔧 處理中</option>
+						</select>
+						<p class="description">客戶會在儀表板看到此狀態</p>
+					</td>
+				</tr>
+				
+				<!-- 最近維運 -->
+				<tr>
+					<th scope="row">
+						<label>最近維運時間</label>
+					</th>
+					<td>
+						<input type="text" name="last_maintenance" value="<?php echo esc_attr($last_maintenance); ?>" class="regular-text" placeholder="例如: 2026/01/02 完成系統更新">
+						<p class="description">顯示在狀態卡片下方</p>
+					</td>
+				</tr>
+				
+				<!-- 服務清單 -->
+				<tr>
+					<th scope="row">
+						<label>服務內容清單</label>
+					</th>
+					<td>
+						<textarea name="service_list" rows="8" class="large-text" placeholder="每行一項服務"><?php echo esc_textarea($service_list); ?></textarea>
+						<p class="description">每行一項服務,會顯示打勾清單</p>
+					</td>
+				</tr>
+				
+				<!-- 顯示控制 -->
+				<tr>
+					<th scope="row">
+						<label>顯示區塊</label>
+					</th>
+					<td>
+						<fieldset>
+							<label style="display:block;margin-bottom:8px;">
+								<input type="checkbox" name="show_traffic" value="1" <?php checked(1, $show_traffic); ?>>
+								<strong>流量概覽</strong>
+							</label>
+							
+							<label style="display:block;margin-bottom:8px;">
+								<input type="checkbox" name="show_woo" value="1" <?php checked(1, $show_woo); ?>>
+								<strong>訂單概覽</strong> (需安裝 WooCommerce)
+							</label>
+							
+							<label style="display:block;">
+								<input type="checkbox" name="show_seo" value="1" <?php checked(1, $show_seo); ?>>
+								<strong>SEO 基本資料</strong>
+							</label>
+						</fieldset>
+						<p class="description">控制要在儀表板顯示哪些區塊</p>
+					</td>
+				</tr>
+				
+			</table>
+			
+			<?php submit_button('儲存設定', 'primary large', 'wu_dashboard_save'); ?>
+		</form>
+		
+		<!-- 效能說明 -->
+		<div style="background:#fff;padding:20px;border:1px solid #ddd;border-radius:5px;margin-top:30px;">
+			<h3>⚡ 效能優化機制</h3>
+			<ul style="line-height:2;color:#555;">
+				<li><strong>查詢快取</strong>: 今日數據快取 1 小時,週/月數據快取 6-12 小時</li>
+				<li><strong>輕量查詢</strong>: 僅查詢必要欄位,不載入完整物件</li>
+				<li><strong>條件載入</strong>: 未勾選的區塊不會執行查詢</li>
+				<li><strong>資料庫索引</strong>: 使用 WordPress 與 WooCommerce 原生索引</li>
+			</ul>
+			
+			<p style="margin:15px 0 0;color:#666;font-size:14px;">
+				💡 如需立即更新數據,儲存設定後會自動清除快取
+			</p>
+		</div>
+	</div>
+	<?php
+}
+
+// ===== CSS Styles =====
+
+add_action('admin_head', function() {
+	?>
+	<style>
+	#wu_status_card .inside,
+	#wu_traffic_overview .inside,
+	#wu_woo_overview .inside,
+	#wu_seo_overview .inside,
+	#wu_service_list .inside,
+	#wu_contact_info .inside {
+		padding: 0 !important;
+		margin: 0 !important;
+	}
+	
+	#wu_status_card h2,
+	#wu_traffic_overview h2,
+	#wu_woo_overview h2,
+	#wu_seo_overview h2,
+	#wu_service_list h2,
+	#wu_contact_info h2 {
+		padding: 12px !important;
+		margin: 0 !important;
+		border-bottom: 1px solid #f0f0f0 !important;
+	}
+	</style>
+	<?php
 });
