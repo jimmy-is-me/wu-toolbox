@@ -2,16 +2,15 @@
 if (!defined('ABSPATH')) exit;
 
 /*
- * WumetaxToolkit - Engineering Analytics Dashboard
- * Version: 5.0 - Data-Driven Dashboard
+ * WumetaxToolkit - Professional Dashboard Widgets
+ * Version: 6.0 - Full-Width First Row Layout
  * 
  * FEATURES:
- * - WordPress native dashboard integration
- * - Engineering/numeric UI style
- * - Login analytics tracking
- * - Media library statistics
- * - Disk space monitoring
- * - Zero performance impact (cached)
+ * - Full-width first row dashboard
+ * - Add/delete service items
+ * - Admin-only login tracking
+ * - Lightweight media stats
+ * - Zero performance impact
  */
 
 // ===== Menu Registration =====
@@ -47,7 +46,7 @@ add_action('admin_init', function() {
 	add_option('wu_dashboard_disk_total', '5120');
 	add_option('wu_dashboard_payments', array());
 	add_option('wu_dashboard_manager_name', 'WUMETAX 末特數位科技');
-	add_option('wu_dashboard_manager_contact', "聯絡表單: https://wumetax.com/contact-us/\nLINE: https://line.me/R/ti/p/@081pjqol");
+	add_option('wu_dashboard_manager_contact', "聯絡信箱: contact@wumetax.com\nLINE: https://lin.ee/Lut7wCe");
 });
 
 // ===== Dashboard Widgets =====
@@ -57,45 +56,39 @@ add_action('wp_dashboard_setup', function() {
 		return;
 	}
 	
-	// 移除預設小工具 (可選)
-	// remove_meta_box('dashboard_right_now', 'dashboard', 'normal');
-	
-	// 1. 網站狀態
+	// 1. 全寬綜合儀表板 (第一行)
 	wp_add_dashboard_widget(
-		'wu_status_widget',
-		'<span class="dashicons dashicons-admin-site"></span> 網站狀態',
-		'wu_render_status_widget'
+		'wu_overview_widget',
+		'<span class="dashicons dashicons-dashboard"></span> 網站綜合儀表板',
+		'wu_render_overview_widget',
+		null,
+		null,
+		'normal',
+		'high'
 	);
 	
-	// 2. 系統資源
-	wp_add_dashboard_widget(
-		'wu_system_widget',
-		'<span class="dashicons dashicons-performance"></span> 系統資源',
-		'wu_render_system_widget'
-	);
-	
-	// 3. 登入統計
+	// 2. 登入統計
 	wp_add_dashboard_widget(
 		'wu_login_widget',
 		'<span class="dashicons dashicons-admin-users"></span> 登入統計',
 		'wu_render_login_widget'
 	);
 	
-	// 4. 媒體檔案
+	// 3. 媒體分析
 	wp_add_dashboard_widget(
 		'wu_media_widget',
 		'<span class="dashicons dashicons-format-gallery"></span> 媒體分析',
 		'wu_render_media_widget'
 	);
 	
-	// 5. 服務內容
+	// 4. 服務內容
 	wp_add_dashboard_widget(
 		'wu_service_widget',
 		'<span class="dashicons dashicons-yes-alt"></span> 維運服務項目',
 		'wu_render_service_widget'
 	);
 	
-	// 6. 最近處理
+	// 5. 最近處理
 	if (!empty(get_option('wu_dashboard_recent_work', array()))) {
 		wp_add_dashboard_widget(
 			'wu_work_widget',
@@ -104,7 +97,7 @@ add_action('wp_dashboard_setup', function() {
 		);
 	}
 	
-	// 7. 款項紀錄 (僅管理員)
+	// 6. 款項紀錄 (僅管理員)
 	if (current_user_can('manage_options') && !empty(get_option('wu_dashboard_payments', array()))) {
 		wp_add_dashboard_widget(
 			'wu_payment_widget',
@@ -113,7 +106,7 @@ add_action('wp_dashboard_setup', function() {
 		);
 	}
 	
-	// 8. 聯絡資訊
+	// 7. 聯絡資訊
 	wp_add_dashboard_widget(
 		'wu_contact_widget',
 		'<span class="dashicons dashicons-phone"></span> 聯絡資訊',
@@ -121,15 +114,19 @@ add_action('wp_dashboard_setup', function() {
 	);
 });
 
-// ===== Widget: 網站狀態 =====
+// ===== Widget: 全寬綜合儀表板 =====
 
-function wu_render_status_widget() {
+function wu_render_overview_widget() {
 	$status = get_option('wu_dashboard_site_status', 'normal');
 	$status_note = get_option('wu_dashboard_status_note', '');
 	$ssl_valid = wu_check_ssl_status();
 	$php_version = PHP_VERSION;
 	$hosting_plan = get_option('wu_dashboard_hosting_plan', 'image');
 	$hosting_rating = get_option('wu_dashboard_hosting_rating', '優良運作');
+	$disk_total = get_option('wu_dashboard_disk_total', 5120);
+	$disk_used = wu_get_disk_usage();
+	$disk_percentage = ($disk_used / $disk_total) * 100;
+	$wp_memory_limit = WP_MEMORY_LIMIT;
 	
 	$status_config = array(
 		'normal' => array('label' => '正常運作', 'color' => '#46b450'),
@@ -146,80 +143,80 @@ function wu_render_status_widget() {
 	$plan_name = $plan_names[$hosting_plan] ?? '標準主機';
 	
 	?>
-	<div class="wu-widget-grid">
-		<div class="wu-stat-card" style="border-left:3px solid <?php echo $current['color']; ?>;">
-			<div class="wu-stat-label">狀態</div>
-			<div class="wu-stat-value" style="color:<?php echo $current['color']; ?>;">
-				<?php echo esc_html($current['label']); ?>
+	<div class="wu-overview-container">
+		<!-- 狀態區 -->
+		<div class="wu-overview-section">
+			<div class="wu-section-title">網站狀態</div>
+			<div class="wu-widget-grid">
+				<div class="wu-stat-card" style="border-left:3px solid <?php echo $current['color']; ?>;">
+					<div class="wu-stat-label">狀態</div>
+					<div class="wu-stat-value" style="color:<?php echo $current['color']; ?>;">
+						<?php echo esc_html($current['label']); ?>
+					</div>
+				</div>
+				
+				<div class="wu-stat-card">
+					<div class="wu-stat-label">SSL/HTTPS</div>
+					<div class="wu-stat-value" style="color:<?php echo $ssl_valid ? '#46b450' : '#f0b849'; ?>;">
+						<?php echo $ssl_valid ? '正常' : '未啟用'; ?>
+					</div>
+				</div>
+				
+				<div class="wu-stat-card">
+					<div class="wu-stat-label">PHP 版本</div>
+					<div class="wu-stat-value"><?php echo esc_html($php_version); ?></div>
+				</div>
+				
+				<div class="wu-stat-card">
+					<div class="wu-stat-label">主機方案</div>
+					<div class="wu-stat-value" style="font-size:16px;"><?php echo esc_html($plan_name); ?></div>
+					<div class="wu-stat-meta">評估: <?php echo esc_html($hosting_rating); ?></div>
+				</div>
 			</div>
+			
+			<?php if (!empty($status_note)): ?>
+			<div class="wu-note"><?php echo nl2br(esc_html($status_note)); ?></div>
+			<?php endif; ?>
 		</div>
 		
-		<div class="wu-stat-card">
-			<div class="wu-stat-label">SSL/HTTPS</div>
-			<div class="wu-stat-value" style="color:<?php echo $ssl_valid ? '#46b450' : '#f0b849'; ?>;">
-				<?php echo $ssl_valid ? '正常' : '未啟用'; ?>
+		<!-- 系統資源區 -->
+		<div class="wu-overview-section">
+			<div class="wu-section-title">系統資源</div>
+			<div class="wu-widget-grid">
+				<div class="wu-stat-card">
+					<div class="wu-stat-label">磁碟使用</div>
+					<div class="wu-stat-value">
+						<?php echo number_format($disk_used, 0); ?> MB
+					</div>
+					<div class="wu-stat-meta">
+						/ <?php echo number_format($disk_total, 0); ?> MB
+						<span style="color:<?php echo $disk_percentage > 80 ? '#dc3232' : '#46b450'; ?>;">
+							(<?php echo number_format($disk_percentage, 1); ?>%)
+						</span>
+					</div>
+					<div class="wu-progress-bar">
+						<div class="wu-progress-fill" style="width:<?php echo min($disk_percentage, 100); ?>%;background:<?php echo $disk_percentage > 80 ? '#dc3232' : '#46b450'; ?>;"></div>
+					</div>
+				</div>
+				
+				<div class="wu-stat-card">
+					<div class="wu-stat-label">WordPress 記憶體</div>
+					<div class="wu-stat-value"><?php echo esc_html($wp_memory_limit); ?></div>
+				</div>
+				
+				<div class="wu-stat-card">
+					<div class="wu-stat-label">剩餘空間</div>
+					<div class="wu-stat-value">
+						<?php echo number_format($disk_total - $disk_used, 0); ?> MB
+					</div>
+				</div>
 			</div>
-		</div>
-		
-		<div class="wu-stat-card">
-			<div class="wu-stat-label">PHP 版本</div>
-			<div class="wu-stat-value"><?php echo esc_html($php_version); ?></div>
-		</div>
-		
-		<div class="wu-stat-card">
-			<div class="wu-stat-label">主機方案</div>
-			<div class="wu-stat-value"><?php echo esc_html($plan_name); ?></div>
 		</div>
 	</div>
 	
-	<?php if (!empty($status_note)): ?>
-	<div class="wu-note"><?php echo nl2br(esc_html($status_note)); ?></div>
-	<?php endif; ?>
-	
-	<div class="wu-meta">評估: <?php echo esc_html($hosting_rating); ?></div>
-	<?php
-}
-
-// ===== Widget: 系統資源 =====
-
-function wu_render_system_widget() {
-	$disk_total = get_option('wu_dashboard_disk_total', 5120);
-	$disk_used = wu_get_disk_usage();
-	$disk_percentage = ($disk_used / $disk_total) * 100;
-	
-	$wp_memory_limit = WP_MEMORY_LIMIT;
-	$wp_max_memory = WP_MAX_MEMORY_LIMIT;
-	
-	?>
-	<div class="wu-widget-grid">
-		<div class="wu-stat-card">
-			<div class="wu-stat-label">磁碟使用</div>
-			<div class="wu-stat-value">
-				<?php echo number_format($disk_used / 1024, 2); ?> GB
-			</div>
-			<div class="wu-stat-meta">
-				/ <?php echo number_format($disk_total / 1024, 2); ?> GB
-				<span style="color:<?php echo $disk_percentage > 80 ? '#dc3232' : '#46b450'; ?>;">
-					(<?php echo number_format($disk_percentage, 1); ?>%)
-				</span>
-			</div>
-			<div class="wu-progress-bar">
-				<div class="wu-progress-fill" style="width:<?php echo min($disk_percentage, 100); ?>%;background:<?php echo $disk_percentage > 80 ? '#dc3232' : '#46b450'; ?>;"></div>
-			</div>
-		</div>
-		
-		<div class="wu-stat-card">
-			<div class="wu-stat-label">WordPress 記憶體</div>
-			<div class="wu-stat-value"><?php echo esc_html($wp_memory_limit); ?></div>
-			<div class="wu-stat-meta">最大: <?php echo esc_html($wp_max_memory); ?></div>
-		</div>
-		
-		<div class="wu-stat-card">
-			<div class="wu-stat-label">剩餘空間</div>
-			<div class="wu-stat-value">
-				<?php echo number_format(($disk_total - $disk_used) / 1024, 2); ?> GB
-			</div>
-		</div>
+	<div class="wu-info-note">
+		<span class="dashicons dashicons-info"></span>
+		所有統計資料每 6-12 小時自動更新
 	</div>
 	<?php
 }
@@ -232,8 +229,8 @@ function wu_render_login_widget() {
 	?>
 	<div class="wu-widget-grid">
 		<div class="wu-stat-card">
-			<div class="wu-stat-label">總用戶數</div>
-			<div class="wu-stat-value"><?php echo number_format($stats['total_users']); ?></div>
+			<div class="wu-stat-label">管理員數</div>
+			<div class="wu-stat-value"><?php echo number_format($stats['total_admins']); ?></div>
 		</div>
 		
 		<div class="wu-stat-card">
@@ -252,20 +249,22 @@ function wu_render_login_widget() {
 		</div>
 	</div>
 	
-	<?php if (!empty($stats['recent_users'])): ?>
+	<?php if (!empty($stats['recent_admins'])): ?>
 	<div class="wu-table-wrap">
 		<table class="wu-mini-table">
 			<thead>
 				<tr>
-					<th>用戶</th>
+					<th>管理員</th>
 					<th>最近登入</th>
+					<th>IP 位址</th>
 				</tr>
 			</thead>
 			<tbody>
-				<?php foreach (array_slice($stats['recent_users'], 0, 5) as $user): ?>
+				<?php foreach (array_slice($stats['recent_admins'], 0, 5) as $admin): ?>
 				<tr>
-					<td><?php echo esc_html($user['name']); ?></td>
-					<td><?php echo esc_html($user['time']); ?></td>
+					<td><?php echo esc_html($admin['name']); ?></td>
+					<td><?php echo esc_html($admin['time']); ?></td>
+					<td><?php echo esc_html($admin['ip']); ?></td>
 				</tr>
 				<?php endforeach; ?>
 			</tbody>
@@ -281,7 +280,7 @@ function wu_render_media_widget() {
 	$stats = wu_get_media_stats();
 	
 	?>
-	<div class="wu-widget-grid">
+	<div class="wu-widget-grid" style="grid-template-columns: repeat(2, 1fr);">
 		<div class="wu-stat-card">
 			<div class="wu-stat-label">總檔案數</div>
 			<div class="wu-stat-value"><?php echo number_format($stats['total_files']); ?></div>
@@ -291,37 +290,6 @@ function wu_render_media_widget() {
 			<div class="wu-stat-label">總容量</div>
 			<div class="wu-stat-value"><?php echo esc_html($stats['total_size']); ?></div>
 		</div>
-		
-		<div class="wu-stat-card">
-			<div class="wu-stat-label">圖片檔案</div>
-			<div class="wu-stat-value"><?php echo number_format($stats['images']); ?></div>
-		</div>
-		
-		<div class="wu-stat-card">
-			<div class="wu-stat-label">文件檔案</div>
-			<div class="wu-stat-value"><?php echo number_format($stats['documents']); ?></div>
-		</div>
-	</div>
-	
-	<div class="wu-table-wrap">
-		<table class="wu-mini-table">
-			<thead>
-				<tr>
-					<th>檔案類型</th>
-					<th style="text-align:right;">數量</th>
-					<th style="text-align:right;">容量</th>
-				</tr>
-			</thead>
-			<tbody>
-				<?php foreach ($stats['by_type'] as $type => $data): ?>
-				<tr>
-					<td><?php echo esc_html(strtoupper($type)); ?></td>
-					<td style="text-align:right;"><?php echo number_format($data['count']); ?></td>
-					<td style="text-align:right;"><?php echo esc_html($data['size']); ?></td>
-				</tr>
-				<?php endforeach; ?>
-			</tbody>
-		</table>
 	</div>
 	<?php
 }
@@ -434,7 +402,28 @@ function wu_render_contact_widget() {
 		<div class="wu-contact-title"><?php echo esc_html($manager_name); ?></div>
 		<div class="wu-contact-sub">網站維運管理單位</div>
 		<?php if (!empty($manager_contact)): ?>
-		<div class="wu-contact-info"><?php echo nl2br(esc_html($manager_contact)); ?></div>
+		<div class="wu-contact-info">
+			<?php
+			$lines = explode("\n", $manager_contact);
+			foreach ($lines as $line) {
+				$line = trim($line);
+				if (preg_match('/^(.*?):\s*(.+)$/', $line, $matches)) {
+					$label = $matches[1];
+					$value = $matches[2];
+					
+					if (filter_var($value, FILTER_VALIDATE_EMAIL)) {
+						echo esc_html($label) . ': <a href="mailto:' . esc_attr($value) . '" style="color:#fff;text-decoration:underline;">' . esc_html($value) . '</a><br>';
+					} elseif (filter_var($value, FILTER_VALIDATE_URL)) {
+						echo esc_html($label) . ': <a href="' . esc_url($value) . '" target="_blank" style="color:#fff;text-decoration:underline;">' . esc_html($value) . '</a><br>';
+					} else {
+						echo esc_html($line) . '<br>';
+					}
+				} else {
+					echo esc_html($line) . '<br>';
+				}
+			}
+			?>
+		</div>
 		<?php endif; ?>
 	</div>
 	<?php
@@ -498,24 +487,29 @@ function wu_get_login_stats() {
 		return $cached;
 	}
 	
-	$users = get_users(array('fields' => array('ID', 'display_name', 'user_login')));
+	$admins = get_users(array(
+		'role' => 'administrator',
+		'fields' => array('ID', 'display_name', 'user_login')
+	));
+	
 	$today = strtotime('today');
 	$week_ago = strtotime('-7 days');
 	$month_ago = strtotime('-30 days');
 	
 	$stats = array(
-		'total_users' => count($users),
+		'total_admins' => count($admins),
 		'today_logins' => 0,
 		'week_logins' => 0,
 		'month_logins' => 0,
-		'recent_users' => array()
+		'recent_admins' => array()
 	);
 	
-	foreach ($users as $user) {
-		$last_login = get_user_meta($user->ID, 'wu_last_login', true);
+	foreach ($admins as $admin) {
+		$last_login = get_user_meta($admin->ID, 'wu_last_login', true);
+		$last_ip = get_user_meta($admin->ID, 'wu_last_ip', true);
 		
 		if (empty($last_login)) {
-			$last_login = strtotime($user->user_registered ?? 'now');
+			continue;
 		}
 		
 		if ($last_login >= $today) {
@@ -528,14 +522,16 @@ function wu_get_login_stats() {
 			$stats['month_logins']++;
 		}
 		
-		$stats['recent_users'][] = array(
-			'name' => $user->display_name ?: $user->user_login,
-			'time' => human_time_diff($last_login, current_time('timestamp')) . ' 前'
+		$stats['recent_admins'][] = array(
+			'name' => $admin->display_name ?: $admin->user_login,
+			'time' => human_time_diff($last_login, current_time('timestamp')) . ' 前',
+			'ip' => $last_ip ?: '-',
+			'timestamp' => $last_login
 		);
 	}
 	
-	usort($stats['recent_users'], function($a, $b) {
-		return strcmp($a['time'], $b['time']);
+	usort($stats['recent_admins'], function($a, $b) {
+		return $b['timestamp'] - $a['timestamp'];
 	});
 	
 	set_transient($cache_key, $stats, HOUR_IN_SECONDS * 6);
@@ -551,52 +547,38 @@ function wu_get_media_stats() {
 		return $cached;
 	}
 	
-	$attachments = get_posts(array(
-		'post_type' => 'attachment',
-		'posts_per_page' => -1,
-		'post_status' => 'any',
-		'fields' => 'ids'
-	));
+	global $wpdb;
+	
+	$total_files = $wpdb->get_var("
+		SELECT COUNT(*) 
+		FROM {$wpdb->posts} 
+		WHERE post_type = 'attachment'
+	");
+	
+	$upload_dir = wp_upload_dir();
+	$total_size = 0;
+	
+	try {
+		$path = $upload_dir['basedir'];
+		if (is_dir($path)) {
+			$iterator = new RecursiveIteratorIterator(
+				new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)
+			);
+			
+			foreach ($iterator as $file) {
+				if ($file->isFile()) {
+					$total_size += $file->getSize();
+				}
+			}
+		}
+	} catch (Exception $e) {
+		$total_size = 0;
+	}
 	
 	$stats = array(
-		'total_files' => count($attachments),
-		'total_size' => 0,
-		'images' => 0,
-		'documents' => 0,
-		'by_type' => array()
+		'total_files' => $total_files ?: 0,
+		'total_size' => wu_format_size($total_size)
 	);
-	
-	foreach ($attachments as $id) {
-		$file_path = get_attached_file($id);
-		$mime_type = get_post_mime_type($id);
-		
-		if ($file_path && file_exists($file_path)) {
-			$size = filesize($file_path);
-			$stats['total_size'] += $size;
-			
-			if (strpos($mime_type, 'image/') === 0) {
-				$stats['images']++;
-			} elseif (strpos($mime_type, 'application/') === 0 || strpos($mime_type, 'text/') === 0) {
-				$stats['documents']++;
-			}
-			
-			$ext = pathinfo($file_path, PATHINFO_EXTENSION);
-			if (!isset($stats['by_type'][$ext])) {
-				$stats['by_type'][$ext] = array('count' => 0, 'size' => 0);
-			}
-			$stats['by_type'][$ext]['count']++;
-			$stats['by_type'][$ext]['size'] += $size;
-		}
-	}
-	
-	$stats['total_size'] = wu_format_size($stats['total_size']);
-	
-	arsort($stats['by_type']);
-	$stats['by_type'] = array_slice($stats['by_type'], 0, 5);
-	
-	foreach ($stats['by_type'] as $ext => &$data) {
-		$data['size'] = wu_format_size($data['size']);
-	}
 	
 	set_transient($cache_key, $stats, HOUR_IN_SECONDS * 12);
 	
@@ -613,11 +595,14 @@ function wu_format_size($bytes) {
 	return round($bytes, 2) . ' ' . $units[$pow];
 }
 
-// ===== Login Tracking =====
+// ===== Login Tracking (Admin + IP) =====
 
 add_action('wp_login', function($user_login, $user) {
-	update_user_meta($user->ID, 'wu_last_login', current_time('timestamp'));
-	delete_transient('wu_login_stats');
+	if (user_can($user, 'manage_options')) {
+		update_user_meta($user->ID, 'wu_last_login', current_time('timestamp'));
+		update_user_meta($user->ID, 'wu_last_ip', $_SERVER['REMOTE_ADDR'] ?? '-');
+		delete_transient('wu_login_stats');
+	}
 }, 10, 2);
 
 // ===== Settings Page =====
@@ -650,7 +635,7 @@ function wu_dashboard_settings_page() {
 		
 		$services = array();
 		if (!empty($_POST['services'])) {
-			$services = array_map('sanitize_text_field', array_filter($_POST['services']));
+			$services = array_values(array_filter(array_map('sanitize_text_field', $_POST['services'])));
 		}
 		update_option('wu_dashboard_services', $services);
 		
@@ -705,11 +690,12 @@ function wu_dashboard_settings_page() {
 			<ul style="margin:8px 0 0 20px;line-height:1.8;">
 				<li>儀表板整合在 WordPress 原始後台首頁</li>
 				<li>所有統計資料使用快取,每 6-12 小時更新</li>
-				<li>登入統計自動追蹤,無需額外設定</li>
+				<li>登入統計僅追蹤管理員及 IP</li>
+				<li>媒體分析僅計算總量,不影響效能</li>
 			</ul>
 		</div>
 		
-		<form method="post" style="background:#fff;padding:25px;border:1px solid #ddd;border-radius:5px;margin-top:20px;">
+		<form method="post" style="background:#fff;padding:25px;border:1px solid #ddd;margin-top:20px;">
 			<?php wp_nonce_field('wu_dash_settings'); ?>
 			
 			<table class="form-table">
@@ -745,9 +731,12 @@ function wu_dashboard_settings_page() {
 							if (empty($services)) {
 								$services = array('');
 							}
-							foreach ($services as $service): 
+							foreach ($services as $i => $service): 
 							?>
-							<input type="text" name="services[]" value="<?php echo esc_attr($service); ?>" placeholder="服務項目" class="large-text" style="margin-bottom:8px;">
+							<div style="display:flex;gap:10px;margin-bottom:8px;align-items:center;">
+								<input type="text" name="services[]" value="<?php echo esc_attr($service); ?>" placeholder="服務項目" class="large-text">
+								<button type="button" class="button" onclick="this.parentElement.remove()">刪除</button>
+							</div>
 							<?php endforeach; ?>
 						</div>
 						<button type="button" class="button" onclick="addService()">新增項目</button>
@@ -764,10 +753,11 @@ function wu_dashboard_settings_page() {
 							}
 							foreach ($recent_work as $work): 
 							?>
-							<div style="background:#f9f9f9;padding:15px;margin-bottom:10px;border-radius:4px;">
+							<div style="background:#f9f9f9;padding:15px;margin-bottom:10px;">
 								<input type="text" name="work_titles[]" value="<?php echo esc_attr($work['title']); ?>" placeholder="處理項目" class="regular-text" style="margin-bottom:8px;">
 								<input type="date" name="work_dates[]" value="<?php echo esc_attr($work['date']); ?>" style="margin-bottom:8px;">
 								<textarea name="work_notes[]" rows="2" class="large-text" placeholder="說明 (選填)"><?php echo esc_textarea($work['note']); ?></textarea>
+								<button type="button" class="button" onclick="this.parentElement.remove()" style="margin-top:5px;">刪除</button>
 							</div>
 							<?php endforeach; ?>
 						</div>
@@ -804,7 +794,7 @@ function wu_dashboard_settings_page() {
 							}
 							foreach ($payments as $payment): 
 							?>
-							<div style="background:#f9f9f9;padding:15px;margin-bottom:10px;border-radius:4px;display:grid;grid-template-columns:120px 1fr 120px 100px;gap:10px;align-items:center;">
+							<div style="background:#f9f9f9;padding:15px;margin-bottom:10px;display:grid;grid-template-columns:120px 1fr 120px 100px 80px;gap:10px;align-items:center;">
 								<input type="date" name="payment_dates[]" value="<?php echo esc_attr($payment['date']); ?>">
 								<input type="text" name="payment_items[]" value="<?php echo esc_attr($payment['item']); ?>" placeholder="項目">
 								<input type="number" name="payment_amounts[]" value="<?php echo esc_attr($payment['amount']); ?>" placeholder="金額">
@@ -812,6 +802,7 @@ function wu_dashboard_settings_page() {
 									<option value="pending" <?php selected($payment['status'], 'pending'); ?>>待付款</option>
 									<option value="paid" <?php selected($payment['status'], 'paid'); ?>>已付款</option>
 								</select>
+								<button type="button" class="button" onclick="this.parentElement.remove()">刪除</button>
 							</div>
 							<?php endforeach; ?>
 						</div>
@@ -824,7 +815,8 @@ function wu_dashboard_settings_page() {
 					<td>
 						<input type="text" name="manager_name" value="<?php echo esc_attr($manager_name); ?>" placeholder="單位名稱" class="regular-text">
 						<br>
-						<textarea name="manager_contact" rows="3" class="large-text" style="margin-top:10px;" placeholder="聯絡方式"><?php echo esc_textarea($manager_contact); ?></textarea>
+						<textarea name="manager_contact" rows="3" class="large-text" style="margin-top:10px;" placeholder="聯絡方式 (支援自動連結)"><?php echo esc_textarea($manager_contact); ?></textarea>
+						<p class="description">格式: 標籤: 內容 (Email 與 URL 自動轉為連結)</p>
 					</td>
 				</tr>
 				
@@ -837,27 +829,32 @@ function wu_dashboard_settings_page() {
 	<script>
 	function addService() {
 		document.getElementById('service-container').insertAdjacentHTML('beforeend',
-			'<input type="text" name="services[]" placeholder="服務項目" class="large-text" style="margin-bottom:8px;">'
+			'<div style="display:flex;gap:10px;margin-bottom:8px;align-items:center;">' +
+			'<input type="text" name="services[]" placeholder="服務項目" class="large-text">' +
+			'<button type="button" class="button" onclick="this.parentElement.remove()">刪除</button>' +
+			'</div>'
 		);
 	}
 	
 	function addWork() {
 		document.getElementById('work-container').insertAdjacentHTML('beforeend',
-			'<div style="background:#f9f9f9;padding:15px;margin-bottom:10px;border-radius:4px;">' +
+			'<div style="background:#f9f9f9;padding:15px;margin-bottom:10px;">' +
 			'<input type="text" name="work_titles[]" placeholder="處理項目" class="regular-text" style="margin-bottom:8px;">' +
 			'<input type="date" name="work_dates[]" style="margin-bottom:8px;">' +
 			'<textarea name="work_notes[]" rows="2" class="large-text" placeholder="說明 (選填)"></textarea>' +
+			'<button type="button" class="button" onclick="this.parentElement.remove()" style="margin-top:5px;">刪除</button>' +
 			'</div>'
 		);
 	}
 	
 	function addPayment() {
 		document.getElementById('payment-container').insertAdjacentHTML('beforeend',
-			'<div style="background:#f9f9f9;padding:15px;margin-bottom:10px;border-radius:4px;display:grid;grid-template-columns:120px 1fr 120px 100px;gap:10px;align-items:center;">' +
+			'<div style="background:#f9f9f9;padding:15px;margin-bottom:10px;display:grid;grid-template-columns:120px 1fr 120px 100px 80px;gap:10px;align-items:center;">' +
 			'<input type="date" name="payment_dates[]">' +
 			'<input type="text" name="payment_items[]" placeholder="項目">' +
 			'<input type="number" name="payment_amounts[]" placeholder="金額">' +
 			'<select name="payment_statuses[]"><option value="pending">待付款</option><option value="paid">已付款</option></select>' +
+			'<button type="button" class="button" onclick="this.parentElement.remove()">刪除</button>' +
 			'</div>'
 		);
 	}
@@ -874,9 +871,17 @@ add_action('admin_head', function() {
 	
 	?>
 	<style>
+	/* Full Width Override */
+	#wu_overview_widget {
+		width: 100% !important;
+	}
+	
+	#normal-sortables #wu_overview_widget {
+		grid-column: 1 / -1;
+	}
+	
 	/* Widget Container Reset */
-	#wu_status_widget .inside,
-	#wu_system_widget .inside,
+	#wu_overview_widget .inside,
 	#wu_login_widget .inside,
 	#wu_media_widget .inside,
 	#wu_service_widget .inside,
@@ -887,20 +892,42 @@ add_action('admin_head', function() {
 		margin: 0 !important;
 	}
 	
+	/* Overview Container */
+	.wu-overview-container {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 20px;
+	}
+	
+	.wu-overview-section {
+		background: #fafafa;
+		padding: 15px;
+		border: 1px solid #e0e0e0;
+	}
+	
+	.wu-section-title {
+		font-size: 13px;
+		font-weight: 600;
+		color: #333;
+		margin-bottom: 12px;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+	
 	/* Grid Layout */
 	.wu-widget-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 		gap: 12px;
-		margin-bottom: 15px;
+		margin-bottom: 12px;
 	}
 	
 	/* Stat Card */
 	.wu-stat-card {
-		background: #f9f9f9;
+		background: #fff;
 		padding: 12px;
-		border-radius: 4px;
 		border-left: 3px solid #0073aa;
+		border: 1px solid #e0e0e0;
 	}
 	
 	.wu-stat-label {
@@ -909,17 +936,18 @@ add_action('admin_head', function() {
 		text-transform: uppercase;
 		margin-bottom: 6px;
 		letter-spacing: 0.3px;
+		font-weight: 500;
 	}
 	
 	.wu-stat-value {
-		font-size: 24px;
+		font-size: 22px;
 		font-weight: 700;
 		color: #111;
 		line-height: 1.2;
 	}
 	
 	.wu-stat-meta {
-		font-size: 12px;
+		font-size: 11px;
 		color: #999;
 		margin-top: 4px;
 	}
@@ -929,14 +957,12 @@ add_action('admin_head', function() {
 		width: 100%;
 		height: 4px;
 		background: #e0e0e0;
-		border-radius: 2px;
 		margin-top: 8px;
 		overflow: hidden;
 	}
 	
 	.wu-progress-fill {
 		height: 100%;
-		border-radius: 2px;
 		transition: width 0.3s;
 	}
 	
@@ -945,17 +971,27 @@ add_action('admin_head', function() {
 		padding: 10px;
 		background: #fff3cd;
 		border-left: 3px solid #f0b849;
-		font-size: 13px;
+		font-size: 12px;
 		color: #333;
 		line-height: 1.5;
 		margin-top: 12px;
 	}
 	
-	.wu-meta {
+	.wu-info-note {
+		margin-top: 12px;
+		padding: 8px 12px;
+		background: #e7f3ff;
+		border-left: 3px solid #0073aa;
 		font-size: 12px;
-		color: #999;
-		margin-top: 10px;
-		text-align: right;
+		color: #555;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	
+	.wu-info-note .dashicons {
+		color: #0073aa;
+		font-size: 16px;
 	}
 	
 	/* Service List */
@@ -990,7 +1026,7 @@ add_action('admin_head', function() {
 	
 	.wu-timeline-item {
 		display: grid;
-		grid-template-columns: 70px 1fr;
+		grid-template-columns: 80px 1fr;
 		gap: 12px;
 		padding-bottom: 12px;
 		border-bottom: 1px solid #f0f0f0;
@@ -1004,7 +1040,7 @@ add_action('admin_head', function() {
 	.wu-timeline-date {
 		font-size: 11px;
 		color: #999;
-		font-weight: 500;
+		font-weight: 600;
 	}
 	
 	.wu-timeline-title {
@@ -1047,6 +1083,7 @@ add_action('admin_head', function() {
 		padding: 8px;
 		border-bottom: 1px solid #f0f0f0;
 		color: #333;
+		font-size: 12px;
 	}
 	
 	.wu-mini-table tr:last-child td {
@@ -1057,7 +1094,6 @@ add_action('admin_head', function() {
 	.wu-badge {
 		display: inline-block;
 		padding: 3px 8px;
-		border-radius: 3px;
 		font-size: 10px;
 		font-weight: 600;
 		text-transform: uppercase;
@@ -1077,7 +1113,6 @@ add_action('admin_head', function() {
 	.wu-contact-card {
 		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 		padding: 20px;
-		border-radius: 4px;
 		text-align: center;
 		color: #fff;
 	}
@@ -1102,6 +1137,10 @@ add_action('admin_head', function() {
 	
 	/* Mobile */
 	@media (max-width: 768px) {
+		.wu-overview-container {
+			grid-template-columns: 1fr;
+		}
+		
 		.wu-widget-grid {
 			grid-template-columns: 1fr;
 		}
