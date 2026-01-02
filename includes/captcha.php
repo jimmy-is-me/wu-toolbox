@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) exit;
 
 /*
  * GDPR-friendly Image CAPTCHA for WP/WooCommerce forms
- * Version: 3.1 - Fixed auto-integration positioning
+ * Version: 3.2 - Advanced Elementor integration with dynamic JS injection
  * - Stateless: HMAC token (code + timestamp), no sessions/cookies/storage
  * - Image rendered on the fly from token; no external services
  * - Supports character sets: uppercase, lowercase, mixed; and types: alnum, alpha, numeric
@@ -70,13 +70,9 @@ function wu_captcha_validate_token($token, $user_input) {
 	$code_to_compare = $code;
 	$input_to_compare = trim((string)$user_input);
 	
-	if ($case_setting === 'upper') {
-		$code_to_compare = strtoupper($code);
-		$input_to_compare = strtoupper($input_to_compare);
-	} elseif ($case_setting === 'lower') {
-		$code_to_compare = strtolower($code);
-		$input_to_compare = strtolower($input_to_compare);
-	}
+	// Auto case-tolerance: always convert to uppercase for comparison
+	$code_to_compare = strtoupper($code);
+	$input_to_compare = strtoupper($input_to_compare);
 	
 	if ($input_to_compare !== $code_to_compare) {
 		return new WP_Error('wu_captcha_mismatch', '驗證碼錯誤');
@@ -188,12 +184,13 @@ function wu_captcha_render_image_from_code($code) {
 		}
 	}
 	
-	// CDN cache prevention headers
+	// Enhanced CDN cache prevention headers
 	header('Content-Type: image/png');
 	header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
 	header('Pragma: no-cache');
 	header('Expires: 0');
 	header('X-Robots-Tag: noindex, nofollow');
+	header('Surrogate-Control: no-store');
 	imagepng($img);
 	imagedestroy($img);
 	exit;
@@ -226,9 +223,8 @@ function wu_captcha_secure_fonts_directory() {
 	$htaccess_file = $fonts_dir . '/.htaccess';
 	if (!file_exists($htaccess_file)) {
 		$htaccess_content = "# Protect font files from direct access\n";
-		$htaccess_content .= "<Files ~ \"\\.(ttf|otf|woff|woff2)$\">\n";
-		$htaccess_content .= "    Require all denied\n";
-		$htaccess_content .= "</Files>\n";
+		$htaccess_content .= "Order Deny,Allow\n";
+		$htaccess_content .= "Deny from all\n";
 		file_put_contents($htaccess_file, $htaccess_content);
 	}
 }
@@ -247,7 +243,7 @@ function wu_captcha_render_field($context = 'default') {
 	$unique_id = 'wu_captcha_' . wp_rand(1000, 9999);
 	
 	?>
-	<div class="wu-captcha-field" style="margin-top:16px;margin-bottom:16px;clear:both;">
+	<div class="wu-captcha-field" data-captcha-id="<?php echo esc_attr($unique_id); ?>" style="margin-top:16px;margin-bottom:16px;clear:both;">
 		<label for="<?php echo esc_attr($unique_id); ?>_input" style="display:block;font-weight:600;margin-bottom:10px;color:#333;">
 			人機驗證 <span style="color:#d63638;">*</span>
 		</label>
@@ -334,6 +330,13 @@ function wu_captcha_render_field($context = 'default') {
 	<?php
 }
 
+// Get CAPTCHA HTML template for JS injection
+function wu_captcha_get_html_template() {
+	ob_start();
+	wu_captcha_render_field('elementor');
+	return ob_get_clean();
+}
+
 // AJAX handler for refresh
 add_action('wp_ajax_wu_captcha_refresh', 'wu_captcha_ajax_refresh');
 add_action('wp_ajax_nopriv_wu_captcha_refresh', 'wu_captcha_ajax_refresh');
@@ -348,6 +351,15 @@ function wu_captcha_ajax_refresh() {
 		'token' => $token,
 		'img_url' => $img_url
 	));
+}
+
+// AJAX handler for getting CAPTCHA HTML
+add_action('wp_ajax_wu_captcha_get_html', 'wu_captcha_ajax_get_html');
+add_action('wp_ajax_nopriv_wu_captcha_get_html', 'wu_captcha_ajax_get_html');
+
+function wu_captcha_ajax_get_html() {
+	$html = wu_captcha_get_html_template();
+	wp_send_json_success(array('html' => $html));
 }
 
 // ===== Shortcode for Manual Placement =====
@@ -537,16 +549,14 @@ add_filter('woocommerce_process_registration_errors', 'wu_captcha_validate_wc_re
 
 // ===== Fluent Forms Auto-Integration (BEFORE Submit Button) =====
 
-// Auto-inject CAPTCHA BEFORE submit button using priority 9 (before submit button renders at priority 10)
+// Auto-inject CAPTCHA BEFORE submit button using priority 9
 add_action('fluentform/render_item_submit_button', function($data, $form) {
 	if (!get_option('wu_captcha_enabled', 0)) return;
 	if (!get_option('wu_captcha_fluent_forms', 1)) return;
 	if (is_user_logged_in()) return;
 	
 	// Output CAPTCHA before submit button
-	ob_start();
 	wu_captcha_render_field('fluentform');
-	echo ob_get_clean();
 }, 9, 2);
 
 // Validate on submission
@@ -573,21 +583,34 @@ add_action('fluentform/before_insert_submission', function($insertData, $data, $
 	}
 }, 10, 3);
 
-// ===== Elementor Pro Auto-Integration (BEFORE Submit Button) =====
+// ===== Elementor Pro Auto-Integration (Dynamic JS Injection) =====
 
-// Auto-inject CAPTCHA BEFORE submit button using priority 9
-add_action('elementor_pro/forms/render_field', function($item, $item_index, $form) {
+// Detect Elementor form/login widgets and enqueue JS
+add_action('elementor/widget/before_render_content', function($widget) {
 	if (!get_option('wu_captcha_enabled', 0)) return;
 	if (!get_option('wu_captcha_elementor', 1)) return;
 	if (is_user_logged_in()) return;
 	
-	// Inject BEFORE submit button by detecting it early
-	if (isset($item['field_type']) && $item['field_type'] === 'submit') {
-		echo '<div class="elementor-field-type-html elementor-field-group elementor-column elementor-col-100" style="order: -1;">';
-		wu_captcha_render_field('elementor');
-		echo '</div>';
+	$widget_name = $widget->get_name();
+	
+	// Check if widget is form or login type
+	if (in_array($widget_name, array('form', 'login'), true)) {
+		// Enqueue Elementor-specific JS
+		wp_enqueue_script(
+			'wu-captcha-elementor',
+			plugin_dir_url(__FILE__) . 'js/wu-captcha-elementor.js',
+			array('jquery'),
+			'3.2',
+			true
+		);
+		
+		// Pass AJAX URL and nonce to JS
+		wp_localize_script('wu-captcha-elementor', 'wuCaptchaElementor', array(
+			'ajaxUrl' => admin_url('admin-ajax.php'),
+			'nonce' => wp_create_nonce('wu_captcha_elementor')
+		));
 	}
-}, 9, 3);
+});
 
 // Validate on submission
 add_action('elementor_pro/forms/validation', function($record, $ajax_handler) {
@@ -595,7 +618,6 @@ add_action('elementor_pro/forms/validation', function($record, $ajax_handler) {
 	if (!get_option('wu_captcha_elementor', 1)) return;
 	if (is_user_logged_in()) return;
 	
-	$fields = $record->get('fields');
 	$raw_fields = $record->get('sent_data');
 	
 	$captcha_input = isset($raw_fields['wu_captcha_input']) ? sanitize_text_field($raw_fields['wu_captcha_input']) : '';
@@ -682,12 +704,13 @@ function wu_captcha_settings_page() {
 			<ul style="margin-left: 20px;line-height:1.8;">
 				<li>✅ 完全符合 GDPR 規範(無外部請求、無追蹤、無 Cookie)</li>
 				<li>✅ 防重放攻擊(Replay Attack Protection)</li>
-				<li>✅ CDN 快取防護(Private Cache-Control Headers)</li>
-				<li>✅ 大小寫自動容錯驗證</li>
+				<li>✅ 強化 CDN 快取防護(Private + Surrogate-Control Headers)</li>
+				<li>✅ 自動大小寫容錯驗證(統一轉大寫比對)</li>
+				<li>✅ 字體目錄自動保護(.htaccess Deny)</li>
 				<li>✅ 前端重新整理按鈕(無需重新載入頁面)</li>
 				<li>✅ 響應式設計(支援手機與平板)</li>
 				<li>✅ 抗 OCR 干擾(噪點、干擾線、隨機角度)</li>
-				<li>✅ <strong>完全自動整合 Fluent Forms 與 Elementor Pro(驗證碼顯示於提交按鈕之前)</strong></li>
+				<li>✅ <strong>Elementor Pro 動態 JS 注入(支援多表單頁面)</strong></li>
 			</ul>
 		</div>
 		
@@ -720,12 +743,12 @@ function wu_captcha_settings_page() {
 								<?php endif; ?>
 							</label>
 							<p class="description" style="margin-left:24px;">
-								啟用後,所有 Fluent Forms 表單會自動在<strong>提交按鈕之前</strong>顯示驗證碼欄位,無需手動設定
+								啟用後,所有 Fluent Forms 表單會自動在<strong>提交按鈕之前</strong>顯示驗證碼欄位
 							</p>
 							
 							<label style="display:block;margin-top:12px;">
 								<input type="checkbox" name="wu_captcha_elementor" value="1" <?php checked(1, get_option('wu_captcha_elementor', 1)); ?> <?php disabled(!$elementor_active); ?>>
-								<strong>Elementor Pro 自動整合</strong>
+								<strong>Elementor Pro 自動整合(動態 JS 注入)</strong>
 								<?php if (!$elementor_active): ?>
 									<span style="color:#999;">(未安裝)</span>
 								<?php else: ?>
@@ -733,7 +756,7 @@ function wu_captcha_settings_page() {
 								<?php endif; ?>
 							</label>
 							<p class="description" style="margin-left:24px;">
-								啟用後,所有 Elementor Pro 表單會自動在<strong>提交按鈕之前</strong>顯示驗證碼欄位,無需手動設定
+								啟用後,系統會透過 JavaScript 自動在<strong>提交按鈕之前</strong>插入驗證碼欄位,支援多表單頁面
 							</p>
 						</fieldset>
 					</td>
@@ -763,7 +786,7 @@ function wu_captcha_settings_page() {
 								</option>
 							<?php endforeach; ?>
 						</select>
-						<p class="description">驗證時會自動容錯處理大小寫</p>
+						<p class="description">驗證時會自動轉大寫比對,避免行動裝置輸入問題</p>
 					</td>
 				</tr>
 				
@@ -805,12 +828,18 @@ function wu_captcha_settings_page() {
 				<li>✓ WordPress 登入/註冊/忘記密碼表單</li>
 				<li>✓ WooCommerce 登入/註冊/忘記密碼表單</li>
 				<li>✓ WordPress 留言表單</li>
-				<li>✓ <strong>Fluent Forms 所有表單(自動注入於提交按鈕之前)</strong></li>
-				<li>✓ <strong>Elementor Pro 所有表單(自動注入於提交按鈕之前)</strong></li>
+				<li>✓ <strong>Fluent Forms 所有表單(PHP 直接注入)</strong></li>
+				<li>✓ <strong>Elementor Pro 所有表單(JavaScript 動態注入)</strong></li>
 			</ul>
 			
 			<div style="background:#fffbcc;padding:15px;border-left:4px solid #ffb900;margin-top:15px;">
-				<p style="margin:0;"><strong>💡 注意:</strong> 啟用 Fluent Forms 或 Elementor Pro 整合後，系統會自動在所有表單的<strong>提交按鈕之前</strong>插入驗證碼欄位，<strong>無需手動添加任何短代碼或小工具</strong>。</p>
+				<p style="margin:0;"><strong>💡 技術說明:</strong></p>
+				<ul style="margin: 10px 0 0 20px;line-height:1.8;">
+					<li><strong>Fluent Forms:</strong> 使用 <code>fluentform/render_item_submit_button</code> hook 在提交按鈕前注入 HTML</li>
+					<li><strong>Elementor Pro:</strong> 使用 <code>elementor/widget/before_render_content</code> 偵測表單小工具,動態載入 <code>wu-captcha-elementor.js</code> 進行前端注入</li>
+					<li><strong>大小寫容錯:</strong> 驗證時統一轉換為大寫進行比對,避免行動裝置自動首字大寫造成驗證失敗</li>
+					<li><strong>CDN 防護:</strong> 圖片回應包含 <code>Cache-Control: private, no-store</code> 與 <code>Surrogate-Control: no-store</code> 標頭</li>
+				</ul>
 			</div>
 		</div>
 		
