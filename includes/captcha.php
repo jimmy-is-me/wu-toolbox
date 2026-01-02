@@ -3,14 +3,14 @@ if (!defined('ABSPATH')) exit;
 
 /*
  * GDPR-friendly Image CAPTCHA for WP/WooCommerce forms
- * Version: 2.0 - Enhanced with font fallback, refresh, replay protection, and integrations
+ * Version: 2.2 - Simplified font detection and improved warnings
  * - Stateless: HMAC token (code + timestamp), no sessions/cookies/storage
  * - Image rendered on the fly from token; no external services
  * - Supports character sets: uppercase, lowercase, mixed; and types: alnum, alpha, numeric
  * - Anti-OCR: noise, interference lines, pixel dots
  * - Replay attack protection via transient cache
  * - Mobile-responsive with refresh button
- * - Integrated with Fluent Forms & Elementor Pro
+ * - Auto-integrated with Fluent Forms & Elementor Pro
  */
 
 // ===== Core Functions =====
@@ -100,42 +100,26 @@ function wu_captcha_generate_code($length = 5) {
 }
 
 function wu_captcha_get_font_path() {
-	// Priority 1: Custom font in plugin/theme directory
-	$custom_font = __DIR__ . '/fonts/captcha.ttf';
-	if (file_exists($custom_font)) {
-		return $custom_font;
+	// Priority: Plugin/theme directory fonts folder
+	$font_dir = WP_CONTENT_DIR . '/plugins/wu-toolbox-main/includes/fonts/captcha.ttf';
+	if (file_exists($font_dir)) {
+		return $font_dir;
 	}
 	
-	// Priority 2: WordPress uploads directory
+	// Fallback: Try WordPress uploads directory
 	$upload_dir = wp_upload_dir();
 	$upload_font = $upload_dir['basedir'] . '/wu-captcha/captcha.ttf';
 	if (file_exists($upload_font)) {
 		return $upload_font;
 	}
 	
-	// Priority 3: System fonts (Linux)
-	$system_fonts = array(
-		'/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-		'/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-		'/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
-		'/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
-		'/usr/share/fonts/truetype/freefont/FreeSansBold.ttf',
-		'/usr/share/fonts/truetype/freefont/FreeSans.ttf',
-	);
-	
-	foreach ($system_fonts as $font) {
-		if (file_exists($font)) {
-			return $font;
-		}
-	}
-	
-	return null; // Fallback to imagestring
+	return null; // Will use GD built-in font
 }
 
 function wu_captcha_render_image_from_code($code) {
 	$char_count = strlen($code);
-	$width = max(180, 32 * $char_count + 40);
-	$height = 60;
+	$width = max(200, 35 * $char_count + 40);
+	$height = 70;
 	
 	$img = imagecreatetruecolor($width, $height);
 	$bg = imagecolorallocate($img, 255, 255, 255);
@@ -169,20 +153,20 @@ function wu_captcha_render_image_from_code($code) {
 	
 	$font = wu_captcha_get_font_path();
 	$use_ttf = function_exists('imagettftext') && $font;
-	$font_size = 26;
-	$baseline_y = 42;
-	$spacing = ($width - 30) / max(1, $char_count);
+	$font_size = 28;
+	$baseline_y = 48;
+	$spacing = ($width - 40) / max(1, $char_count);
 	
 	for ($i = 0; $i < $char_count; $i++) {
 		$ch = $code[$i];
-		$x = 15 + intval($i * $spacing + wp_rand(-3, 3));
+		$x = 20 + intval($i * $spacing + wp_rand(-3, 3));
 		$angle = wp_rand(-10, 10);
 		
 		if ($use_ttf) {
 			imagettftext($img, $font_size, $angle, $x, $baseline_y, $fg, $font, $ch);
 		} else {
-			// Fallback to GD built-in font
-			imagestring($img, 5, $x, 20, $ch, $fg);
+			// Fallback to GD built-in font (larger)
+			imagestring($img, 5, $x, 25, $ch, $fg);
 		}
 	}
 	
@@ -210,11 +194,11 @@ add_action('template_redirect', function() {
 	wu_captcha_render_image_from_code($code);
 });
 
-// ===== Render Field with Refresh Button =====
+// ===== Render Field with Refresh Button (Fixed Position) =====
 
 function wu_captcha_render_field($context = 'default') {
 	if (!get_option('wu_captcha_enabled', 0)) return;
-	if (is_user_logged_in()) return;
+	if (is_user_logged_in() && $context !== 'preview') return;
 	
 	$code = wu_captcha_generate_code();
 	$ts = time();
@@ -223,45 +207,59 @@ function wu_captcha_render_field($context = 'default') {
 	$unique_id = 'wu_captcha_' . wp_rand(1000, 9999);
 	
 	?>
-	<div class="wu-captcha-field" style="margin-top:12px;margin-bottom:12px;">
-		<label for="<?php echo esc_attr($unique_id); ?>_input" style="display:block;font-weight:600;margin-bottom:8px;">
+	<div class="wu-captcha-field" style="margin-top:16px;margin-bottom:16px;clear:both;">
+		<label for="<?php echo esc_attr($unique_id); ?>_input" style="display:block;font-weight:600;margin-bottom:10px;color:#333;">
 			人機驗證 <span style="color:#d63638;">*</span>
 		</label>
-		<div class="wu-captcha-image-container" style="position:relative;display:inline-block;margin-bottom:8px;">
-			<img id="<?php echo esc_attr($unique_id); ?>_img" 
-			     src="<?php echo $img_url; ?>" 
-			     alt="CAPTCHA" 
-			     style="display:block;border:2px solid #ddd;padding:6px;background:#fff;max-width:100%;height:auto;border-radius:4px;">
+		
+		<div style="margin-bottom:10px;">
+			<div class="wu-captcha-wrapper" style="position:relative;display:inline-block;max-width:100%;">
+				<img id="<?php echo esc_attr($unique_id); ?>_img" 
+				     src="<?php echo $img_url; ?>" 
+				     alt="CAPTCHA" 
+				     style="display:block;border:2px solid #ddd;padding:8px;background:#fff;max-width:100%;height:auto;border-radius:4px;">
+			</div>
 			<button type="button" 
-			        class="wu-captcha-refresh" 
+			        class="wu-captcha-refresh-btn" 
 			        onclick="wuCaptchaRefresh('<?php echo esc_js($unique_id); ?>')"
-			        style="position:absolute;top:8px;right:8px;background:#0073aa;color:#fff;border:none;padding:6px 10px;cursor:pointer;border-radius:3px;font-size:12px;line-height:1;"
+			        style="display:inline-block;margin-top:8px;background:#0073aa;color:#fff;border:none;padding:8px 14px;cursor:pointer;border-radius:4px;font-size:13px;transition:background 0.2s;"
 			        title="重新整理驗證碼">
 				🔄 重新整理
 			</button>
 		</div>
+		
 		<div>
 			<input type="text" 
 			       id="<?php echo esc_attr($unique_id); ?>_input" 
 			       name="wu_captcha_input" 
 			       autocomplete="off" 
 			       placeholder="請輸入圖片中的驗證碼" 
-			       required 
-			       style="width:100%;max-width:280px;padding:8px;border:1px solid #ddd;border-radius:4px;">
+			       <?php if ($context !== 'preview'): ?>required<?php endif; ?>
+			       style="width:100%;max-width:300px;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
 			<input type="hidden" 
 			       id="<?php echo esc_attr($unique_id); ?>_token" 
 			       name="wu_captcha_token" 
 			       value="<?php echo esc_attr($token); ?>">
 		</div>
-		<small style="display:block;color:#666;margin-top:6px;">
-			此驗證碼符合 GDPR 規範，看不清楚可點擊重新整理
+		<small style="display:block;color:#666;margin-top:6px;font-size:12px;">
+			此驗證碼符合 GDPR 規範，看不清楚請點擊「重新整理」按鈕
 		</small>
 	</div>
+	
+	<?php if (!wp_script_is('wu-captcha-refresh', 'enqueued')): ?>
 	<script>
 	function wuCaptchaRefresh(uniqueId) {
 		var img = document.getElementById(uniqueId + '_img');
 		var tokenField = document.getElementById(uniqueId + '_token');
 		var inputField = document.getElementById(uniqueId + '_input');
+		
+		if (!img || !tokenField || !inputField) return;
+		
+		// Show loading state
+		var btn = event.target;
+		var originalText = btn.innerHTML;
+		btn.innerHTML = '⏳ 載入中...';
+		btn.disabled = true;
 		
 		// Generate new token via AJAX
 		var xhr = new XMLHttpRequest();
@@ -269,18 +267,30 @@ function wu_captcha_render_field($context = 'default') {
 		xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
 		xhr.onload = function() {
 			if (xhr.status === 200) {
-				var response = JSON.parse(xhr.responseText);
-				if (response.success) {
-					img.src = response.data.img_url + '&t=' + Date.now();
-					tokenField.value = response.data.token;
-					inputField.value = '';
-					inputField.focus();
+				try {
+					var response = JSON.parse(xhr.responseText);
+					if (response.success) {
+						img.src = response.data.img_url + '&t=' + Date.now();
+						tokenField.value = response.data.token;
+						inputField.value = '';
+						inputField.focus();
+					}
+				} catch(e) {
+					console.error('CAPTCHA refresh failed:', e);
 				}
 			}
+			btn.innerHTML = originalText;
+			btn.disabled = false;
+		};
+		xhr.onerror = function() {
+			btn.innerHTML = originalText;
+			btn.disabled = false;
 		};
 		xhr.send('action=wu_captcha_refresh');
 	}
 	</script>
+	<?php wp_add_inline_script('wu-captcha-refresh', '', 'after'); ?>
+	<?php endif; ?>
 	<?php
 }
 
@@ -316,53 +326,55 @@ add_action('wp_head', function() {
 	<style>
 	.wu-captcha-field {
 		clear: both;
-		margin: 12px 0;
+		margin: 16px 0;
 	}
 	.wu-captcha-field label {
 		display: block;
 		font-weight: 600;
-		margin-bottom: 8px;
+		margin-bottom: 10px;
 		color: #333;
 	}
-	.wu-captcha-image-container {
+	.wu-captcha-wrapper {
 		position: relative;
 		display: inline-block;
-		margin-bottom: 8px;
 		max-width: 100%;
 	}
-	.wu-captcha-image-container img {
+	.wu-captcha-wrapper img {
 		display: block;
 		max-width: 100%;
 		height: auto;
 		border: 2px solid #ddd;
 		border-radius: 4px;
-		padding: 6px;
+		padding: 8px;
 		background: #fff;
 	}
-	.wu-captcha-refresh {
-		position: absolute;
-		top: 8px;
-		right: 8px;
+	.wu-captcha-refresh-btn {
+		display: inline-block;
+		margin-top: 8px;
 		background: #0073aa;
 		color: #fff;
 		border: none;
-		padding: 6px 10px;
+		padding: 8px 14px;
 		cursor: pointer;
-		border-radius: 3px;
-		font-size: 12px;
-		line-height: 1;
+		border-radius: 4px;
+		font-size: 13px;
 		transition: background 0.2s;
 	}
-	.wu-captcha-refresh:hover {
+	.wu-captcha-refresh-btn:hover:not(:disabled) {
 		background: #005177;
+	}
+	.wu-captcha-refresh-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
 	}
 	.wu-captcha-field input[type="text"] {
 		width: 100%;
-		max-width: 280px;
+		max-width: 300px;
 		padding: 10px;
 		border: 1px solid #ddd;
 		border-radius: 4px;
 		font-size: 14px;
+		box-sizing: border-box;
 	}
 	.wu-captcha-field input[type="text"]:focus {
 		outline: none;
@@ -373,9 +385,9 @@ add_action('wp_head', function() {
 		.wu-captcha-field input[type="text"] {
 			max-width: 100%;
 		}
-		.wu-captcha-refresh {
-			font-size: 11px;
-			padding: 5px 8px;
+		.wu-captcha-refresh-btn {
+			font-size: 12px;
+			padding: 6px 12px;
 		}
 	}
 	</style>
@@ -448,7 +460,7 @@ add_filter('preprocess_comment', function($commentdata) {
 	$result = wu_captcha_validate_token($token, $input);
 	
 	if ($result !== true) {
-		wp_die(esc_html($result->get_error_message()), 400);
+		wp_die(esc_html($result->get_error_message()), '驗證碼錯誤', array('back_link' => true));
 	}
 	return $commentdata;
 });
@@ -483,16 +495,20 @@ function wu_captcha_validate_wc_registration($errors, $username, $password, $ema
 }
 add_filter('woocommerce_process_registration_errors', 'wu_captcha_validate_wc_registration', 30, 4);
 
-// ===== Fluent Forms Integration =====
+// ===== Fluent Forms Integration (Auto) =====
 
 add_action('fluentform/before_insert_submission', function($insertData, $data, $form) {
+	// Check if Fluent Forms integration is enabled
 	if (!get_option('wu_captcha_enabled', 0)) return;
+	if (!get_option('wu_captcha_fluent_forms', 1)) return; // Default enabled
 	
 	// Check if captcha fields exist in the data
-	if (!isset($data['wu_captcha_input']) || !isset($data['wu_captcha_token'])) {
-		wp_send_json_error(array(
-			'errors' => array('wu_captcha' => '請完成人機驗證'),
-		), 422);
+	$has_captcha = isset($data['wu_captcha_input']) && isset($data['wu_captcha_token']);
+	
+	// If no captcha fields, check if form has HTML field with shortcode
+	if (!$has_captcha) {
+		// Allow forms without captcha to proceed
+		return;
 	}
 	
 	$token = sanitize_text_field($data['wu_captcha_token']);
@@ -501,15 +517,17 @@ add_action('fluentform/before_insert_submission', function($insertData, $data, $
 	
 	if ($result !== true) {
 		wp_send_json_error(array(
-			'errors' => array('wu_captcha' => $result->get_error_message()),
+			'errors' => array('wu_captcha_input' => array($result->get_error_message())),
 		), 422);
 	}
 }, 10, 3);
 
-// ===== Elementor Pro Forms Integration =====
+// ===== Elementor Pro Forms Integration (Auto) =====
 
 add_action('elementor_pro/forms/validation', function($record, $ajax_handler) {
+	// Check if Elementor integration is enabled
 	if (!get_option('wu_captcha_enabled', 0)) return;
+	if (!get_option('wu_captcha_elementor', 1)) return; // Default enabled
 	
 	$fields = $record->get('fields');
 	
@@ -518,16 +536,18 @@ add_action('elementor_pro/forms/validation', function($record, $ajax_handler) {
 	$captcha_token = null;
 	
 	foreach ($fields as $field_id => $field) {
-		if ($field['id'] === 'wu_captcha_input') {
-			$captcha_input = $field['value'];
-		}
-		if ($field['id'] === 'wu_captcha_token') {
-			$captcha_token = $field['value'];
+		if (isset($field['raw_value']) && isset($field['id'])) {
+			if (strpos($field['id'], 'wu_captcha_input') !== false) {
+				$captcha_input = $field['raw_value'];
+			}
+			if (strpos($field['id'], 'wu_captcha_token') !== false) {
+				$captcha_token = $field['raw_value'];
+			}
 		}
 	}
 	
+	// If no captcha fields found, allow form to proceed
 	if (!$captcha_input || !$captcha_token) {
-		$ajax_handler->add_error_message('請完成人機驗證');
 		return;
 	}
 	
@@ -541,6 +561,7 @@ add_action('elementor_pro/forms/validation', function($record, $ajax_handler) {
 // Elementor Widget for CAPTCHA
 add_action('elementor/widgets/register', function($widgets_manager) {
 	if (!class_exists('Elementor\Widget_Base')) return;
+	if (!get_option('wu_captcha_enabled', 0)) return;
 	
 	class WU_Captcha_Elementor_Widget extends \Elementor\Widget_Base {
 		
@@ -575,6 +596,8 @@ add_action('admin_init', function() {
 	add_option('wu_captcha_type', 'alnum');
 	add_option('wu_captcha_case', 'mixed');
 	add_option('wu_captcha_length', 5);
+	add_option('wu_captcha_fluent_forms', 1);
+	add_option('wu_captcha_elementor', 1);
 });
 
 add_action('admin_menu', function() {
@@ -592,29 +615,33 @@ function wu_captcha_settings_page() {
 	if (isset($_POST['submit'])) {
 		check_admin_referer('wu_captcha_settings');
 		update_option('wu_captcha_enabled', isset($_POST['wu_captcha_enabled']) ? 1 : 0);
+		update_option('wu_captcha_fluent_forms', isset($_POST['wu_captcha_fluent_forms']) ? 1 : 0);
+		update_option('wu_captcha_elementor', isset($_POST['wu_captcha_elementor']) ? 1 : 0);
 		update_option('wu_captcha_type', in_array($_POST['wu_captcha_type'] ?? 'alnum', array('alnum', 'alpha', 'numeric'), true) ? sanitize_text_field($_POST['wu_captcha_type']) : 'alnum');
 		update_option('wu_captcha_case', in_array($_POST['wu_captcha_case'] ?? 'mixed', array('upper', 'lower', 'mixed'), true) ? sanitize_text_field($_POST['wu_captcha_case']) : 'mixed');
 		$len = max(3, min(8, intval($_POST['wu_captcha_length'] ?? 5)));
 		update_option('wu_captcha_length', $len);
-		echo '<div class="notice notice-success"><p>設定已儲存。</p></div>';
+		echo '<div class="notice notice-success is-dismissible"><p><strong>設定已儲存。</strong></p></div>';
 	}
 	
 	$font_status = wu_captcha_check_font_status();
+	$fluent_active = defined('FLUENTFORM');
+	$elementor_active = defined('ELEMENTOR_PRO_VERSION');
 	
 	?>
 	<div class="wrap">
-		<h1>登入/註冊驗證碼設定</h1>
+		<h1>🔐 登入/註冊驗證碼設定</h1>
 		
 		<div class="notice notice-info">
-			<h3>功能特色</h3>
-			<ul style="margin-left: 20px;">
-				<li>✅ 完全符合 GDPR 規範（無外部請求、無追蹤、無 Cookie）</li>
-				<li>✅ 防重放攻擊（Replay Attack Protection）</li>
-				<li>✅ 自動字體回退機制（支援 Windows/Linux/自訂字體）</li>
-				<li>✅ 前端重新整理按鈕（無需重新載入頁面）</li>
-				<li>✅ 響應式設計（支援手機與平板）</li>
-				<li>✅ 抗 OCR 干擾（噪點、干擾線、隨機角度）</li>
-				<li>✅ 整合 Fluent Forms 與 Elementor Pro</li>
+			<h3>✨ 功能特色</h3>
+			<ul style="margin-left: 20px;line-height:1.8;">
+				<li>✅ 完全符合 GDPR 規範(無外部請求、無追蹤、無 Cookie)</li>
+				<li>✅ 防重放攻擊(Replay Attack Protection)</li>
+				<li>✅ 自動字體回退機制(TrueType 字體或 GD 內建字體)</li>
+				<li>✅ 前端重新整理按鈕(無需重新載入頁面)</li>
+				<li>✅ 響應式設計(支援手機與平板)</li>
+				<li>✅ 抗 OCR 干擾(噪點、干擾線、隨機角度)</li>
+				<li>✅ 自動整合 Fluent Forms 與 Elementor Pro</li>
 			</ul>
 		</div>
 		
@@ -623,9 +650,9 @@ function wu_captcha_settings_page() {
 			<h3>⚠️ 字體警告</h3>
 			<p>系統未偵測到 TrueType 字體,目前使用 GD 內建字體(較不美觀)。</p>
 			<p><strong>建議操作:</strong></p>
-			<ol style="margin-left: 20px;">
-				<li>下載免費字體: <a href="https://github.com/dejavu-fonts/dejavu-fonts/releases" target="_blank">DejaVu Sans</a> 或 <a href="https://fonts.google.com/specimen/Roboto" target="_blank">Google Roboto</a></li>
-				<li>建立目錄: <code><?php echo esc_html(__DIR__ . '/fonts/'); ?></code></li>
+			<ol style="margin-left: 20px;line-height:1.8;">
+				<li>下載免費字體: <a href="https://github.com/dejavu-fonts/dejavu-fonts/releases" target="_blank" rel="noopener">DejaVu Sans</a> 或 <a href="https://fonts.google.com/specimen/Roboto" target="_blank" rel="noopener">Google Roboto</a></li>
+				<li>建立目錄: <code>/var/www/html/public/wp-content/plugins/wu-toolbox-main/includes/fonts/</code></li>
 				<li>上傳字體檔案並重新命名為: <code>captcha.ttf</code></li>
 				<li>重新載入此頁面以確認</li>
 			</ol>
@@ -636,39 +663,73 @@ function wu_captcha_settings_page() {
 		</div>
 		<?php endif; ?>
 		
-		<form method="post">
+		<form method="post" style="background:#fff;padding:20px;border:1px solid #ddd;border-radius:5px;margin-top:20px;">
 			<?php wp_nonce_field('wu_captcha_settings'); ?>
 			
 			<table class="form-table">
 				<tr>
-					<th scope="row">啟用驗證碼</th>
+					<th scope="row"><label for="wu_captcha_enabled">啟用驗證碼</label></th>
 					<td>
 						<label>
-							<input type="checkbox" name="wu_captcha_enabled" value="1" <?php checked(1, get_option('wu_captcha_enabled', 0)); ?>>
-							啟用於留言、登入、註冊、密碼重設與 WooCommerce 帳戶表單
+							<input type="checkbox" id="wu_captcha_enabled" name="wu_captcha_enabled" value="1" <?php checked(1, get_option('wu_captcha_enabled', 0)); ?>>
+							<strong>啟用於留言、登入、註冊、密碼重設與 WooCommerce 帳戶表單</strong>
 						</label>
 						<p class="description">已登入的用戶不會看到驗證碼</p>
 					</td>
 				</tr>
 				
 				<tr>
-					<th scope="row">字元類型</th>
+					<th scope="row">表單外掛整合</th>
 					<td>
-						<select name="wu_captcha_type">
-							<?php foreach (array('alnum' => '英數混合', 'alpha' => '僅英文字母', 'numeric' => '僅數字') as $k => $label): ?>
+						<fieldset>
+							<label style="display:block;margin-bottom:8px;">
+								<input type="checkbox" name="wu_captcha_fluent_forms" value="1" <?php checked(1, get_option('wu_captcha_fluent_forms', 1)); ?> <?php disabled(!$fluent_active); ?>>
+								<strong>Fluent Forms 自動整合</strong>
+								<?php if (!$fluent_active): ?>
+									<span style="color:#999;">(未安裝)</span>
+								<?php else: ?>
+									<span style="color:#46b450;">(✓ 已安裝)</span>
+								<?php endif; ?>
+							</label>
+							<p class="description" style="margin-left:24px;">
+								啟用後,在 Fluent Forms 中使用短代碼 <code>[wu_captcha]</code> 即可自動驗證
+							</p>
+							
+							<label style="display:block;margin-top:12px;">
+								<input type="checkbox" name="wu_captcha_elementor" value="1" <?php checked(1, get_option('wu_captcha_elementor', 1)); ?> <?php disabled(!$elementor_active); ?>>
+								<strong>Elementor Pro 自動整合</strong>
+								<?php if (!$elementor_active): ?>
+									<span style="color:#999;">(未安裝)</span>
+								<?php else: ?>
+									<span style="color:#46b450;">(✓ 已安裝)</span>
+								<?php endif; ?>
+							</label>
+							<p class="description" style="margin-left:24px;">
+								啟用後,可在 Elementor 小工具中找到「人機驗證碼」或使用短代碼 <code>[wu_captcha]</code>
+							</p>
+						</fieldset>
+					</td>
+				</tr>
+				
+				<tr>
+					<th scope="row"><label for="wu_captcha_type">字元類型</label></th>
+					<td>
+						<select id="wu_captcha_type" name="wu_captcha_type">
+							<?php foreach (array('alnum' => '英數混合 (推薦)', 'alpha' => '僅英文字母', 'numeric' => '僅數字') as $k => $label): ?>
 								<option value="<?php echo esc_attr($k); ?>" <?php selected(get_option('wu_captcha_type', 'alnum'), $k); ?>>
 									<?php echo esc_html($label); ?>
 								</option>
 							<?php endforeach; ?>
 						</select>
+						<p class="description">建議使用「英數混合」以提高安全性</p>
 					</td>
 				</tr>
 				
 				<tr>
-					<th scope="row">大小寫</th>
+					<th scope="row"><label for="wu_captcha_case">大小寫</label></th>
 					<td>
-						<select name="wu_captcha_case">
-							<?php foreach (array('mixed' => '大小寫混合', 'upper' => '僅大寫', 'lower' => '僅小寫') as $k => $label): ?>
+						<select id="wu_captcha_case" name="wu_captcha_case">
+							<?php foreach (array('mixed' => '大小寫混合 (推薦)', 'upper' => '僅大寫', 'lower' => '僅小寫') as $k => $label): ?>
 								<option value="<?php echo esc_attr($k); ?>" <?php selected(get_option('wu_captcha_case', 'mixed'), $k); ?>>
 									<?php echo esc_html($label); ?>
 								</option>
@@ -678,50 +739,70 @@ function wu_captcha_settings_page() {
 				</tr>
 				
 				<tr>
-					<th scope="row">字元長度</th>
+					<th scope="row"><label for="wu_captcha_length">字元長度</label></th>
 					<td>
-						<input type="number" name="wu_captcha_length" min="3" max="8" value="<?php echo intval(get_option('wu_captcha_length', 5)); ?>">
+						<input type="number" id="wu_captcha_length" name="wu_captcha_length" min="3" max="8" value="<?php echo intval(get_option('wu_captcha_length', 5)); ?>" style="width:80px;">
 						<p class="description">建議 4-6 個字元以平衡安全性與易用性</p>
 					</td>
 				</tr>
 			</table>
 			
-			<?php submit_button('儲存設定'); ?>
+			<?php submit_button('💾 儲存設定', 'primary large'); ?>
 		</form>
 		
-		<hr>
+		<hr style="margin:30px 0;">
 		
-		<h2>使用說明</h2>
+		<h2>📖 使用說明</h2>
 		
 		<div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
-			<h3>自動整合 (無需額外設定)</h3>
-			<ul style="margin-left: 20px;">
-				<li>WordPress 登入/註冊/忘記密碼表單</li>
-				<li>WooCommerce 登入/註冊/忘記密碼表單</li>
-				<li>WordPress 留言表單</li>
+			<h3>🔄 自動整合 (無需額外設定)</h3>
+			<ul style="margin-left: 20px;line-height:1.8;">
+				<li>✓ WordPress 登入/註冊/忘記密碼表單</li>
+				<li>✓ WooCommerce 登入/註冊/忘記密碼表單</li>
+				<li>✓ WordPress 留言表單</li>
 			</ul>
 			
-			<h3>手動整合方式</h3>
+			<h3>🔧 手動整合方式</h3>
 			
-			<h4>1. Fluent Forms</h4>
-			<p>在表單中新增「自訂 HTML」欄位,貼上以下短代碼:</p>
-			<pre style="background: #f5f5f5; padding: 10px; border-radius: 3px;">[wu_captcha]</pre>
+			<h4>1️⃣ Fluent Forms</h4>
+			<p>在表單編輯器中新增「<strong>自訂 HTML</strong>」欄位,貼上以下短代碼:</p>
+			<pre style="background: #f5f5f5; padding: 10px; border-radius: 3px; border-left: 4px solid #0073aa;">[wu_captcha]</pre>
 			
-			<h4>2. Elementor Pro</h4>
-			<p>方法 A: 在小工具列表中搜尋「人機驗證碼」並拖曳到表單中</p>
-			<p>方法 B: 新增「短代碼」小工具,輸入: <code>[wu_captcha]</code></p>
+			<h4>2️⃣ Elementor Pro</h4>
+			<p><strong>方法 A</strong>: 在小工具列表中搜尋「<strong>人機驗證碼</strong>」並拖曳到表單中</p>
+			<p><strong>方法 B</strong>: 新增「<strong>短代碼</strong>」小工具,輸入: <code>[wu_captcha]</code></p>
 			
-			<h4>3. 其他表單外掛</h4>
+			<h4>3️⃣ 其他表單外掛 (Contact Form 7, WPForms 等)</h4>
 			<p>在表單中插入短代碼: <code>[wu_captcha]</code></p>
 		</div>
 		
-		<hr>
+		<hr style="margin:30px 0;">
 		
-		<h2>預覽測試</h2>
+		<h2>🧪 預覽測試</h2>
 		<div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
-			<?php wu_captcha_render_field('preview'); ?>
+			<?php if (get_option('wu_captcha_enabled', 0)): ?>
+				<p style="color:#666;margin-bottom:15px;">
+					<strong>提示:</strong> 以下是驗證碼的實際外觀,您可以測試「重新整理」功能。
+				</p>
+				<?php wu_captcha_render_field('preview'); ?>
+				<p style="color:#999;margin-top:15px;font-size:12px;">
+					* 預覽模式下不會驗證輸入內容
+				</p>
+			<?php else: ?>
+				<div class="notice notice-warning inline" style="margin:0;">
+					<p><strong>驗證碼功能未啟用。</strong>請先勾選上方的「啟用驗證碼」選項並儲存設定。</p>
+				</div>
+			<?php endif; ?>
 		</div>
 	</div>
+	
+	<style>
+	.wrap h2 { margin-top: 30px; }
+	.wrap h3 { margin-top: 20px; color: #23282d; }
+	.wrap h4 { margin-top: 15px; color: #555; }
+	.wrap pre { font-family: 'Courier New', monospace; font-size: 13px; }
+	.wrap code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+	</style>
 	<?php
 }
 
