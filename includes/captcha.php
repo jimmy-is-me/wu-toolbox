@@ -3,14 +3,14 @@ if (!defined('ABSPATH')) exit;
 
 /*
  * GDPR-friendly Image CAPTCHA for WP/WooCommerce forms
- * Version: 3.0 - Advanced auto-integration and security enhancements
+ * Version: 3.1 - Fixed auto-integration positioning
  * - Stateless: HMAC token (code + timestamp), no sessions/cookies/storage
  * - Image rendered on the fly from token; no external services
  * - Supports character sets: uppercase, lowercase, mixed; and types: alnum, alpha, numeric
  * - Anti-OCR: noise, interference lines, pixel dots
  * - Replay attack protection via transient cache
  * - Mobile-responsive with refresh button
- * - Full auto-integration with Fluent Forms & Elementor Pro
+ * - Full auto-integration with Fluent Forms & Elementor Pro (BEFORE submit button)
  * - CDN cache prevention, case-insensitive validation, directory security
  */
 
@@ -535,16 +535,19 @@ function wu_captcha_validate_wc_registration($errors, $username, $password, $ema
 }
 add_filter('woocommerce_process_registration_errors', 'wu_captcha_validate_wc_registration', 30, 4);
 
-// ===== Fluent Forms Auto-Integration =====
+// ===== Fluent Forms Auto-Integration (BEFORE Submit Button) =====
 
-// Auto-inject CAPTCHA before submit button
+// Auto-inject CAPTCHA BEFORE submit button using priority 9 (before submit button renders at priority 10)
 add_action('fluentform/render_item_submit_button', function($data, $form) {
 	if (!get_option('wu_captcha_enabled', 0)) return;
 	if (!get_option('wu_captcha_fluent_forms', 1)) return;
 	if (is_user_logged_in()) return;
 	
-	echo wu_captcha_render_field('fluentform');
-}, 10, 2);
+	// Output CAPTCHA before submit button
+	ob_start();
+	wu_captcha_render_field('fluentform');
+	echo ob_get_clean();
+}, 9, 2);
 
 // Validate on submission
 add_action('fluentform/before_insert_submission', function($insertData, $data, $form) {
@@ -570,17 +573,17 @@ add_action('fluentform/before_insert_submission', function($insertData, $data, $
 	}
 }, 10, 3);
 
-// ===== Elementor Pro Auto-Integration =====
+// ===== Elementor Pro Auto-Integration (BEFORE Submit Button) =====
 
-// Auto-inject CAPTCHA field in forms
+// Auto-inject CAPTCHA BEFORE submit button using priority 9
 add_action('elementor_pro/forms/render_field', function($item, $item_index, $form) {
 	if (!get_option('wu_captcha_enabled', 0)) return;
 	if (!get_option('wu_captcha_elementor', 1)) return;
 	if (is_user_logged_in()) return;
 	
-	// Inject before submit button
+	// Inject BEFORE submit button by detecting it early
 	if (isset($item['field_type']) && $item['field_type'] === 'submit') {
-		echo '<div class="elementor-field-type-html elementor-field-group elementor-column elementor-col-100">';
+		echo '<div class="elementor-field-type-html elementor-field-group elementor-column elementor-col-100" style="order: -1;">';
 		wu_captcha_render_field('elementor');
 		echo '</div>';
 	}
@@ -684,7 +687,7 @@ function wu_captcha_settings_page() {
 				<li>✅ 前端重新整理按鈕(無需重新載入頁面)</li>
 				<li>✅ 響應式設計(支援手機與平板)</li>
 				<li>✅ 抗 OCR 干擾(噪點、干擾線、隨機角度)</li>
-				<li>✅ <strong>完全自動整合 Fluent Forms 與 Elementor Pro(無需手動設定)</strong></li>
+				<li>✅ <strong>完全自動整合 Fluent Forms 與 Elementor Pro(驗證碼顯示於提交按鈕之前)</strong></li>
 			</ul>
 		</div>
 		
@@ -717,7 +720,7 @@ function wu_captcha_settings_page() {
 								<?php endif; ?>
 							</label>
 							<p class="description" style="margin-left:24px;">
-								啟用後,所有 Fluent Forms 表單會自動顯示驗證碼欄位,無需手動設定
+								啟用後,所有 Fluent Forms 表單會自動在<strong>提交按鈕之前</strong>顯示驗證碼欄位,無需手動設定
 							</p>
 							
 							<label style="display:block;margin-top:12px;">
@@ -730,7 +733,7 @@ function wu_captcha_settings_page() {
 								<?php endif; ?>
 							</label>
 							<p class="description" style="margin-left:24px;">
-								啟用後,所有 Elementor Pro 表單會自動顯示驗證碼欄位,無需手動設定
+								啟用後,所有 Elementor Pro 表單會自動在<strong>提交按鈕之前</strong>顯示驗證碼欄位,無需手動設定
 							</p>
 						</fieldset>
 					</td>
@@ -802,12 +805,12 @@ function wu_captcha_settings_page() {
 				<li>✓ WordPress 登入/註冊/忘記密碼表單</li>
 				<li>✓ WooCommerce 登入/註冊/忘記密碼表單</li>
 				<li>✓ WordPress 留言表單</li>
-				<li>✓ <strong>Fluent Forms 所有表單(自動注入)</strong></li>
-				<li>✓ <strong>Elementor Pro 所有表單(自動注入)</strong></li>
+				<li>✓ <strong>Fluent Forms 所有表單(自動注入於提交按鈕之前)</strong></li>
+				<li>✓ <strong>Elementor Pro 所有表單(自動注入於提交按鈕之前)</strong></li>
 			</ul>
 			
 			<div style="background:#fffbcc;padding:15px;border-left:4px solid #ffb900;margin-top:15px;">
-				<p style="margin:0;"><strong>💡 注意:</strong> 啟用 Fluent Forms 或 Elementor Pro 整合後，系統會自動在所有表單的提交按鈕前插入驗證碼欄位，<strong>無需手動添加任何短代碼或小工具</strong>。</p>
+				<p style="margin:0;"><strong>💡 注意:</strong> 啟用 Fluent Forms 或 Elementor Pro 整合後，系統會自動在所有表單的<strong>提交按鈕之前</strong>插入驗證碼欄位，<strong>無需手動添加任何短代碼或小工具</strong>。</p>
 			</div>
 		</div>
 		
