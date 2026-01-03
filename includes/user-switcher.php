@@ -2,7 +2,7 @@
 /**
  * 使用者切換模組
  * 幫助管理員快速輕鬆地在 WordPress 使用者帳戶之間切換
- * 版本:3.1 - 修正 WordPress 6.7 翻譯載入問題
+ * 版本:3.0 - 會話驗證、資源分離、日誌整合、快取優化
  */
 
 if (!defined('ABSPATH')) exit;
@@ -13,29 +13,9 @@ class WU_User_Switcher {
     private $option_name = 'wu_user_switcher_settings';
     private $cookie_name = 'wu_switched_user';
     private $counter_option = 'wu_user_switcher_counter';
-    private $assets_version = '3.1';
+    private $assets_version = '3.0';
     
     public function __construct() {
-        // 延遲到 init 動作執行,避免翻譯載入過早
-        add_action('init', array($this, 'init_hooks'), 1);
-        
-        // 安全措施必須在最早期執行
-        add_action('wp_login', array($this, 'clear_switch_cookie'), 10, 2);
-        add_action('wp_logout', array($this, 'clear_switch_cookie'));
-        add_action('clear_auth_cookie', array($this, 'clear_switch_cookie'));
-        
-        // 會話驗證必須在 init 之前
-        add_action('plugins_loaded', array($this, 'validate_switch_session'), 999);
-        
-        // 啟用/停用 Hook
-        register_activation_hook(__FILE__, array($this, 'activate'));
-        register_deactivation_hook(__FILE__, array($this, 'deactivate'));
-    }
-    
-    /**
-     * 初始化 Hooks (延遲到 init)
-     */
-    public function init_hooks() {
         $this->settings = get_option($this->option_name, $this->get_default_settings());
         
         // 後台功能
@@ -62,15 +42,27 @@ class WU_User_Switcher {
             add_action('admin_enqueue_scripts', array($this, 'enqueue_switched_assets'));
             
             // 防止快取
-            add_action('template_redirect', array($this, 'prevent_caching'), 1);
+            add_action('init', array($this, 'prevent_caching'), 1);
             add_action('send_headers', array($this, 'send_no_cache_headers'));
             
             // 通知快取外掛
-            add_action('template_redirect', array($this, 'notify_cache_plugins'), 1);
+            add_action('init', array($this, 'notify_cache_plugins'), 1);
         }
+        
+        // 安全措施
+        add_action('wp_login', array($this, 'clear_switch_cookie'), 10, 2);
+        add_action('wp_logout', array($this, 'clear_switch_cookie'));
+        add_action('clear_auth_cookie', array($this, 'clear_switch_cookie'));
+        
+        // 會話驗證 (強化版本)
+        add_action('init', array($this, 'validate_switch_session'), 1);
         
         // WooCommerce 相容性
         add_action('wu_user_switched', array($this, 'handle_woocommerce_session'), 10, 2);
+        
+        // 啟用/停用 Hook
+        register_activation_hook(__FILE__, array($this, 'activate'));
+        register_deactivation_hook(__FILE__, array($this, 'deactivate'));
     }
     
     /**
@@ -215,7 +207,7 @@ body.wu-user-switched {
     
     // 切換用戶函數
     window.wuSwitchUser = function(userId) {
-        if (!userId || !confirm("確定要切換到此用戶嗎?")) {
+        if (!userId || !confirm("確定要切換到此用戶嗎？")) {
             return false;
         }
         
@@ -235,12 +227,12 @@ body.wu-user-switched {
                 }
             },
             error: function() {
-                alert("請求失敗,請重試");
+                alert("請求失敗，請重試");
             }
         });
     };
     
-    // 當處於切換狀態時,定期檢查會話
+    // 當處於切換狀態時，定期檢查會話
     if (typeof wuUserSwitcher !== "undefined" && wuUserSwitcher.isSwitched) {
         setInterval(function() {
             $.ajax({
@@ -252,7 +244,7 @@ body.wu-user-switched {
                 },
                 success: function(response) {
                     if (!response.success) {
-                        alert("切換會話已失效,將重新載入頁面");
+                        alert("切換會話已失效，將重新載入頁面");
                         window.location.reload();
                     }
                 }
@@ -570,25 +562,24 @@ body.wu-user-switched {
             
             <div class="notice notice-info">
                 <h3>功能說明</h3>
-                <p><strong>使用者切換功能</strong>讓管理員可以快速在不同用戶帳戶之間切換,無需重新登入,方便測試和支援。</p>
+                <p><strong>使用者切換功能</strong>讓管理員可以快速在不同用戶帳戶之間切換，無需重新登入，方便測試和支援。</p>
                 
-                <h4>主要功能:</h4>
+                <h4>主要功能：</h4>
                 <ul>
-                    <li><strong>即時切換</strong>:在用戶列表中點擊即可切換到該用戶</li>
-                    <li><strong>快速返回</strong>:一鍵返回到原始管理員帳戶</li>
-                    <li><strong>管理欄整合</strong>:在管理欄顯示切換選項</li>
-                    <li><strong>權限保留</strong>:嚴格控制切換權限</li>
+                    <li><strong>即時切換</strong>：在用戶列表中點擊即可切換到該用戶</li>
+                    <li><strong>快速返回</strong>：一鍵返回到原始管理員帳戶</li>
+                    <li><strong>管理欄整合</strong>：在管理欄顯示切換選項</li>
+                    <li><strong>權限保留</strong>：嚴格控制切換權限</li>
                 </ul>
                 
-                <h4>安全措施 (v3.1 強化):</h4>
+                <h4>安全措施 (v3.0 強化)：</h4>
                 <ul>
-                    <li>Cookie 簽章驗證,防止偽造</li>
-                    <li>會話令牌驗證,確保原始用戶在線</li>
-                    <li>防止嵌套切換(切換狀態下無法再次切換)</li>
-                    <li>自動記錄所有切換操作(可整合 Audit Logger)</li>
+                    <li>Cookie 簽章驗證，防止偽造</li>
+                    <li>會話令牌驗證，確保原始用戶在線</li>
+                    <li>防止嵌套切換（切換狀態下無法再次切換）</li>
+                    <li>自動記錄所有切換操作（可整合 Audit Logger）</li>
                     <li>會話超時自動清除</li>
-                    <li>完整的快取防護(支援主流快取外掛)</li>
-                    <li>WordPress 6.7 相容性修正</li>
+                    <li>完整的快取防護（支援主流快取外掛）</li>
                 </ul>
             </div>
             
@@ -612,7 +603,7 @@ body.wu-user-switched {
                                 <input type="checkbox" name="<?php echo $this->option_name; ?>[strict_session_validation]" value="1" <?php checked($this->settings['strict_session_validation']); ?>>
                                 啟用嚴格的會話令牌驗證
                             </label>
-                            <p class="description">驗證原始用戶的會話令牌是否仍然有效(強烈推薦)</p>
+                            <p class="description">驗證原始用戶的會話令牌是否仍然有效（強烈推薦）</p>
                         </td>
                     </tr>
                     <tr>
@@ -642,7 +633,7 @@ body.wu-user-switched {
                                 <input type="checkbox" name="<?php echo $this->option_name; ?>[prevent_nested_switch]" value="1" <?php checked($this->settings['prevent_nested_switch']); ?>>
                                 禁止在切換狀態下再次切換
                             </label>
-                            <p class="description">提高安全性,防止權限混亂(強烈推薦)</p>
+                            <p class="description">提高安全性，防止權限混亂（強烈推薦）</p>
                         </td>
                     </tr>
                     <tr>
@@ -662,7 +653,7 @@ body.wu-user-switched {
                                 <input type="checkbox" name="<?php echo $this->option_name; ?>[restore_wc_cart]" value="1" <?php checked($this->settings['restore_wc_cart']); ?>>
                                 返回時恢復原始購物車
                             </label>
-                            <p class="description">切換回來時嘗試恢復管理員的購物車(實驗性功能)</p>
+                            <p class="description">切換回來時嘗試恢復管理員的購物車（實驗性功能）</p>
                         </td>
                     </tr>
                     <tr>
@@ -676,10 +667,10 @@ body.wu-user-switched {
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row">會話超時時間(秒)</th>
+                        <th scope="row">會話超時時間（秒）</th>
                         <td>
                             <input type="number" name="<?php echo $this->option_name; ?>[session_timeout]" value="<?php echo esc_attr($this->settings['session_timeout']); ?>" min="300" max="86400" class="regular-text">
-                            <p class="description">切換會話的超時時間(預設:3600秒 = 1小時)</p>
+                            <p class="description">切換會話的超時時間（預設：3600秒 = 1小時）</p>
                         </td>
                     </tr>
                     <tr>
@@ -699,11 +690,11 @@ body.wu-user-switched {
                     <tr>
                         <th scope="row">受限制的用戶 ID</th>
                         <td>
-                            <textarea name="<?php echo $this->option_name; ?>[restricted_users]" rows="5" cols="50" placeholder="每行一個用戶ID,例如:
+                            <textarea name="<?php echo $this->option_name; ?>[restricted_users]" rows="5" cols="50" placeholder="每行一個用戶ID，例如：
 1
 2
 3"><?php echo esc_textarea(implode("\n", $this->settings['restricted_users'])); ?></textarea>
-                            <p class="description">這些用戶無法被切換(一行一個ID)</p>
+                            <p class="description">這些用戶無法被切換（一行一個ID）</p>
                         </td>
                     </tr>
                 </table>
@@ -821,22 +812,22 @@ body.wu-user-switched {
                         <?php endforeach; ?>
                     </tbody>
                 </table>
-                <p style="margin-top: 15px;"><em>當用戶處於切換狀態時,系統會自動通知這些快取外掛不要快取頁面。</em></p>
+                <p style="margin-top: 15px;"><em>當用戶處於切換狀態時，系統會自動通知這些快取外掛不要快取頁面。</em></p>
             </div>
             
             <h2>使用說明</h2>
             <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
-                <h3>如何使用用戶切換功能:</h3>
+                <h3>如何使用用戶切換功能：</h3>
                 <ol>
-                    <li><strong>在用戶列表中切換</strong>:前往「用戶」→「所有用戶」,點擊用戶旁邊的「切換到此用戶」連結</li>
-                    <li><strong>透過管理欄切換</strong>:在管理欄中找到用戶切換選項</li>
-                    <li><strong>返回原用戶</strong>:切換後可透過管理欄的紅色「返回原用戶」按鈕返回</li>
-                    <li><strong>查看切換狀態</strong>:管理欄會以橙色閃爍顯示目前的切換狀態,前台會顯示警示橫幅</li>
+                    <li><strong>在用戶列表中切換</strong>：前往「用戶」→「所有用戶」，點擊用戶旁邊的「切換到此用戶」連結</li>
+                    <li><strong>透過管理欄切換</strong>：在管理欄中找到用戶切換選項</li>
+                    <li><strong>返回原用戶</strong>：切換後可透過管理欄的紅色「返回原用戶」按鈕返回</li>
+                    <li><strong>查看切換狀態</strong>：管理欄會以橙色閃爍顯示目前的切換狀態，前台會顯示警示橫幅</li>
                 </ol>
                 
                 <div class="wu-two-column" style="margin-top: 15px;">
                     <div>
-                        <h4>可以切換的用戶:</h4>
+                        <h4>可以切換的用戶：</h4>
                         <ul>
                             <li>擁有允許角色的用戶</li>
                             <li>未被限制的用戶</li>
@@ -844,7 +835,7 @@ body.wu-user-switched {
                         </ul>
                     </div>
                     <div>
-                        <h4>安全限制:</h4>
+                        <h4>安全限制：</h4>
                         <ul>
                             <li>無法切換到受限制的用戶</li>
                             <li>無法切換到自己的帳戶</li>
@@ -940,7 +931,7 @@ body.wu-user-switched {
             return;
         }
         
-        // 如果目前是切換狀態,顯示返回選項
+        // 如果目前是切換狀態，顯示返回選項
         if ($this->is_switched_user()) {
             $original_user = $this->get_original_user();
             if ($original_user && $this->settings['allow_switch_back']) {
@@ -990,7 +981,7 @@ body.wu-user-switched {
         
         // 防止嵌套切換
         if ($this->is_switched_user() && $this->settings['prevent_nested_switch']) {
-            wp_die('您目前已在切換狀態,請先返回原用戶');
+            wp_die('您目前已在切換狀態，請先返回原用戶');
         }
         
         // 驗證目標用戶
@@ -1062,7 +1053,7 @@ body.wu-user-switched {
         
         // 防止嵌套切換
         if ($this->is_switched_user() && $this->settings['prevent_nested_switch']) {
-            wp_send_json_error('您目前已在切換狀態,請先返回原用戶');
+            wp_send_json_error('您目前已在切換狀態，請先返回原用戶');
         }
         
         // 驗證目標用戶
@@ -1094,12 +1085,12 @@ body.wu-user-switched {
         
         $current_user_id = get_current_user_id();
         
-        // 保存原始用戶資訊(如果還沒有切換)
+        // 保存原始用戶資訊（如果還沒有切換）
         if (!$this->is_switched_user()) {
             $original_user = wp_get_current_user();
             $this->set_original_user($original_user);
             
-            // 保存 WooCommerce 購物車(如果需要)
+            // 保存 WooCommerce 購物車（如果需要）
             if ($this->settings['restore_wc_cart'] && class_exists('WooCommerce')) {
                 $this->save_woocommerce_cart($original_user->ID);
             }
@@ -1141,7 +1132,7 @@ body.wu-user-switched {
         wp_set_current_user($original_user_id);
         wp_set_auth_cookie($original_user_id);
         
-        // 恢復購物車(如果需要)
+        // 恢復購物車（如果需要）
         if ($this->settings['restore_wc_cart'] && class_exists('WooCommerce')) {
             $this->restore_woocommerce_cart($original_user_id);
         }
@@ -1174,7 +1165,7 @@ body.wu-user-switched {
         $user_roles = $current_user->roles;
         $allowed_roles = $this->settings['allowed_roles'];
         
-        // 如果用戶是切換狀態,需要檢查原始用戶的角色
+        // 如果用戶是切換狀態，需要檢查原始用戶的角色
         if ($this->is_switched_user()) {
             $original_user = $this->get_original_user();
             if ($original_user) {
@@ -1386,7 +1377,7 @@ body.wu-user-switched {
         if (!$original_user) {
             $this->clear_switch_cookie();
             wp_logout();
-            wp_die('原始用戶不存在,已自動登出');
+            wp_die('原始用戶不存在，已自動登出');
         }
         
         // 嚴格會話驗證
@@ -1394,7 +1385,7 @@ body.wu-user-switched {
             if (!$this->validate_session_token($data)) {
                 $this->clear_switch_cookie();
                 wp_logout();
-                wp_die('原始會話已失效,已自動登出');
+                wp_die('原始會話已失效，已自動登出');
             }
         }
     }
@@ -1483,7 +1474,7 @@ body.wu-user-switched {
                 )
             );
         } else {
-            // 備用簡單日誌(僅保留最近50筆)
+            // 備用簡單日誌（僅保留最近50筆）
             $log_data = get_option('wu_user_switcher_log', array());
             
             $log_entry = array(
@@ -1497,7 +1488,7 @@ body.wu-user-switched {
             
             array_unshift($log_data, $log_entry);
             
-            // 只保留最近50筆記錄(減少資料量)
+            // 只保留最近50筆記錄（減少資料量）
             if (count($log_data) > 50) {
                 $log_data = array_slice($log_data, 0, 50);
             }
@@ -1510,7 +1501,7 @@ body.wu-user-switched {
      * 取得最近的切換記錄
      */
     private function get_recent_switches($limit = 20) {
-        // 如果使用 Audit Logger,從那裡讀取
+        // 如果使用 Audit Logger，從那裡讀取
         if (class_exists('WU_Audit_Logger')) {
             $logger = new WU_Audit_Logger();
             // 假設有 get_events 方法
