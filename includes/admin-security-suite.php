@@ -3,7 +3,7 @@
  * 安全套件模組 (單頁整合版)
  * 檔案名稱: admin-security-suite.php
  * 功能: XML-RPC 禁用、RSS 禁用、評論管理 (單頁 Tab 切換)
- * 版本: 2.0
+ * 版本: 2.1
  * 
  * 適用環境: 多站點管理 (140+ 網站)
  * 優化重點: 單一管理入口、Tab 切換介面、降低選單複雜度
@@ -17,20 +17,17 @@ if (!defined('ABSPATH')) exit;
  */
 class WU_Security_Suite {
     
-    private static $instance = null;
+    private $settings;
+    private $option_name = 'wu_security_suite_settings';
     
-    public static function get_instance() {
-        if (null === self::$instance) {
-            self::$instance = new self();
-        }
-        return self::$instance;
-    }
-    
-    private function __construct() {
+    public function __construct() {
+        $this->settings = get_option($this->option_name, $this->get_default_settings());
+        
+        // 後台功能
         if (is_admin()) {
             add_action('admin_menu', array($this, 'add_admin_menu'), 25);
-            add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
             add_action('admin_init', array($this, 'register_settings'));
+            add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
         }
         
         // 前台功能初始化
@@ -38,54 +35,91 @@ class WU_Security_Suite {
     }
     
     /**
-     * 添加管理選單 (僅一個頁面)
+     * 預設設定
      */
-    public function add_admin_menu() {
-        add_menu_page(
-            '安全設定',
-            '安全設定',
-            'manage_options',
-            'wu-security-suite',
-            array($this, 'render_admin_page'),
-            'dashicons-shield',
-            26
+    private function get_default_settings() {
+        return array(
+            // XML-RPC 設定
+            'xmlrpc_enabled' => false,
+            
+            // RSS 設定
+            'rss_enabled' => false,
+            'rss_redirect_type' => '403',
+            'rss_custom_message' => 'RSS feeds are disabled on this site.',
+            
+            // 評論設定
+            'comments_globally' => false,
+            'comments_posts' => false,
+            'comments_pages' => false,
+            'comments_custom_types' => false
         );
     }
     
     /**
-     * 註冊所有設定選項
+     * 添加管理選單
      */
-    public function register_settings() {
-        // XML-RPC 設定
-        register_setting('wu_security_settings', 'wu_disable_xmlrpc');
-        
-        // RSS 設定
-        register_setting('wu_security_settings', 'wu_disable_rss_feeds');
-        register_setting('wu_security_settings', 'wu_rss_redirect_type');
-        register_setting('wu_security_settings', 'wu_rss_custom_message');
-        
-        // 評論設定
-        register_setting('wu_security_settings', 'wu_disable_comments_globally');
-        register_setting('wu_security_settings', 'wu_disable_comments_posts');
-        register_setting('wu_security_settings', 'wu_disable_comments_pages');
-        register_setting('wu_security_settings', 'wu_disable_comments_custom_types');
+    public function add_admin_menu() {
+        add_submenu_page(
+            'wumetax-toolkit',
+            '安全設定',
+            '安全設定',
+            'manage_options',
+            'wu-security-suite',
+            array($this, 'admin_page')
+        );
     }
     
     /**
-     * 載入樣式與腳本
+     * 註冊設定
+     */
+    public function register_settings() {
+        register_setting(
+            'wu_security_suite_group',
+            $this->option_name,
+            array($this, 'sanitize_settings')
+        );
+    }
+    
+    /**
+     * 清理設定
+     */
+    public function sanitize_settings($input) {
+        $sanitized = array();
+        
+        // XML-RPC
+        $sanitized['xmlrpc_enabled'] = !empty($input['xmlrpc_enabled']) ? true : false;
+        
+        // RSS
+        $sanitized['rss_enabled'] = !empty($input['rss_enabled']) ? true : false;
+        $sanitized['rss_redirect_type'] = sanitize_text_field($input['rss_redirect_type'] ?? '403');
+        $sanitized['rss_custom_message'] = wp_kses_post($input['rss_custom_message'] ?? 'RSS feeds are disabled on this site.');
+        
+        // 評論
+        $sanitized['comments_globally'] = !empty($input['comments_globally']) ? true : false;
+        $sanitized['comments_posts'] = !empty($input['comments_posts']) ? true : false;
+        $sanitized['comments_pages'] = !empty($input['comments_pages']) ? true : false;
+        $sanitized['comments_custom_types'] = !empty($input['comments_custom_types']) ? true : false;
+        
+        return $sanitized;
+    }
+    
+    /**
+     * 載入後台資源
      */
     public function enqueue_admin_assets($hook) {
-        if ($hook !== 'toplevel_page_wu-security-suite') {
+        if ($hook !== 'wumetaxtoolkit_page_wu-security-suite') {
             return;
         }
         
-        // 注入 Tab 切換 CSS 和 JS
-        wp_add_inline_style('wp-admin', $this->get_admin_css());
-        wp_add_inline_script('jquery', $this->get_admin_js());
+        wp_enqueue_style('wu-security-suite', false, array(), '2.1');
+        wp_add_inline_style('wu-security-suite', $this->get_admin_css());
+        
+        wp_enqueue_script('wu-security-suite', false, array('jquery'), '2.1', true);
+        wp_add_inline_script('wu-security-suite', $this->get_admin_js());
     }
     
     /**
-     * 管理頁面 CSS
+     * 取得後台 CSS
      */
     private function get_admin_css() {
         return '
@@ -111,28 +145,27 @@ class WU_Security_Suite {
         .wu-security-module-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.1); }
         .wu-security-module-card h3 { margin-top: 0; color: #2271b1; display: flex; align-items: center; }
         .wu-security-module-card .dashicons { margin-right: 8px; }
+        .wu-status-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 13px; font-weight: 600; margin-left: 10px; }
+        .wu-status-on { background: #00a32a; color: #fff; }
+        .wu-status-off { background: #d63638; color: #fff; }
         ';
     }
     
     /**
-     * 管理頁面 JavaScript
+     * 取得後台 JavaScript
      */
     private function get_admin_js() {
         return '
         jQuery(document).ready(function($) {
-            // Tab 切換功能
             $(".wu-security-tab").on("click", function() {
                 var tab = $(this).data("tab");
                 $(".wu-security-tab").removeClass("active");
                 $(".wu-security-content").removeClass("active");
                 $(this).addClass("active");
                 $("#wu-tab-" + tab).addClass("active");
-                
-                // 儲存當前 Tab 到 localStorage
                 localStorage.setItem("wu_security_active_tab", tab);
             });
             
-            // 恢復上次選擇的 Tab
             var lastTab = localStorage.getItem("wu_security_active_tab");
             if (lastTab) {
                 $(".wu-security-tab[data-tab=\"" + lastTab + "\"]").click();
@@ -140,13 +173,11 @@ class WU_Security_Suite {
                 $(".wu-security-tab:first").click();
             }
             
-            // 全域評論禁用控制
             $("#wu_disable_comments_globally").on("change", function() {
                 var disabled = $(this).is(":checked");
                 $("#wu_disable_comments_posts, #wu_disable_comments_pages, #wu_disable_comments_custom_types").prop("disabled", disabled).closest("tr").css("opacity", disabled ? "0.5" : "1");
             }).trigger("change");
             
-            // RSS 自訂訊息顯示控制
             $("#wu_rss_redirect_type").on("change", function() {
                 $("#wu_rss_custom_message").closest("tr").toggle($(this).val() === "message");
             }).trigger("change");
@@ -155,27 +186,11 @@ class WU_Security_Suite {
     }
     
     /**
-     * 渲染管理頁面
+     * 管理頁面
      */
-    public function render_admin_page() {
+    public function admin_page() {
         if (!current_user_can('manage_options')) {
-            wp_die(__('您沒有權限訪問此頁面。'));
-        }
-        
-        // 處理表單提交
-        if (isset($_POST['wu_security_submit'])) {
-            check_admin_referer('wu_security_settings');
-            
-            update_option('wu_disable_xmlrpc', isset($_POST['wu_disable_xmlrpc']) ? 1 : 0);
-            update_option('wu_disable_rss_feeds', isset($_POST['wu_disable_rss_feeds']) ? 1 : 0);
-            update_option('wu_rss_redirect_type', sanitize_text_field($_POST['wu_rss_redirect_type'] ?? '403'));
-            update_option('wu_rss_custom_message', wp_kses_post($_POST['wu_rss_custom_message'] ?? 'RSS feeds are disabled on this site.'));
-            update_option('wu_disable_comments_globally', isset($_POST['wu_disable_comments_globally']) ? 1 : 0);
-            update_option('wu_disable_comments_posts', isset($_POST['wu_disable_comments_posts']) ? 1 : 0);
-            update_option('wu_disable_comments_pages', isset($_POST['wu_disable_comments_pages']) ? 1 : 0);
-            update_option('wu_disable_comments_custom_types', isset($_POST['wu_disable_comments_custom_types']) ? 1 : 0);
-            
-            echo '<div class="notice notice-success is-dismissible"><p><strong>設定已儲存！</strong></p></div>';
+            wp_die(esc_html__('您沒有足夠的權限訪問此頁面。', 'wumetax-toolkit'));
         }
         
         // 處理刪除評論
@@ -185,15 +200,20 @@ class WU_Security_Suite {
             echo '<div class="notice notice-success is-dismissible"><p><strong>已刪除 ' . intval($deleted_count) . ' 條評論！</strong></p></div>';
         }
         
-        // 獲取狀態資料
-        $xmlrpc_disabled = get_option('wu_disable_xmlrpc', false);
-        $rss_disabled = get_option('wu_disable_rss_feeds', false);
-        $comments_disabled = get_option('wu_disable_comments_globally', false);
+        $this->settings = get_option($this->option_name, $this->get_default_settings());
+        $xmlrpc_disabled = !empty($this->settings['xmlrpc_enabled']);
+        $rss_disabled = !empty($this->settings['rss_enabled']);
+        $comments_disabled = !empty($this->settings['comments_globally']);
         $comments_count = wp_count_comments();
         
         ?>
         <div class="wrap wu-security-wrap">
-            <h1><span class="dashicons dashicons-shield" style="font-size: 32px; vertical-align: middle;"></span> 安全設定</h1>
+            <h1>
+                <span class="dashicons dashicons-shield" style="font-size: 32px; vertical-align: middle;"></span> 安全設定
+                <span class="wu-status-badge <?php echo ($xmlrpc_disabled || $rss_disabled || $comments_disabled) ? 'wu-status-on' : 'wu-status-off'; ?>">
+                    <?php echo ($xmlrpc_disabled || $rss_disabled || $comments_disabled) ? '部分啟用' : '未啟用'; ?>
+                </span>
+            </h1>
             <p class="description">管理 WordPress 網站的核心安全功能，降低攻擊風險並提升效能。</p>
             
             <!-- Tab 導覽 -->
@@ -279,8 +299,8 @@ class WU_Security_Suite {
             
             <!-- Tab 內容：XML-RPC -->
             <div id="wu-tab-xmlrpc" class="wu-security-content">
-                <form method="post" action="">
-                    <?php wp_nonce_field('wu_security_settings'); ?>
+                <form method="post" action="options.php">
+                    <?php settings_fields('wu_security_suite_group'); ?>
                     
                     <div class="wu-security-card">
                         <h2>XML-RPC 安全設定</h2>
@@ -301,7 +321,7 @@ class WU_Security_Suite {
                                 <th scope="row">禁用 XML-RPC</th>
                                 <td>
                                     <label>
-                                        <input type="checkbox" name="wu_disable_xmlrpc" value="1" <?php checked(1, $xmlrpc_disabled); ?> />
+                                        <input type="checkbox" name="<?php echo $this->option_name; ?>[xmlrpc_enabled]" value="1" <?php checked(1, $xmlrpc_disabled); ?> />
                                         完全禁用 WordPress 的 XML-RPC 功能
                                     </label>
                                     <p class="description">勾選此選項將禁用 XML-RPC，防止暴力攻擊和 DDoS 放大攻擊。</p>
@@ -321,16 +341,14 @@ class WU_Security_Suite {
                         </ul>
                     </div>
                     
-                    <p class="submit">
-                        <input type="submit" name="wu_security_submit" class="button button-primary" value="儲存設定" />
-                    </p>
+                    <?php submit_button('儲存設定'); ?>
                 </form>
             </div>
             
             <!-- Tab 內容：RSS -->
             <div id="wu-tab-rss" class="wu-security-content">
-                <form method="post" action="">
-                    <?php wp_nonce_field('wu_security_settings'); ?>
+                <form method="post" action="options.php">
+                    <?php settings_fields('wu_security_suite_group'); ?>
                     
                     <div class="wu-security-card">
                         <h2>RSS 禁用設定</h2>
@@ -350,7 +368,7 @@ class WU_Security_Suite {
                                 <th scope="row">禁用 RSS 來源</th>
                                 <td>
                                     <label>
-                                        <input type="checkbox" name="wu_disable_rss_feeds" value="1" <?php checked(1, $rss_disabled); ?> />
+                                        <input type="checkbox" name="<?php echo $this->option_name; ?>[rss_enabled]" value="1" <?php checked(1, $rss_disabled); ?> />
                                         禁用所有 RSS 來源
                                     </label>
                                     <p class="description">勾選此選項將禁用網站的所有 RSS 來源，包括文章、評論、分類等。</p>
@@ -359,11 +377,11 @@ class WU_Security_Suite {
                             <tr>
                                 <th scope="row">RSS 請求處理方式</th>
                                 <td>
-                                    <select name="wu_rss_redirect_type" id="wu_rss_redirect_type">
-                                        <option value="403" <?php selected(get_option('wu_rss_redirect_type', '403'), '403'); ?>>返回 403 禁止存取錯誤</option>
-                                        <option value="404" <?php selected(get_option('wu_rss_redirect_type', '403'), '404'); ?>>返回 404 找不到頁面錯誤</option>
-                                        <option value="homepage" <?php selected(get_option('wu_rss_redirect_type', '403'), 'homepage'); ?>>重新導向到首頁</option>
-                                        <option value="message" <?php selected(get_option('wu_rss_redirect_type', '403'), 'message'); ?>>顯示自訂訊息</option>
+                                    <select name="<?php echo $this->option_name; ?>[rss_redirect_type]" id="wu_rss_redirect_type">
+                                        <option value="403" <?php selected($this->settings['rss_redirect_type'], '403'); ?>>返回 403 禁止存取錯誤</option>
+                                        <option value="404" <?php selected($this->settings['rss_redirect_type'], '404'); ?>>返回 404 找不到頁面錯誤</option>
+                                        <option value="homepage" <?php selected($this->settings['rss_redirect_type'], 'homepage'); ?>>重新導向到首頁</option>
+                                        <option value="message" <?php selected($this->settings['rss_redirect_type'], 'message'); ?>>顯示自訂訊息</option>
                                     </select>
                                     <p class="description">選擇當有人嘗試存取 RSS 來源時的處理方式。</p>
                                 </td>
@@ -371,7 +389,7 @@ class WU_Security_Suite {
                             <tr>
                                 <th scope="row">自訂訊息</th>
                                 <td>
-                                    <textarea name="wu_rss_custom_message" id="wu_rss_custom_message" rows="3" class="large-text"><?php echo esc_textarea(get_option('wu_rss_custom_message', 'RSS feeds are disabled on this site.')); ?></textarea>
+                                    <textarea name="<?php echo $this->option_name; ?>[rss_custom_message]" id="wu_rss_custom_message" rows="3" class="large-text"><?php echo esc_textarea($this->settings['rss_custom_message']); ?></textarea>
                                     <p class="description">當選擇「顯示自訂訊息」時顯示的內容。支援 HTML 標籤。</p>
                                 </td>
                             </tr>
@@ -398,16 +416,14 @@ class WU_Security_Suite {
                         </ul>
                     </div>
                     
-                    <p class="submit">
-                        <input type="submit" name="wu_security_submit" class="button button-primary" value="儲存設定" />
-                    </p>
+                    <?php submit_button('儲存設定'); ?>
                 </form>
             </div>
             
             <!-- Tab 內容：評論 -->
             <div id="wu-tab-comments" class="wu-security-content">
-                <form method="post" action="">
-                    <?php wp_nonce_field('wu_security_settings'); ?>
+                <form method="post" action="options.php">
+                    <?php settings_fields('wu_security_suite_group'); ?>
                     
                     <div class="wu-security-card">
                         <h2>評論管理設定</h2>
@@ -431,7 +447,7 @@ class WU_Security_Suite {
                                 <th scope="row">全域禁用評論</th>
                                 <td>
                                     <label>
-                                        <input type="checkbox" name="wu_disable_comments_globally" id="wu_disable_comments_globally" value="1" <?php checked(1, $comments_disabled); ?> />
+                                        <input type="checkbox" name="<?php echo $this->option_name; ?>[comments_globally]" id="wu_disable_comments_globally" value="1" <?php checked(1, $comments_disabled); ?> />
                                         完全禁用整個網站的評論功能
                                     </label>
                                     <p class="description">勾選此選項將禁用所有內容類型的評論功能，包括現有評論的顯示。</p>
@@ -441,7 +457,7 @@ class WU_Security_Suite {
                                 <th scope="row">禁用文章評論</th>
                                 <td>
                                     <label>
-                                        <input type="checkbox" name="wu_disable_comments_posts" id="wu_disable_comments_posts" value="1" <?php checked(1, get_option('wu_disable_comments_posts', false)); ?> />
+                                        <input type="checkbox" name="<?php echo $this->option_name; ?>[comments_posts]" id="wu_disable_comments_posts" value="1" <?php checked(1, $this->settings['comments_posts']); ?> />
                                         僅禁用文章（Post）的評論功能
                                     </label>
                                     <p class="description">僅針對文章內容類型禁用評論，其他內容類型不受影響。</p>
@@ -451,7 +467,7 @@ class WU_Security_Suite {
                                 <th scope="row">禁用頁面評論</th>
                                 <td>
                                     <label>
-                                        <input type="checkbox" name="wu_disable_comments_pages" id="wu_disable_comments_pages" value="1" <?php checked(1, get_option('wu_disable_comments_pages', false)); ?> />
+                                        <input type="checkbox" name="<?php echo $this->option_name; ?>[comments_pages]" id="wu_disable_comments_pages" value="1" <?php checked(1, $this->settings['comments_pages']); ?> />
                                         僅禁用頁面（Page）的評論功能
                                     </label>
                                     <p class="description">僅針對頁面內容類型禁用評論，其他內容類型不受影響。</p>
@@ -461,7 +477,7 @@ class WU_Security_Suite {
                                 <th scope="row">禁用自訂內容類型評論</th>
                                 <td>
                                     <label>
-                                        <input type="checkbox" name="wu_disable_comments_custom_types" id="wu_disable_comments_custom_types" value="1" <?php checked(1, get_option('wu_disable_comments_custom_types', false)); ?> />
+                                        <input type="checkbox" name="<?php echo $this->option_name; ?>[comments_custom_types]" id="wu_disable_comments_custom_types" value="1" <?php checked(1, $this->settings['comments_custom_types']); ?> />
                                         禁用自訂內容類型的評論功能
                                     </label>
                                     <p class="description">針對所有自訂內容類型（如產品、作品集等）禁用評論功能。</p>
@@ -470,9 +486,7 @@ class WU_Security_Suite {
                         </table>
                     </div>
                     
-                    <p class="submit">
-                        <input type="submit" name="wu_security_submit" class="button button-primary" value="儲存設定" />
-                    </p>
+                    <?php submit_button('儲存設定'); ?>
                 </form>
                 
                 <?php if ($comments_count->total_comments > 0): ?>
@@ -507,7 +521,7 @@ class WU_Security_Suite {
      */
     private function init_frontend_features() {
         // XML-RPC 禁用
-        if (get_option('wu_disable_xmlrpc', false)) {
+        if (!empty($this->settings['xmlrpc_enabled'])) {
             add_filter('xmlrpc_enabled', '__return_false');
             add_filter('wp_xmlrpc_server_class', '__return_false');
             remove_action('wp_head', 'rsd_link');
@@ -516,7 +530,7 @@ class WU_Security_Suite {
         }
         
         // RSS 禁用
-        if (get_option('wu_disable_rss_feeds', false)) {
+        if (!empty($this->settings['rss_enabled'])) {
             remove_action('wp_head', 'feed_links_extra', 3);
             remove_action('wp_head', 'feed_links', 2);
             add_action('do_feed', array($this, 'handle_feed_request'), 1);
@@ -529,7 +543,7 @@ class WU_Security_Suite {
         }
         
         // 評論禁用
-        if (get_option('wu_disable_comments_globally', false)) {
+        if (!empty($this->settings['comments_globally'])) {
             add_action('init', array($this, 'remove_comment_support'));
             add_filter('comments_open', '__return_false', 20, 2);
             add_filter('pings_open', '__return_false', 20, 2);
@@ -539,20 +553,19 @@ class WU_Security_Suite {
             add_action('admin_menu', array($this, 'remove_comment_admin_menus'));
             add_filter('feed_links_show_comments_feed', '__return_false');
         } else {
-            // 選擇性禁用
-            if (get_option('wu_disable_comments_posts', false)) {
+            if (!empty($this->settings['comments_posts'])) {
                 add_action('init', function() {
                     remove_post_type_support('post', 'comments');
                     remove_post_type_support('post', 'trackbacks');
                 });
             }
-            if (get_option('wu_disable_comments_pages', false)) {
+            if (!empty($this->settings['comments_pages'])) {
                 add_action('init', function() {
                     remove_post_type_support('page', 'comments');
                     remove_post_type_support('page', 'trackbacks');
                 });
             }
-            if (get_option('wu_disable_comments_custom_types', false)) {
+            if (!empty($this->settings['comments_custom_types'])) {
                 add_action('init', array($this, 'disable_custom_type_comments'));
             }
         }
@@ -572,7 +585,7 @@ class WU_Security_Suite {
      * 處理 RSS 請求
      */
     public function handle_feed_request() {
-        $redirect_type = get_option('wu_rss_redirect_type', '403');
+        $redirect_type = $this->settings['rss_redirect_type'];
         
         switch ($redirect_type) {
             case '403':
@@ -590,7 +603,7 @@ class WU_Security_Suite {
                 wp_redirect(home_url(), 301);
                 exit;
             case 'message':
-                $custom_message = get_option('wu_rss_custom_message', 'RSS feeds are disabled on this site.');
+                $custom_message = $this->settings['rss_custom_message'];
                 status_header(200);
                 nocache_headers();
                 echo '<!DOCTYPE html><html><head><title>RSS Feeds Disabled</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;line-height:1.6;margin:0;padding:40px 20px;background-color:#f1f1f1;"><div style="max-width:600px;margin:0 auto;background:white;padding:40px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1);"><h1 style="color:#23282d;margin-bottom:20px;text-align:center;">RSS Feeds Disabled</h1><div style="color:#555;margin-bottom:30px;">' . wp_kses_post($custom_message) . '</div><div style="text-align:center;"><a href="' . esc_url(home_url()) . '" style="color:#0073aa;text-decoration:none;padding:10px 20px;border:1px solid #0073aa;border-radius:4px;display:inline-block;">Return to ' . esc_html(get_bloginfo('name')) . '</a></div></div></body></html>';
@@ -674,5 +687,5 @@ class WU_Security_Suite {
     }
 }
 
-// 初始化安全套件
-WU_Security_Suite::get_instance();
+// 初始化模組
+new WU_Security_Suite();
