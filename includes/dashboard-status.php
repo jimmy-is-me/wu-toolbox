@@ -3,15 +3,16 @@ if (!defined('ABSPATH')) exit;
 
 /*
  * WumetaxToolkit - Professional Client Dashboard
- * Version: 10.0 - Clean & Professional Design
+ * Version: 11.0 - Enhanced Features
  * 
- * FEATURES:
- * - Single column layout (WordPress native style)
- * - No emoji, professional text only
- * - Disk quota upgrade notice
- * - Support ticket system (Discord webhook)
- * - Simplified login tracking
- * - Zero performance impact
+ * CHANGELOG:
+ * - Auto-detect domain name
+ * - Advanced plan upgrade webhook
+ * - Disk upgrade webhook
+ * - Ticket submission history
+ * - Backup & security status
+ * - Removed login tracking
+ * - Service plan label
  */
 
 // ===== Menu Registration =====
@@ -33,6 +34,8 @@ add_action('admin_init', function() {
 	add_option('wu_dashboard_enabled', 1);
 	add_option('wu_dashboard_site_status', 'normal');
 	add_option('wu_dashboard_status_note', '');
+	add_option('wu_dashboard_backup_status', 'normal');
+	add_option('wu_dashboard_security_status', 'normal');
 	add_option('wu_dashboard_recent_work', array());
 	add_option('wu_dashboard_services', array(
 		'定期備份採每日備份，保留三份，緊急還原使用',
@@ -50,7 +53,7 @@ add_action('admin_init', function() {
 	add_option('wu_dashboard_payments', array());
 	add_option('wu_dashboard_referrals', array());
 	add_option('wu_dashboard_advanced_plan', 0);
-	add_option('wu_dashboard_domain_name', '');
+	add_option('wu_dashboard_support_tickets', array());
 });
 
 // ===== Dashboard Widget =====
@@ -76,18 +79,20 @@ add_action('wp_dashboard_setup', function() {
 function wu_render_unified_dashboard() {
 	$status = get_option('wu_dashboard_site_status', 'normal');
 	$status_note = get_option('wu_dashboard_status_note', '');
+	$backup_status = get_option('wu_dashboard_backup_status', 'normal');
+	$security_status = get_option('wu_dashboard_security_status', 'normal');
 	$ssl_info = wu_get_ssl_info();
 	$php_info = wu_get_php_info();
 	$hosting_plan = get_option('wu_dashboard_hosting_plan', 'image');
 	$hosting_rating = get_option('wu_dashboard_hosting_rating', '優良運作');
 	$disk_info = wu_get_disk_info();
-	$login_stats = wu_get_login_stats();
 	$services = get_option('wu_dashboard_services', array());
 	$recent_work = get_option('wu_dashboard_recent_work', array());
 	$payments = get_option('wu_dashboard_payments', array());
 	$referrals = get_option('wu_dashboard_referrals', array());
 	$advanced_plan = get_option('wu_dashboard_advanced_plan', 0);
-	$domain_name = get_option('wu_dashboard_domain_name', parse_url(home_url(), PHP_URL_HOST));
+	$support_tickets = get_option('wu_dashboard_support_tickets', array());
+	$domain_name = parse_url(home_url(), PHP_URL_HOST);
 	
 	$status_config = array(
 		'normal' => array('label' => '正常運作', 'color' => '#46b450'),
@@ -112,6 +117,12 @@ function wu_render_unified_dashboard() {
 	if (!empty($payments)) {
 		usort($payments, function($a, $b) {
 			return strtotime($b['date']) - strtotime($a['date']);
+		});
+	}
+	
+	if (!empty($support_tickets)) {
+		usort($support_tickets, function($a, $b) {
+			return $b['timestamp'] - $a['timestamp'];
 		});
 	}
 	
@@ -163,6 +174,24 @@ function wu_render_unified_dashboard() {
 						<td><strong><?php echo esc_html($plan_name); ?></strong></td>
 						<td class="wu-info-meta">評估：<?php echo esc_html($hosting_rating); ?></td>
 					</tr>
+					<tr>
+						<th>備份狀態</th>
+						<td>
+							<span class="wu-status-indicator" style="color:<?php echo $backup_status === 'normal' ? '#46b450' : '#dc3232'; ?>;">
+								<?php echo $backup_status === 'normal' ? '正常' : '異常'; ?>
+							</span>
+						</td>
+						<td class="wu-info-meta">每日自動備份，保留 3 份</td>
+					</tr>
+					<tr>
+						<th>安全狀態</th>
+						<td>
+							<span class="wu-status-indicator" style="color:<?php echo $security_status === 'normal' ? '#46b450' : '#dc3232'; ?>;">
+								<?php echo $security_status === 'normal' ? '正常' : '異常'; ?>
+							</span>
+						</td>
+						<td class="wu-info-meta">防火牆與安全監控運作中</td>
+					</tr>
 				</tbody>
 			</table>
 		</div>
@@ -201,51 +230,28 @@ function wu_render_unified_dashboard() {
 				<?php echo esc_html($disk_info['status_text']); ?>
 			</div>
 			
-			<?php if ($disk_info['over_quota']): ?>
+			<?php if ($disk_info['percentage'] >= 100): ?>
 			<div class="wu-notice wu-notice-error">
-				<strong>磁碟空間已超過配額</strong><br>
-				如需增加磁碟配額，請聯繫我們：<br>
-				• 增加 5 GB：NT$ 2,000 / 年<br>
-				• 增加 10 GB：NT$ 3,500 / 年
+				<strong><?php echo $disk_info['percentage'] == 100 ? '磁碟已滿' : '磁碟容量超出配額'; ?></strong><br>
+				立即聯繫升級 NVMe SSD 硬碟空間：<br>
+				• +5 GB：NT$ 2,000 / 年<br>
+				• +10 GB：NT$ 3,500 / 年
+				<div style="margin-top:10px;">
+					<button type="button" class="wu-button wu-button-danger" onclick="wuRequestDiskUpgrade()">
+						立即申請磁碟升級
+					</button>
+				</div>
 			</div>
-			<?php endif; ?>
-		</div>
-		
-		<!-- 管理員登入紀錄 -->
-		<div class="wu-section">
-			<h3 class="wu-section-title">管理員登入紀錄</h3>
-			<?php if (!empty($login_stats['recent_logins'])): ?>
-			<table class="wu-table">
-				<thead>
-					<tr>
-						<th>管理員</th>
-						<th>登入時間</th>
-						<th>IP 位址</th>
-						<th style="text-align:center;">登入次數</th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php foreach ($login_stats['recent_logins'] as $login): ?>
-					<tr>
-						<td><strong><?php echo esc_html($login['name']); ?></strong></td>
-						<td><?php echo esc_html($login['time']); ?></td>
-						<td><code class="wu-code"><?php echo esc_html($login['ip']); ?></code></td>
-						<td style="text-align:center;">
-							<span class="wu-count-badge"><?php echo esc_html($login['count']); ?></span>
-						</td>
-					</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
-			<?php else: ?>
-			<p class="wu-empty-state">尚無登入紀錄</p>
 			<?php endif; ?>
 		</div>
 		
 		<!-- 維運服務項目 -->
 		<?php if (!empty($services)): ?>
 		<div class="wu-section">
-			<h3 class="wu-section-title">維運服務項目</h3>
+			<h3 class="wu-section-title">
+				維運服務項目
+				<span class="wu-section-label">目前方案</span>
+			</h3>
 			<ul class="wu-service-list">
 				<?php foreach ($services as $service): ?>
 				<li><?php echo esc_html($service); ?></li>
@@ -302,7 +308,7 @@ function wu_render_unified_dashboard() {
 					<li>提供所需模組授權金鑰並協助定期更新</li>
 				</ul>
 				<p class="wu-promo-note">升級進階維護方案，享受更完整的技術支援與資料安全保障</p>
-				<a href="mailto:contact@wumetax.com?subject=進階維護方案諮詢" class="wu-button">立即諮詢升級</a>
+				<button type="button" class="wu-button" onclick="wuRequestAdvancedPlan()">立即諮詢升級</button>
 			</div>
 		</div>
 		<?php endif; ?>
@@ -442,17 +448,44 @@ function wu_render_unified_dashboard() {
 			<div class="wu-support-note">
 				<p><strong>注意事項：</strong></p>
 				<ul>
-					<li>收到工單後，我們將盡快安排處理（工作日 24 小時內回覆）</li>
+					<li>收到工單後，我們將盡快安排處理（工作日 7 天內回覆）</li>
 					<li>若問題超出現有服務範疇，將另行報價</li>
 					<li>如長時間無回覆，請聯繫 <a href="https://lin.ee/Lut7wCe" target="_blank">LINE 官方帳號</a></li>
 				</ul>
 			</div>
+			
+			<!-- 工單提交紀錄 -->
+			<?php if (!empty($support_tickets)): ?>
+			<div class="wu-ticket-history">
+				<h4 class="wu-ticket-history-title">工單提交紀錄</h4>
+				<table class="wu-table wu-table-compact">
+					<thead>
+						<tr>
+							<th width="150">提交時間</th>
+							<th>問題類型</th>
+							<th style="text-align:center;" width="120">工單編號</th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach (array_slice($support_tickets, 0, 10) as $ticket): ?>
+						<tr>
+							<td><?php echo esc_html(date('Y/m/d H:i', $ticket['timestamp'])); ?></td>
+							<td><strong><?php echo esc_html($ticket['subject']); ?></strong></td>
+							<td style="text-align:center;">
+								<code class="wu-code">#<?php echo esc_html($ticket['ticket_id']); ?></code>
+							</td>
+						</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			</div>
+			<?php endif; ?>
 		</div>
 		
 		<!-- 聯絡資訊 -->
 		<div class="wu-section wu-contact-section">
 			<h3 class="wu-section-title">聯絡資訊</h3>
-			<div class="wu-contact-grid">
+			<div class="wu-contact-list">
 				<div class="wu-contact-item">
 					<div class="wu-contact-label">公司名稱</div>
 					<div class="wu-contact-value">WUMETAX 末特數位科技</div>
@@ -480,6 +513,7 @@ function wu_render_unified_dashboard() {
 	
 	<script>
 	jQuery(document).ready(function($) {
+		// 工單提交
 		$('#wu-support-form').on('submit', function(e) {
 			e.preventDefault();
 			
@@ -509,6 +543,9 @@ function wu_render_unified_dashboard() {
 					if (response.success) {
 						$result.html('<div class="wu-notice wu-notice-success">' + response.data.message + '</div>');
 						$form[0].reset();
+						setTimeout(function() {
+							location.reload();
+						}, 2000);
 					} else {
 						$result.html('<div class="wu-notice wu-notice-error">' + response.data.message + '</div>');
 					}
@@ -524,6 +561,63 @@ function wu_render_unified_dashboard() {
 			});
 		});
 	});
+	
+	// 進階方案諮詢
+	function wuRequestAdvancedPlan() {
+		if (!confirm('確定要發送進階維護方案諮詢申請嗎？')) {
+			return;
+		}
+		
+		jQuery.ajax({
+			url: ajaxurl,
+			type: 'POST',
+			data: {
+				action: 'wu_request_advanced_plan',
+				domain: '<?php echo esc_js(home_url()); ?>',
+				site_name: '<?php echo esc_js(get_bloginfo('name')); ?>'
+			},
+			success: function(response) {
+				if (response.success) {
+					alert('諮詢申請已送出，我們將盡快與您聯繫！');
+				} else {
+					alert('提交失敗，請聯繫 LINE 官方帳號：https://lin.ee/Lut7wCe');
+				}
+			},
+			error: function() {
+				alert('提交失敗，請聯繫 LINE 官方帳號：https://lin.ee/Lut7wCe');
+			}
+		});
+	}
+	
+	// 磁碟升級申請
+	function wuRequestDiskUpgrade() {
+		if (!confirm('確定要發送磁碟升級申請嗎？')) {
+			return;
+		}
+		
+		jQuery.ajax({
+			url: ajaxurl,
+			type: 'POST',
+			data: {
+				action: 'wu_request_disk_upgrade',
+				domain: '<?php echo esc_js(home_url()); ?>',
+				site_name: '<?php echo esc_js(get_bloginfo('name')); ?>',
+				current_usage: '<?php echo esc_js($disk_info['used_formatted']); ?>',
+				quota: '<?php echo esc_js($disk_info['quota_formatted']); ?>',
+				percentage: '<?php echo esc_js($disk_info['percentage']); ?>'
+			},
+			success: function(response) {
+				if (response.success) {
+					alert('磁碟升級申請已送出，我們將盡快與您聯繫！');
+				} else {
+					alert('提交失敗，請聯繫 LINE 官方帳號：https://lin.ee/Lut7wCe');
+				}
+			},
+			error: function() {
+				alert('提交失敗，請聯繫 LINE 官方帳號：https://lin.ee/Lut7wCe');
+			}
+		});
+	}
 	</script>
 	<?php
 }
@@ -548,15 +642,23 @@ function wu_handle_support_ticket() {
 		wp_send_json_error(array('message' => '請填寫所有必填欄位'));
 	}
 	
+	// 生成工單編號
+	$ticket_id = strtoupper(substr(md5($domain . time()), 0, 8));
+	
 	// 發送到 Discord
 	$webhook_url = 'https://discordapp.com/api/webhooks/1456920175335968858/p6yPCrxqVwTozOEJwIiXkxS8lSe4K4xq1noRLPeYsLXYT8AOqUjllca2rsiClzbamJF2';
 	
 	$discord_message = array(
 		'embeds' => array(
 			array(
-				'title' => '新的技術支援工單',
+				'title' => '🎫 新的技術支援工單',
 				'color' => 3447003,
 				'fields' => array(
+					array(
+						'name' => '工單編號',
+						'value' => '#' . $ticket_id,
+						'inline' => true
+					),
 					array(
 						'name' => '網站',
 						'value' => $domain,
@@ -597,9 +699,152 @@ function wu_handle_support_ticket() {
 		wp_send_json_error(array('message' => '提交失敗，請稍後再試或聯繫 LINE 官方帳號'));
 	}
 	
+	// 儲存工單紀錄
+	$tickets = get_option('wu_dashboard_support_tickets', array());
+	$tickets[] = array(
+		'ticket_id' => $ticket_id,
+		'subject' => $subject,
+		'timestamp' => current_time('timestamp')
+	);
+	update_option('wu_dashboard_support_tickets', $tickets);
+	
 	wp_send_json_success(array(
-		'message' => '工單已成功提交！我們收到後將盡快安排處理。若問題超出處理範疇則另行報價，若長時間無回覆請聯繫 LINE 官方帳號。'
+		'message' => '工單已成功提交！工單編號：#' . $ticket_id . '。我們收到後將盡快安排處理。'
 	));
+}
+
+// ===== Advanced Plan Request Handler =====
+
+add_action('wp_ajax_wu_request_advanced_plan', 'wu_handle_advanced_plan_request');
+
+function wu_handle_advanced_plan_request() {
+	if (!current_user_can('read')) {
+		wp_send_json_error(array('message' => '權限不足'));
+	}
+	
+	$domain = sanitize_text_field($_POST['domain'] ?? '');
+	$site_name = sanitize_text_field($_POST['site_name'] ?? '');
+	
+	$webhook_url = 'https://discordapp.com/api/webhooks/1456931726247858190/nqtBoz3Io5j-JJbnVoYfS8waJ8lynYgj-3BuZ3TH_EiXIga5iF14GL5BI-tamrXccAKD';
+	
+	$discord_message = array(
+		'embeds' => array(
+			array(
+				'title' => '🚀 進階維護方案諮詢申請',
+				'color' => 3066993,
+				'fields' => array(
+					array(
+						'name' => '網站名稱',
+						'value' => $site_name,
+						'inline' => false
+					),
+					array(
+						'name' => '網站網址',
+						'value' => $domain,
+						'inline' => false
+					),
+					array(
+						'name' => '申請時間',
+						'value' => current_time('Y-m-d H:i:s'),
+						'inline' => false
+					),
+					array(
+						'name' => '方案內容',
+						'value' => 'NT$ 8,000 / 年（未稅）',
+						'inline' => false
+					)
+				)
+			)
+		)
+	);
+	
+	$response = wp_remote_post($webhook_url, array(
+		'headers' => array('Content-Type' => 'application/json'),
+		'body' => json_encode($discord_message),
+		'timeout' => 15
+	));
+	
+	if (is_wp_error($response)) {
+		wp_send_json_error(array('message' => '提交失敗'));
+	}
+	
+	wp_send_json_success(array('message' => '已成功送出'));
+}
+
+// ===== Disk Upgrade Request Handler =====
+
+add_action('wp_ajax_wu_request_disk_upgrade', 'wu_handle_disk_upgrade_request');
+
+function wu_handle_disk_upgrade_request() {
+	if (!current_user_can('read')) {
+		wp_send_json_error(array('message' => '權限不足'));
+	}
+	
+	$domain = sanitize_text_field($_POST['domain'] ?? '');
+	$site_name = sanitize_text_field($_POST['site_name'] ?? '');
+	$current_usage = sanitize_text_field($_POST['current_usage'] ?? '');
+	$quota = sanitize_text_field($_POST['quota'] ?? '');
+	$percentage = sanitize_text_field($_POST['percentage'] ?? '');
+	
+	$webhook_url = 'https://discordapp.com/api/webhooks/1456932781689929759/RLZBDmug38qCPtsFbqH_Imc50TqkaeV18lQpF1kLSJxyqfz6ZZ-e7T7TH2hOF-yIv_Rz';
+	
+	$discord_message = array(
+		'embeds' => array(
+			array(
+				'title' => '💾 磁碟升級申請（緊急）',
+				'color' => 15158332,
+				'fields' => array(
+					array(
+						'name' => '網站名稱',
+						'value' => $site_name,
+						'inline' => false
+					),
+					array(
+						'name' => '網站網址',
+						'value' => $domain,
+						'inline' => false
+					),
+					array(
+						'name' => '目前使用量',
+						'value' => $current_usage,
+						'inline' => true
+					),
+					array(
+						'name' => '配額',
+						'value' => $quota,
+						'inline' => true
+					),
+					array(
+						'name' => '使用率',
+						'value' => $percentage . '%',
+						'inline' => true
+					),
+					array(
+						'name' => '申請時間',
+						'value' => current_time('Y-m-d H:i:s'),
+						'inline' => false
+					),
+					array(
+						'name' => '升級方案',
+						'value' => "• +5 GB：NT$ 2,000 / 年\n• +10 GB：NT$ 3,500 / 年",
+						'inline' => false
+					)
+				)
+			)
+		)
+	);
+	
+	$response = wp_remote_post($webhook_url, array(
+		'headers' => array('Content-Type' => 'application/json'),
+		'body' => json_encode($discord_message),
+		'timeout' => 15
+	));
+	
+	if (is_wp_error($response)) {
+		wp_send_json_error(array('message' => '提交失敗'));
+	}
+	
+	wp_send_json_success(array('message' => '已成功送出'));
 }
 
 // ===== Helper Functions =====
@@ -638,7 +883,6 @@ function wu_get_php_info() {
 	$major = (int) PHP_MAJOR_VERSION;
 	$minor = (int) PHP_MINOR_VERSION;
 	
-	// PHP 穩定版本判斷
 	$stable_versions = array('8.1', '8.2', '8.3');
 	$current_version = $major . '.' . $minor;
 	
@@ -678,7 +922,6 @@ function wu_get_disk_info() {
 	$remaining_mb = $quota_mb - $used_mb;
 	$over_quota = $percentage > 100;
 	
-	// 狀態判斷
 	if ($percentage < 70) {
 		$status_text = '磁碟空間充足';
 		$status_class = 'wu-disk-status-normal';
@@ -687,17 +930,25 @@ function wu_get_disk_info() {
 		$status_text = '磁碟空間即將達上限，建議清理或升級配額';
 		$status_class = 'wu-disk-status-warning';
 		$color = '#f0b849';
-	} else {
+	} elseif ($percentage < 100) {
 		$status_text = '磁碟空間已接近上限，請盡快處理';
 		$status_class = 'wu-disk-status-danger';
 		$color = '#dc3232';
+	} elseif ($percentage == 100) {
+		$status_text = '磁碟已滿';
+		$status_class = 'wu-disk-status-full';
+		$color = '#dc3232';
+	} else {
+		$status_text = '磁碟容量超出配額';
+		$status_class = 'wu-disk-status-exceeded';
+		$color = '#a00';
 	}
 	
 	$info = array(
 		'used_mb' => $used_mb,
 		'quota_mb' => $quota_mb,
 		'remaining_mb' => $remaining_mb,
-		'percentage' => number_format(min($percentage, 100), 1),
+		'percentage' => number_format(min($percentage, 999), 1),
 		'used_formatted' => number_format($used_mb, 0) . ' MB',
 		'quota_formatted' => number_format($quota_mb, 0) . ' MB',
 		'remaining_formatted' => number_format(max($remaining_mb, 0), 0) . ' MB',
@@ -753,65 +1004,6 @@ function wu_calculate_site_size() {
 	return $size;
 }
 
-function wu_get_login_stats() {
-	$cache_key = 'wu_login_stats';
-	$cached = get_transient($cache_key);
-	
-	if ($cached !== false) {
-		return $cached;
-	}
-	
-	$admins = get_users(array(
-		'role' => 'administrator',
-		'fields' => array('ID', 'display_name', 'user_login')
-	));
-	
-	$recent_logins = array();
-	
-	foreach ($admins as $admin) {
-		$last_login = get_user_meta($admin->ID, 'wu_last_login', true);
-		$last_ip = get_user_meta($admin->ID, 'wu_last_ip', true);
-		$login_count = get_user_meta($admin->ID, 'wu_login_count', true);
-		
-		if (!empty($last_login)) {
-			$recent_logins[] = array(
-				'name' => $admin->display_name ?: $admin->user_login,
-				'time' => date('Y-m-d H:i:s', $last_login),
-				'ip' => $last_ip ?: '-',
-				'count' => $login_count ?: 1,
-				'timestamp' => $last_login
-			);
-		}
-	}
-	
-	usort($recent_logins, function($a, $b) {
-		return $b['timestamp'] - $a['timestamp'];
-	});
-	
-	$stats = array(
-		'recent_logins' => array_slice($recent_logins, 0, 10)
-	);
-	
-	set_transient($cache_key, $stats, HOUR_IN_SECONDS * 6);
-	
-	return $stats;
-}
-
-// ===== Login Tracking =====
-
-add_action('wp_login', function($user_login, $user) {
-	if (user_can($user, 'manage_options')) {
-		update_user_meta($user->ID, 'wu_last_login', current_time('timestamp'));
-		update_user_meta($user->ID, 'wu_last_ip', $_SERVER['REMOTE_ADDR'] ?? '-');
-		
-		// 累計登入次數
-		$current_count = get_user_meta($user->ID, 'wu_login_count', true);
-		update_user_meta($user->ID, 'wu_login_count', intval($current_count) + 1);
-		
-		delete_transient('wu_login_stats');
-	}
-}, 10, 2);
-
 // ===== Settings Page =====
 
 function wu_dashboard_settings_page() {
@@ -825,7 +1017,8 @@ function wu_dashboard_settings_page() {
 		update_option('wu_dashboard_enabled', isset($_POST['enabled']) ? 1 : 0);
 		update_option('wu_dashboard_site_status', sanitize_text_field($_POST['status'] ?? 'normal'));
 		update_option('wu_dashboard_status_note', sanitize_textarea_field($_POST['status_note'] ?? ''));
-		update_option('wu_dashboard_domain_name', sanitize_text_field($_POST['domain_name'] ?? ''));
+		update_option('wu_dashboard_backup_status', sanitize_text_field($_POST['backup_status'] ?? 'normal'));
+		update_option('wu_dashboard_security_status', sanitize_text_field($_POST['security_status'] ?? 'normal'));
 		
 		$recent_work = array();
 		if (!empty($_POST['work_titles'])) {
@@ -885,7 +1078,6 @@ function wu_dashboard_settings_page() {
 		delete_transient('wu_ssl_info');
 		delete_transient('wu_disk_info');
 		delete_transient('wu_site_size_mb');
-		delete_transient('wu_login_stats');
 		
 		echo '<div class="notice notice-success is-dismissible"><p><strong>設定已儲存</strong></p></div>';
 	}
@@ -893,7 +1085,8 @@ function wu_dashboard_settings_page() {
 	$enabled = get_option('wu_dashboard_enabled', 1);
 	$status = get_option('wu_dashboard_site_status', 'normal');
 	$status_note = get_option('wu_dashboard_status_note', '');
-	$domain_name = get_option('wu_dashboard_domain_name', parse_url(home_url(), PHP_URL_HOST));
+	$backup_status = get_option('wu_dashboard_backup_status', 'normal');
+	$security_status = get_option('wu_dashboard_security_status', 'normal');
 	$recent_work = get_option('wu_dashboard_recent_work', array());
 	$services = get_option('wu_dashboard_services', array());
 	$hosting_plan = get_option('wu_dashboard_hosting_plan', 'image');
@@ -912,6 +1105,7 @@ function wu_dashboard_settings_page() {
 			<p style="margin:0;"><strong>系統說明</strong></p>
 			<ul style="margin:8px 0 0 20px;line-height:1.8;">
 				<li>儀表板採用 WordPress 原生風格設計，單欄式佈局</li>
+				<li>網域名稱自動抓取當前網站網址</li>
 				<li>磁碟使用僅計算 WordPress 網站本身，不影響後台載入速度</li>
 				<li>所有統計資料使用快取機制，每 6-12 小時自動更新</li>
 				<li>技術支援工單會自動發送到 Discord 通知</li>
@@ -969,9 +1163,22 @@ function wu_dashboard_settings_page() {
 				</tr>
 				
 				<tr>
-					<th><label>網域名稱</label></th>
+					<th><label>備份狀態</label></th>
 					<td>
-						<input type="text" name="domain_name" value="<?php echo esc_attr($domain_name); ?>" class="regular-text">
+						<select name="backup_status">
+							<option value="normal" <?php selected($backup_status, 'normal'); ?>>正常</option>
+							<option value="abnormal" <?php selected($backup_status, 'abnormal'); ?>>異常</option>
+						</select>
+					</td>
+				</tr>
+				
+				<tr>
+					<th><label>安全狀態</label></th>
+					<td>
+						<select name="security_status">
+							<option value="normal" <?php selected($security_status, 'normal'); ?>>正常</option>
+							<option value="abnormal" <?php selected($security_status, 'abnormal'); ?>>異常</option>
+						</select>
 					</td>
 				</tr>
 				
@@ -1190,6 +1397,19 @@ add_action('admin_head', function() {
 		margin: 0 0 15px 0;
 		padding-bottom: 10px;
 		border-bottom: 1px solid #dcdcde;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+	
+	.wu-section-label {
+		display: inline-block;
+		padding: 3px 10px;
+		background: #2271b1;
+		color: #fff;
+		font-size: 11px;
+		font-weight: 600;
+		border-radius: 3px;
 	}
 	
 	/* Status Card */
@@ -1221,6 +1441,10 @@ add_action('admin_head', function() {
 		font-size: 13px;
 		color: #50575e;
 		line-height: 1.6;
+	}
+	
+	.wu-status-indicator {
+		font-weight: 600;
 	}
 	
 	/* Info Table */
@@ -1348,7 +1572,9 @@ add_action('admin_head', function() {
 		color: #996800;
 	}
 	
-	.wu-disk-status-danger {
+	.wu-disk-status-danger,
+	.wu-disk-status-full,
+	.wu-disk-status-exceeded {
 		background: #fcdbdb;
 		color: #b32d2e;
 	}
@@ -1401,6 +1627,10 @@ add_action('admin_head', function() {
 	
 	.wu-table tbody tr:last-child td {
 		border-bottom: none;
+	}
+	
+	.wu-table-compact tbody td {
+		padding: 8px 12px;
 	}
 	
 	.wu-code {
@@ -1576,12 +1806,22 @@ add_action('admin_head', function() {
 		border-radius: 3px;
 		font-size: 13px;
 		font-weight: 600;
+		border: none;
+		cursor: pointer;
 		transition: background 0.2s;
 	}
 	
 	.wu-button:hover {
 		background: #135e96;
 		color: #fff;
+	}
+	
+	.wu-button-danger {
+		background: #d63638;
+	}
+	
+	.wu-button-danger:hover {
+		background: #b32d2e;
 	}
 	
 	/* Referral */
@@ -1708,14 +1948,31 @@ add_action('admin_head', function() {
 		line-height: 1.6;
 	}
 	
+	/* Ticket History */
+	.wu-ticket-history {
+		margin-top: 20px;
+		padding: 15px;
+		background: #fff;
+		border: 1px solid #dcdcde;
+	}
+	
+	.wu-ticket-history-title {
+		font-size: 13px;
+		font-weight: 600;
+		color: #1d2327;
+		margin: 0 0 15px 0;
+		padding-bottom: 10px;
+		border-bottom: 1px solid #dcdcde;
+	}
+	
 	/* Contact */
 	.wu-contact-section {
 		background: #f0f6fc;
 	}
 	
-	.wu-contact-grid {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
+	.wu-contact-list {
+		display: flex;
+		flex-direction: column;
 		gap: 15px;
 	}
 	
@@ -1723,14 +1980,16 @@ add_action('admin_head', function() {
 		padding: 15px;
 		background: #fff;
 		border: 1px solid #dcdcde;
-		text-align: center;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
 	}
 	
 	.wu-contact-label {
-		font-size: 11px;
+		font-size: 12px;
 		color: #646970;
+		font-weight: 600;
 		text-transform: uppercase;
-		margin-bottom: 8px;
 	}
 	
 	.wu-contact-value {
@@ -1760,8 +2019,7 @@ add_action('admin_head', function() {
 	
 	/* Responsive */
 	@media (max-width: 782px) {
-		.wu-disk-grid,
-		.wu-contact-grid {
+		.wu-disk-grid {
 			grid-template-columns: 1fr;
 		}
 		
@@ -1769,6 +2027,12 @@ add_action('admin_head', function() {
 			flex-direction: column;
 			gap: 10px;
 			text-align: center;
+		}
+		
+		.wu-contact-item {
+			flex-direction: column;
+			text-align: center;
+			gap: 8px;
 		}
 	}
 	</style>
