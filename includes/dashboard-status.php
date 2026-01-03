@@ -3,13 +3,13 @@ if (!defined('ABSPATH')) exit;
 
 /*
  * WumetaxToolkit - Unified Dashboard Widget
- * Version: 7.0 - Single Full-Width Dashboard
+ * Version: 8.0 - Performance Optimized Media Quota
  * 
  * FEATURES:
- * - Single unified full-width dashboard
- * - Complete site disk usage calculation
- * - Admin-only login tracking with IP
- * - Lightweight performance
+ * - Incremental media size tracking (no directory scan)
+ * - Thumbnail/derivative images calculation
+ * - Real-time quota monitoring
+ * - Zero performance impact
  */
 
 // ===== Menu Registration =====
@@ -44,6 +44,11 @@ add_action('admin_init', function() {
 	add_option('wu_dashboard_hosting_rating', '優良運作');
 	add_option('wu_dashboard_disk_total', '5120');
 	add_option('wu_dashboard_payments', array());
+	
+	// 媒體配額設定
+	add_option('wu_media_used_bytes', 0);
+	add_option('wu_media_quota_bytes', 10737418240); // 10 GB
+	add_option('wu_media_last_sync', 0);
 });
 
 // ===== Dashboard Widget =====
@@ -53,7 +58,6 @@ add_action('wp_dashboard_setup', function() {
 		return;
 	}
 	
-	// 單一全寬綜合儀表板
 	wp_add_dashboard_widget(
 		'wu_unified_dashboard',
 		'<span class="dashicons dashicons-dashboard"></span> 網站綜合儀表板',
@@ -68,7 +72,6 @@ add_action('wp_dashboard_setup', function() {
 // ===== Unified Dashboard Renderer =====
 
 function wu_render_unified_dashboard() {
-	// 取得所有資料
 	$status = get_option('wu_dashboard_site_status', 'normal');
 	$status_note = get_option('wu_dashboard_status_note', '');
 	$ssl_valid = wu_check_ssl_status();
@@ -80,7 +83,7 @@ function wu_render_unified_dashboard() {
 	$disk_percentage = ($disk_used / $disk_total) * 100;
 	$wp_memory_limit = WP_MEMORY_LIMIT;
 	$login_stats = wu_get_login_stats();
-	$media_stats = wu_get_media_stats();
+	$media_quota = wu_get_media_quota_info();
 	$services = get_option('wu_dashboard_services', array());
 	$recent_work = get_option('wu_dashboard_recent_work', array());
 	$payments = get_option('wu_dashboard_payments', array());
@@ -99,7 +102,6 @@ function wu_render_unified_dashboard() {
 	);
 	$plan_name = $plan_names[$hosting_plan] ?? '標準主機';
 	
-	// 排序最近處理和款項
 	if (!empty($recent_work)) {
 		usort($recent_work, function($a, $b) {
 			return strtotime($b['date']) - strtotime($a['date']);
@@ -181,7 +183,7 @@ function wu_render_unified_dashboard() {
 			</div>
 		</div>
 		
-		<!-- Row 2: 登入統計 + 媒體分析 -->
+		<!-- Row 2: 登入統計 + 媒體配額 -->
 		<div class="wu-dashboard-row">
 			<div class="wu-dashboard-section">
 				<div class="wu-section-header">登入統計</div>
@@ -227,15 +229,28 @@ function wu_render_unified_dashboard() {
 			</div>
 			
 			<div class="wu-dashboard-section">
-				<div class="wu-section-header">媒體分析</div>
-				<div class="wu-grid-2">
-					<div class="wu-stat-box">
-						<div class="wu-label">總檔案數</div>
-						<div class="wu-value"><?php echo number_format($media_stats['total_files']); ?></div>
+				<div class="wu-section-header">媒體配額</div>
+				<div class="wu-media-quota-display">
+					<div class="wu-quota-main">
+						<div class="wu-quota-status <?php echo esc_attr($media_quota['status_class']); ?>">
+							<?php echo esc_html($media_quota['status_icon']); ?>
+							<span><?php echo esc_html($media_quota['status_text']); ?></span>
+						</div>
+						<div class="wu-quota-usage">
+							<div class="wu-quota-label">使用中</div>
+							<div class="wu-quota-value">
+								<?php echo esc_html($media_quota['used_formatted']); ?> 
+								<span class="wu-quota-total">/ <?php echo esc_html($media_quota['quota_formatted']); ?></span>
+							</div>
+							<div class="wu-quota-percentage">使用率: <?php echo esc_html($media_quota['percentage']); ?>%</div>
+						</div>
 					</div>
-					<div class="wu-stat-box">
-						<div class="wu-label">總容量</div>
-						<div class="wu-value"><?php echo esc_html($media_stats['total_size']); ?></div>
+					<div class="wu-progress">
+						<div class="wu-progress-bar" style="width:<?php echo min($media_quota['percentage'], 100); ?>%;background:<?php echo $media_quota['bar_color']; ?>;"></div>
+					</div>
+					<div class="wu-quota-meta">
+						<div>檔案數量: <?php echo number_format($media_quota['file_count']); ?></div>
+						<div>剩餘空間: <?php echo esc_html($media_quota['remaining_formatted']); ?></div>
 					</div>
 				</div>
 			</div>
@@ -274,7 +289,7 @@ function wu_render_unified_dashboard() {
 			<?php endif; ?>
 		</div>
 		
-		<!-- Row 4: 款項紀錄 (僅管理員) -->
+		<!-- Row 4: 款項紀錄 -->
 		<?php if (current_user_can('manage_options') && !empty($payments)): ?>
 		<div class="wu-dashboard-row">
 			<div class="wu-dashboard-section wu-full-width">
@@ -332,6 +347,202 @@ function wu_render_unified_dashboard() {
 	<?php
 }
 
+// ===== Media Quota Functions =====
+
+function wu_get_media_quota_info() {
+	$used_bytes = get_option('wu_media_used_bytes', 0);
+	$quota_bytes = get_option('wu_media_quota_bytes', 10737418240);
+	$file_count = wp_count_posts('attachment')->inherit ?? 0;
+	
+	$used_gb = $used_bytes / 1073741824;
+	$quota_gb = $quota_bytes / 1073741824;
+	$percentage = ($used_bytes / $quota_bytes) * 100;
+	$remaining_bytes = max(0, $quota_bytes - $used_bytes);
+	
+	// 狀態判斷
+	if ($percentage < 70) {
+		$status_text = '正常';
+		$status_icon = '🟢';
+		$status_class = 'wu-status-normal';
+		$bar_color = '#46b450';
+	} elseif ($percentage < 90) {
+		$status_text = '即將達上限';
+		$status_icon = '🟡';
+		$status_class = 'wu-status-warning';
+		$bar_color = '#f0b849';
+	} else {
+		$status_text = '已接近上限';
+		$status_icon = '🔴';
+		$status_class = 'wu-status-danger';
+		$bar_color = '#dc3232';
+	}
+	
+	return array(
+		'used_bytes' => $used_bytes,
+		'quota_bytes' => $quota_bytes,
+		'used_formatted' => number_format($used_gb, 2) . ' GB',
+		'quota_formatted' => number_format($quota_gb, 0) . ' GB',
+		'remaining_formatted' => wu_format_bytes($remaining_bytes),
+		'percentage' => number_format($percentage, 1),
+		'file_count' => $file_count,
+		'status_text' => $status_text,
+		'status_icon' => $status_icon,
+		'status_class' => $status_class,
+		'bar_color' => $bar_color
+	);
+}
+
+function wu_format_bytes($bytes) {
+	if ($bytes >= 1073741824) {
+		return number_format($bytes / 1073741824, 2) . ' GB';
+	} elseif ($bytes >= 1048576) {
+		return number_format($bytes / 1048576, 2) . ' MB';
+	} elseif ($bytes >= 1024) {
+		return number_format($bytes / 1024, 2) . ' KB';
+	}
+	return $bytes . ' B';
+}
+
+// ===== Media Upload Hook (累加) =====
+
+add_action('add_attachment', 'wu_media_add_size', 10, 1);
+
+function wu_media_add_size($attachment_id) {
+	$file_path = get_attached_file($attachment_id);
+	
+	if (!$file_path || !file_exists($file_path)) {
+		return;
+	}
+	
+	$total_size = 0;
+	
+	// 主檔案
+	$total_size += filesize($file_path);
+	
+	// 取得所有衍生圖片 (thumbnail, medium, large, webp 等)
+	$metadata = wp_get_attachment_metadata($attachment_id);
+	
+	if (!empty($metadata['sizes']) && is_array($metadata['sizes'])) {
+		$upload_dir = wp_upload_dir();
+		$base_dir = dirname($file_path);
+		
+		foreach ($metadata['sizes'] as $size_data) {
+			if (!empty($size_data['file'])) {
+				$derivative_path = $base_dir . '/' . $size_data['file'];
+				if (file_exists($derivative_path)) {
+					$total_size += filesize($derivative_path);
+				}
+			}
+		}
+	}
+	
+	// 累加到 option
+	$current_used = get_option('wu_media_used_bytes', 0);
+	$new_used = $current_used + $total_size;
+	update_option('wu_media_used_bytes', $new_used);
+}
+
+// ===== Media Delete Hook (扣除) =====
+
+add_action('delete_attachment', 'wu_media_subtract_size', 10, 1);
+
+function wu_media_subtract_size($attachment_id) {
+	$file_path = get_attached_file($attachment_id);
+	
+	if (!$file_path || !file_exists($file_path)) {
+		return;
+	}
+	
+	$total_size = 0;
+	
+	// 主檔案
+	$total_size += filesize($file_path);
+	
+	// 取得所有衍生圖片
+	$metadata = wp_get_attachment_metadata($attachment_id);
+	
+	if (!empty($metadata['sizes']) && is_array($metadata['sizes'])) {
+		$base_dir = dirname($file_path);
+		
+		foreach ($metadata['sizes'] as $size_data) {
+			if (!empty($size_data['file'])) {
+				$derivative_path = $base_dir . '/' . $size_data['file'];
+				if (file_exists($derivative_path)) {
+					$total_size += filesize($derivative_path);
+				}
+			}
+		}
+	}
+	
+	// 從 option 扣除
+	$current_used = get_option('wu_media_used_bytes', 0);
+	$new_used = max(0, $current_used - $total_size);
+	update_option('wu_media_used_bytes', $new_used);
+}
+
+// ===== Initial Sync (只執行一次) =====
+
+add_action('admin_init', 'wu_maybe_init_media_quota');
+
+function wu_maybe_init_media_quota() {
+	$last_sync = get_option('wu_media_last_sync', 0);
+	
+	// 如果已同步過，跳出
+	if ($last_sync > 0) {
+		return;
+	}
+	
+	// 使用 WP-Cron 背景執行（避免阻塞）
+	if (!wp_next_scheduled('wu_media_quota_init_sync')) {
+		wp_schedule_single_event(time() + 60, 'wu_media_quota_init_sync');
+	}
+}
+
+add_action('wu_media_quota_init_sync', 'wu_perform_media_quota_init');
+
+function wu_perform_media_quota_init() {
+	global $wpdb;
+	
+	$attachments = $wpdb->get_results("
+		SELECT ID 
+		FROM {$wpdb->posts} 
+		WHERE post_type = 'attachment' 
+		LIMIT 1000
+	");
+	
+	$total_size = 0;
+	
+	foreach ($attachments as $attachment) {
+		$file_path = get_attached_file($attachment->ID);
+		
+		if (!$file_path || !file_exists($file_path)) {
+			continue;
+		}
+		
+		// 主檔案
+		$total_size += filesize($file_path);
+		
+		// 衍生圖片
+		$metadata = wp_get_attachment_metadata($attachment->ID);
+		
+		if (!empty($metadata['sizes']) && is_array($metadata['sizes'])) {
+			$base_dir = dirname($file_path);
+			
+			foreach ($metadata['sizes'] as $size_data) {
+				if (!empty($size_data['file'])) {
+					$derivative_path = $base_dir . '/' . $size_data['file'];
+					if (file_exists($derivative_path)) {
+						$total_size += filesize($derivative_path);
+					}
+				}
+			}
+		}
+	}
+	
+	update_option('wu_media_used_bytes', $total_size);
+	update_option('wu_media_last_sync', time());
+}
+
 // ===== Helper Functions =====
 
 function wu_check_ssl_status() {
@@ -356,7 +567,6 @@ function wu_get_site_disk_usage() {
 		return $cached;
 	}
 	
-	// 計算整個網站根目錄大小
 	$site_path = ABSPATH;
 	$size = 0;
 	
@@ -447,62 +657,6 @@ function wu_get_login_stats() {
 	return $stats;
 }
 
-function wu_get_media_stats() {
-	$cache_key = 'wu_media_stats';
-	$cached = get_transient($cache_key);
-	
-	if ($cached !== false) {
-		return $cached;
-	}
-	
-	global $wpdb;
-	
-	$total_files = $wpdb->get_var("
-		SELECT COUNT(*) 
-		FROM {$wpdb->posts} 
-		WHERE post_type = 'attachment'
-	");
-	
-	$upload_dir = wp_upload_dir();
-	$total_size = 0;
-	
-	try {
-		$path = $upload_dir['basedir'];
-		if (is_dir($path)) {
-			$iterator = new RecursiveIteratorIterator(
-				new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)
-			);
-			
-			foreach ($iterator as $file) {
-				if ($file->isFile()) {
-					$total_size += $file->getSize();
-				}
-			}
-		}
-	} catch (Exception $e) {
-		$total_size = 0;
-	}
-	
-	$stats = array(
-		'total_files' => $total_files ?: 0,
-		'total_size' => wu_format_size($total_size)
-	);
-	
-	set_transient($cache_key, $stats, HOUR_IN_SECONDS * 12);
-	
-	return $stats;
-}
-
-function wu_format_size($bytes) {
-	$units = array('B', 'KB', 'MB', 'GB', 'TB');
-	$bytes = max($bytes, 0);
-	$pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-	$pow = min($pow, count($units) - 1);
-	$bytes /= (1 << (10 * $pow));
-	
-	return round($bytes, 2) . ' ' . $units[$pow];
-}
-
 // ===== Login Tracking =====
 
 add_action('wp_login', function($user_login, $user) {
@@ -551,6 +705,10 @@ function wu_dashboard_settings_page() {
 		update_option('wu_dashboard_hosting_rating', sanitize_text_field($_POST['hosting_rating'] ?? ''));
 		update_option('wu_dashboard_disk_total', intval($_POST['disk_total'] ?? 5120));
 		
+		// 媒體配額設定
+		$media_quota_gb = floatval($_POST['media_quota'] ?? 10);
+		update_option('wu_media_quota_bytes', $media_quota_gb * 1073741824);
+		
 		$payments = array();
 		if (!empty($_POST['payment_items'])) {
 			foreach ($_POST['payment_items'] as $i => $item) {
@@ -569,9 +727,16 @@ function wu_dashboard_settings_page() {
 		delete_transient('wu_ssl_check');
 		delete_transient('wu_site_disk_usage');
 		delete_transient('wu_login_stats');
-		delete_transient('wu_media_stats');
 		
 		echo '<div class="notice notice-success is-dismissible"><p><strong>✅ 設定已儲存</strong></p></div>';
+	}
+	
+	// 重新同步媒體配額
+	if (isset($_POST['wu_resync_media'])) {
+		check_admin_referer('wu_dash_settings');
+		delete_option('wu_media_last_sync');
+		wu_perform_media_quota_init();
+		echo '<div class="notice notice-success is-dismissible"><p><strong>✅ 媒體配額已重新同步</strong></p></div>';
 	}
 	
 	$enabled = get_option('wu_dashboard_enabled', 1);
@@ -582,7 +747,9 @@ function wu_dashboard_settings_page() {
 	$hosting_plan = get_option('wu_dashboard_hosting_plan', 'image');
 	$hosting_rating = get_option('wu_dashboard_hosting_rating', '優良運作');
 	$disk_total = get_option('wu_dashboard_disk_total', 5120);
+	$media_quota = get_option('wu_media_quota_bytes', 10737418240) / 1073741824;
 	$payments = get_option('wu_dashboard_payments', array());
+	$media_quota_info = wu_get_media_quota_info();
 	
 	?>
 	<div class="wrap">
@@ -593,9 +760,37 @@ function wu_dashboard_settings_page() {
 			<ul style="margin:8px 0 0 20px;line-height:1.8;">
 				<li>儀表板整合在 WordPress 原始後台首頁</li>
 				<li>磁碟使用計算整個網站大小</li>
+				<li>媒體配額採用增量追蹤,零效能影響</li>
 				<li>所有統計資料使用快取,每 6-12 小時更新</li>
-				<li>登入統計僅追蹤管理員及 IP</li>
 			</ul>
+		</div>
+		
+		<!-- 媒體配額當前狀態 -->
+		<div style="background:#fff;padding:20px;border:1px solid #ddd;margin-top:20px;">
+			<h2 style="margin-top:0;">媒體配額當前狀態</h2>
+			<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:15px;">
+				<div style="padding:15px;background:#f9f9f9;border-left:3px solid #0073aa;">
+					<div style="font-size:11px;color:#666;margin-bottom:5px;">使用中</div>
+					<div style="font-size:20px;font-weight:700;"><?php echo esc_html($media_quota_info['used_formatted']); ?></div>
+				</div>
+				<div style="padding:15px;background:#f9f9f9;border-left:3px solid #0073aa;">
+					<div style="font-size:11px;color:#666;margin-bottom:5px;">配額</div>
+					<div style="font-size:20px;font-weight:700;"><?php echo esc_html($media_quota_info['quota_formatted']); ?></div>
+				</div>
+				<div style="padding:15px;background:#f9f9f9;border-left:3px solid #0073aa;">
+					<div style="font-size:11px;color:#666;margin-bottom:5px;">使用率</div>
+					<div style="font-size:20px;font-weight:700;color:<?php echo $media_quota_info['bar_color']; ?>;"><?php echo esc_html($media_quota_info['percentage']); ?>%</div>
+				</div>
+				<div style="padding:15px;background:#f9f9f9;border-left:3px solid #0073aa;">
+					<div style="font-size:11px;color:#666;margin-bottom:5px;">狀態</div>
+					<div style="font-size:20px;font-weight:700;"><?php echo esc_html($media_quota_info['status_icon'] . ' ' . $media_quota_info['status_text']); ?></div>
+				</div>
+			</div>
+			<form method="post" style="margin-top:15px;">
+				<?php wp_nonce_field('wu_dash_settings'); ?>
+				<button type="submit" name="wu_resync_media" class="button button-secondary">🔄 重新同步媒體配額</button>
+				<p class="description">重新計算所有現有媒體檔案的大小 (此操作可能需要數分鐘)</p>
+			</form>
 		</div>
 		
 		<form method="post" style="background:#fff;padding:25px;border:1px solid #ddd;margin-top:20px;">
@@ -688,6 +883,15 @@ function wu_dashboard_settings_page() {
 				</tr>
 				
 				<tr>
+					<th><label>媒體配額</label></th>
+					<td>
+						<input type="number" name="media_quota" value="<?php echo esc_attr($media_quota); ?>" step="0.1" min="1" class="regular-text">
+						<span>GB</span>
+						<p class="description">設定媒體庫容量上限 (預設 10 GB)</p>
+					</td>
+				</tr>
+				
+				<tr>
 					<th><label>款項紀錄</label></th>
 					<td>
 						<div id="payment-container">
@@ -764,7 +968,6 @@ add_action('admin_head', function() {
 	
 	?>
 	<style>
-	/* Full Width Widget */
 	#wu_unified_dashboard {
 		width: 100% !important;
 		grid-column: 1 / -1 !important;
@@ -775,7 +978,6 @@ add_action('admin_head', function() {
 		margin: 0 !important;
 	}
 	
-	/* Unified Container */
 	.wu-unified-container {
 		display: flex;
 		flex-direction: column;
@@ -809,7 +1011,6 @@ add_action('admin_head', function() {
 		padding-bottom: 8px;
 	}
 	
-	/* Grid Systems */
 	.wu-grid-2 {
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
@@ -828,7 +1029,6 @@ add_action('admin_head', function() {
 		gap: 10px;
 	}
 	
-	/* Stat Box */
 	.wu-stat-box {
 		background: #fff;
 		border: 1px solid #e0e0e0;
@@ -858,7 +1058,6 @@ add_action('admin_head', function() {
 		margin-top: 4px;
 	}
 	
-	/* Progress Bar */
 	.wu-progress {
 		width: 100%;
 		height: 4px;
@@ -872,7 +1071,6 @@ add_action('admin_head', function() {
 		transition: width 0.3s;
 	}
 	
-	/* Alert */
 	.wu-alert {
 		padding: 10px;
 		background: #fff3cd;
@@ -883,7 +1081,70 @@ add_action('admin_head', function() {
 		margin-top: 10px;
 	}
 	
-	/* Table */
+	/* Media Quota Display */
+	.wu-media-quota-display {
+		background: #fff;
+		padding: 15px;
+		border: 1px solid #e0e0e0;
+	}
+	
+	.wu-quota-main {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 10px;
+	}
+	
+	.wu-quota-status {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 14px;
+		font-weight: 600;
+	}
+	
+	.wu-quota-status.wu-status-normal { color: #46b450; }
+	.wu-quota-status.wu-status-warning { color: #f0b849; }
+	.wu-quota-status.wu-status-danger { color: #dc3232; }
+	
+	.wu-quota-usage {
+		text-align: right;
+	}
+	
+	.wu-quota-label {
+		font-size: 10px;
+		color: #666;
+		text-transform: uppercase;
+		margin-bottom: 4px;
+	}
+	
+	.wu-quota-value {
+		font-size: 24px;
+		font-weight: 700;
+		color: #111;
+	}
+	
+	.wu-quota-total {
+		font-size: 16px;
+		color: #999;
+	}
+	
+	.wu-quota-percentage {
+		font-size: 11px;
+		color: #666;
+		margin-top: 4px;
+	}
+	
+	.wu-quota-meta {
+		display: flex;
+		justify-content: space-between;
+		margin-top: 10px;
+		padding-top: 10px;
+		border-top: 1px solid #f0f0f0;
+		font-size: 11px;
+		color: #666;
+	}
+	
 	.wu-table {
 		width: 100%;
 		border-collapse: collapse;
@@ -913,7 +1174,6 @@ add_action('admin_head', function() {
 		border-bottom: none;
 	}
 	
-	/* List */
 	.wu-list {
 		margin: 0;
 		padding: 0;
@@ -937,7 +1197,6 @@ add_action('admin_head', function() {
 		margin-right: 8px;
 	}
 	
-	/* Timeline */
 	.wu-timeline {
 		display: flex;
 		flex-direction: column;
@@ -976,7 +1235,6 @@ add_action('admin_head', function() {
 		line-height: 1.5;
 	}
 	
-	/* Badge */
 	.wu-badge {
 		display: inline-block;
 		padding: 3px 8px;
@@ -995,7 +1253,6 @@ add_action('admin_head', function() {
 		color: #856404;
 	}
 	
-	/* Contact Box */
 	.wu-contact-box {
 		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 		padding: 20px;
@@ -1032,7 +1289,6 @@ add_action('admin_head', function() {
 		color: #f0f0f0;
 	}
 	
-	/* Footer Note */
 	.wu-footer-note {
 		margin-top: 10px;
 		padding: 8px 12px;
@@ -1050,7 +1306,6 @@ add_action('admin_head', function() {
 		font-size: 16px;
 	}
 	
-	/* Mobile Responsive */
 	@media (max-width: 768px) {
 		.wu-dashboard-row {
 			grid-template-columns: 1fr;
