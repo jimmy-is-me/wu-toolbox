@@ -3,16 +3,14 @@ if (!defined('ABSPATH')) exit;
 
 /*
  * WumetaxToolkit - Professional Client Dashboard
- * Version: 11.0 - Enhanced Features
+ * Version: 12.0 - Enhanced Features
  * 
  * CHANGELOG:
- * - Auto-detect domain name
- * - Advanced plan upgrade webhook
- * - Disk upgrade webhook
- * - Ticket submission history
- * - Backup & security status
- * - Removed login tracking
- * - Service plan label
+ * - Added value-added services management
+ * - Payment records sortable
+ * - Dashboard horizontal layout for records
+ * - Updated support ticket categories
+ * - Referral info always visible
  */
 
 // ===== Menu Registration =====
@@ -38,18 +36,19 @@ add_action('admin_init', function() {
 	add_option('wu_dashboard_security_status', 'normal');
 	add_option('wu_dashboard_recent_work', array());
 	add_option('wu_dashboard_services', array(
-		'定期備份採每日備份，保留三份，緊急還原使用',
-		'效能與速度優化：圖片最佳化 WebP、快取設定',
+		'定期備份採每日備份,保留三份,緊急還原使用',
+		'效能與速度優化:圖片最佳化 WebP、快取設定',
 		'24 小時網站狀態監測',
 		'網站異常處理與救援',
-		'SEO 與基本分析支援（Google Search Console 錯誤排除、網站結構與索引問題檢查）',
+		'SEO 與基本分析支援(Google Search Console 錯誤排除、網站結構與索引問題檢查)',
 		'使用 Cloudflare CDN 加速全球訪問',
 		'99% 正常運轉時間保證',
-		'企業級防火牆防護（7G Firewall / AI Bot Protection）'
+		'企業級防火牆防護(7G Firewall / AI Bot Protection)'
 	));
+	add_option('wu_dashboard_value_services', array()); // 新增加值服務
 	add_option('wu_dashboard_hosting_plan', 'image');
 	add_option('wu_dashboard_hosting_rating', '優良運作');
-	add_option('wu_dashboard_disk_quota', 5120); // MB
+	add_option('wu_dashboard_disk_quota', 5120);
 	add_option('wu_dashboard_payments', array());
 	add_option('wu_dashboard_referrals', array());
 	add_option('wu_dashboard_advanced_plan', 0);
@@ -87,6 +86,7 @@ function wu_render_unified_dashboard() {
 	$hosting_rating = get_option('wu_dashboard_hosting_rating', '優良運作');
 	$disk_info = wu_get_disk_info();
 	$services = get_option('wu_dashboard_services', array());
+	$value_services = get_option('wu_dashboard_value_services', array());
 	$recent_work = get_option('wu_dashboard_recent_work', array());
 	$payments = get_option('wu_dashboard_payments', array());
 	$referrals = get_option('wu_dashboard_referrals', array());
@@ -148,7 +148,7 @@ function wu_render_unified_dashboard() {
 					<tr>
 						<th>網域名稱</th>
 						<td><strong><?php echo esc_html($domain_name); ?></strong></td>
-						<td class="wu-info-meta">DNS 託管：Cloudflare 管理</td>
+						<td class="wu-info-meta">DNS 託管:Cloudflare 管理</td>
 					</tr>
 					<tr>
 						<th>SSL 安全憑證</th>
@@ -172,7 +172,7 @@ function wu_render_unified_dashboard() {
 					<tr>
 						<th>主機方案</th>
 						<td><strong><?php echo esc_html($plan_name); ?></strong></td>
-						<td class="wu-info-meta">評估：<?php echo esc_html($hosting_rating); ?></td>
+						<td class="wu-info-meta">評估:<?php echo esc_html($hosting_rating); ?></td>
 					</tr>
 					<tr>
 						<th>備份狀態</th>
@@ -181,7 +181,7 @@ function wu_render_unified_dashboard() {
 								<?php echo $backup_status === 'normal' ? '正常' : '異常'; ?>
 							</span>
 						</td>
-						<td class="wu-info-meta">每日自動備份，保留 3 份</td>
+						<td class="wu-info-meta">每日自動備份,保留 3 份</td>
 					</tr>
 					<tr>
 						<th>安全狀態</th>
@@ -233,9 +233,9 @@ function wu_render_unified_dashboard() {
 			<?php if ($disk_info['percentage'] >= 100): ?>
 			<div class="wu-notice wu-notice-error">
 				<strong><?php echo $disk_info['percentage'] == 100 ? '磁碟已滿' : '磁碟容量超出配額'; ?></strong><br>
-				立即聯繫升級 NVMe SSD 硬碟空間：<br>
-				• +5 GB：NT$ 2,000 / 年<br>
-				• +10 GB：NT$ 3,500 / 年
+				立即聯繫升級 NVMe SSD 硬碟空間:<br>
+				• +5 GB:NT$ 2,000 / 年<br>
+				• +10 GB:NT$ 3,500 / 年
 				<div style="margin-top:10px;">
 					<button type="button" class="wu-button wu-button-danger" onclick="wuRequestDiskUpgrade()">
 						立即申請磁碟升級
@@ -260,14 +260,29 @@ function wu_render_unified_dashboard() {
 		</div>
 		<?php endif; ?>
 		
+		<!-- 加值服務 -->
+		<?php if (!empty($value_services)): ?>
+		<div class="wu-section">
+			<h3 class="wu-section-title">
+				加值服務
+				<span class="wu-section-label" style="background:#00a32a;">已訂購</span>
+			</h3>
+			<ul class="wu-service-list">
+				<?php foreach ($value_services as $service): ?>
+				<li><?php echo esc_html($service); ?></li>
+				<?php endforeach; ?>
+			</ul>
+		</div>
+		<?php endif; ?>
+		
 		<!-- 進階維護方案 -->
 		<?php if ($advanced_plan): ?>
 		<div class="wu-section wu-section-highlight">
-			<h3 class="wu-section-title">進階維護方案（已啟用）</h3>
+			<h3 class="wu-section-title">進階維護方案(已啟用)</h3>
 			<ul class="wu-feature-list">
 				<li>
 					<strong>Object Storage 異地資料備援</strong>
-					<span class="wu-feature-desc">最多保留 30 份系統備份，僅作系統還原使用</span>
+					<span class="wu-feature-desc">最多保留 30 份系統備份,僅作系統還原使用</span>
 				</li>
 				<li>
 					<strong>定期網站垃圾清理與資料庫基礎優化</strong>
@@ -275,7 +290,7 @@ function wu_render_unified_dashboard() {
 				</li>
 				<li>
 					<strong>主機與網站狀態定期檢視</strong>
-					<span class="wu-feature-desc">屬內部維運作業，未另行提供書面檢測報告</span>
+					<span class="wu-feature-desc">屬內部維運作業,未另行提供書面檢測報告</span>
 				</li>
 				<li>
 					<strong>定期更新、漏洞修補</strong>
@@ -297,35 +312,36 @@ function wu_render_unified_dashboard() {
 			<div class="wu-promo-box">
 				<div class="wu-promo-header">
 					<div class="wu-promo-title">進階維護方案</div>
-					<div class="wu-promo-price">NT$ 8,000 <span>/年（未稅）</span></div>
+					<div class="wu-promo-price">NT$ 8,000 <span>/年(未稅)</span></div>
 				</div>
 				<ul class="wu-promo-list">
-					<li>Object Storage 異地資料備援（保留 30 份備份）</li>
+					<li>Object Storage 異地資料備援(保留 30 份備份)</li>
 					<li>定期網站垃圾清理與資料庫基礎優化</li>
 					<li>主機與網站狀態定期檢視</li>
 					<li>定期更新、漏洞修補</li>
-					<li>網站問題諮詢與技術回覆（工作日 24 小時內）</li>
+					<li>網站問題諮詢與技術回覆(工作日 24 小時內)</li>
 					<li>提供所需模組授權金鑰並協助定期更新</li>
 				</ul>
-				<p class="wu-promo-note">升級進階維護方案，享受更完整的技術支援與資料安全保障</p>
+				<p class="wu-promo-note">升級進階維護方案,享受更完整的技術支援與資料安全保障</p>
 				<button type="button" class="wu-button" onclick="wuRequestAdvancedPlan()">立即諮詢升級</button>
 			</div>
 		</div>
 		<?php endif; ?>
 		
 		<!-- 推薦回饋專區 -->
-		<?php if (!empty($referrals)): ?>
 		<div class="wu-section">
 			<h3 class="wu-section-title">推薦回饋專區</h3>
 			<div class="wu-referral-rules">
-				<p><strong>推薦回饋辦法：</strong></p>
+				<p><strong>推薦回饋辦法:</strong></p>
 				<ul>
 					<li>成功推薦新客戶</li>
 					<li>被推薦人每續約一年主機</li>
 					<li>推薦者即可額外獲得 1 個月主機使用權</li>
-					<li>只要被推薦人持續續約，回饋就會持續累積</li>
+					<li>只要被推薦人持續續約,回饋就會持續累積</li>
 				</ul>
 			</div>
+			
+			<?php if (!empty($referrals)): ?>
 			<table class="wu-table">
 				<thead>
 					<tr>
@@ -350,64 +366,52 @@ function wu_render_unified_dashboard() {
 					<?php endforeach; ?>
 				</tbody>
 			</table>
+			<?php else: ?>
+			<div class="wu-empty-state">
+				<p>目前尚無推薦紀錄</p>
+				<p>歡迎推薦朋友使用我們的服務,即可享有回饋!</p>
+			</div>
+			<?php endif; ?>
 		</div>
-		<?php endif; ?>
 		
-		<!-- 最近處理紀錄 -->
+		<!-- 最近處理紀錄(橫排) -->
 		<?php if (!empty($recent_work)): ?>
 		<div class="wu-section">
 			<h3 class="wu-section-title">最近處理紀錄</h3>
-			<table class="wu-table">
-				<thead>
-					<tr>
-						<th width="100">日期</th>
-						<th>處理項目</th>
-						<th>說明</th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php foreach (array_slice($recent_work, 0, 10) as $work): ?>
-					<tr>
-						<td><?php echo esc_html(date('Y/m/d', strtotime($work['date']))); ?></td>
-						<td><strong><?php echo esc_html($work['title']); ?></strong></td>
-						<td><?php echo !empty($work['note']) ? nl2br(esc_html($work['note'])) : '-'; ?></td>
-					</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
+			<div class="wu-card-grid">
+				<?php foreach (array_slice($recent_work, 0, 6) as $work): ?>
+				<div class="wu-record-card">
+					<div class="wu-record-date"><?php echo esc_html(date('Y/m/d', strtotime($work['date']))); ?></div>
+					<div class="wu-record-title"><?php echo esc_html($work['title']); ?></div>
+					<?php if (!empty($work['note'])): ?>
+					<div class="wu-record-note"><?php echo nl2br(esc_html($work['note'])); ?></div>
+					<?php endif; ?>
+				</div>
+				<?php endforeach; ?>
+			</div>
 		</div>
 		<?php endif; ?>
 		
-		<!-- 款項紀錄 -->
+		<!-- 款項紀錄(橫排) -->
 		<?php if (current_user_can('manage_options') && !empty($payments)): ?>
 		<div class="wu-section">
 			<h3 class="wu-section-title">款項紀錄</h3>
-			<table class="wu-table">
-				<thead>
-					<tr>
-						<th width="100">日期</th>
-						<th>項目</th>
-						<th style="text-align:right;" width="120">金額</th>
-						<th style="text-align:center;" width="80">狀態</th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php foreach (array_slice($payments, 0, 10) as $payment): ?>
-					<tr>
-						<td><?php echo esc_html(date('Y/m/d', strtotime($payment['date']))); ?></td>
-						<td><?php echo esc_html($payment['item']); ?></td>
-						<td style="text-align:right;"><strong>NT$ <?php echo number_format($payment['amount']); ?></strong></td>
-						<td style="text-align:center;">
-							<?php if ($payment['status'] === 'paid'): ?>
-								<span class="wu-badge wu-badge-success">已付款</span>
-							<?php else: ?>
-								<span class="wu-badge wu-badge-warning">待付款</span>
-							<?php endif; ?>
-						</td>
-					</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
+			<div class="wu-card-grid">
+				<?php foreach (array_slice($payments, 0, 6) as $payment): ?>
+				<div class="wu-payment-card">
+					<div class="wu-payment-date"><?php echo esc_html(date('Y/m/d', strtotime($payment['date']))); ?></div>
+					<div class="wu-payment-item"><?php echo esc_html($payment['item']); ?></div>
+					<div class="wu-payment-amount">NT$ <?php echo number_format($payment['amount']); ?></div>
+					<div class="wu-payment-status">
+						<?php if ($payment['status'] === 'paid'): ?>
+							<span class="wu-badge wu-badge-success">已付款</span>
+						<?php else: ?>
+							<span class="wu-badge wu-badge-warning">待付款</span>
+						<?php endif; ?>
+					</div>
+				</div>
+				<?php endforeach; ?>
+			</div>
 		</div>
 		<?php endif; ?>
 		
@@ -426,10 +430,8 @@ function wu_render_unified_dashboard() {
 					<select id="wu_support_subject" name="subject" class="wu-select" required>
 						<option value="">請選擇問題類型</option>
 						<option value="網站異常">網站異常</option>
-						<option value="效能問題">效能問題</option>
 						<option value="功能諮詢">功能諮詢</option>
 						<option value="備份還原">備份還原</option>
-						<option value="帳號權限">帳號權限</option>
 						<option value="其他問題">其他問題</option>
 					</select>
 				</div>
@@ -446,11 +448,11 @@ function wu_render_unified_dashboard() {
 				<div id="wu-support-result"></div>
 			</form>
 			<div class="wu-support-note">
-				<p><strong>注意事項：</strong></p>
+				<p><strong>注意事項:</strong></p>
 				<ul>
-					<li>收到工單後，我們將盡快安排處理（工作日 7 天內回覆）</li>
-					<li>若問題超出現有服務範疇，將另行報價</li>
-					<li>如長時間無回覆，請聯繫 <a href="https://lin.ee/Lut7wCe" target="_blank">LINE 官方帳號</a></li>
+					<li>收到工單後,我們將盡快安排處理(工作日 7 天內回覆)</li>
+					<li>若問題超出現有服務範疇,將另行報價</li>
+					<li>如長時間無回覆,請聯繫 <a href="https://lin.ee/Lut7wCe" target="_blank">LINE 官方帳號</a></li>
 				</ul>
 			</div>
 			
@@ -551,7 +553,7 @@ function wu_render_unified_dashboard() {
 					}
 				},
 				error: function() {
-					$result.html('<div class="wu-notice wu-notice-error">提交失敗，請稍後再試或聯繫 LINE 官方帳號</div>');
+					$result.html('<div class="wu-notice wu-notice-error">提交失敗,請稍後再試或聯繫 LINE 官方帳號</div>');
 				},
 				complete: function() {
 					$button.prop('disabled', false);
@@ -564,7 +566,7 @@ function wu_render_unified_dashboard() {
 	
 	// 進階方案諮詢
 	function wuRequestAdvancedPlan() {
-		if (!confirm('確定要發送進階維護方案諮詢申請嗎？')) {
+		if (!confirm('確定要發送進階維護方案諮詢申請嗎?')) {
 			return;
 		}
 		
@@ -578,20 +580,20 @@ function wu_render_unified_dashboard() {
 			},
 			success: function(response) {
 				if (response.success) {
-					alert('諮詢申請已送出，我們將盡快與您聯繫！');
+					alert('諮詢申請已送出,我們將盡快與您聯繫!');
 				} else {
-					alert('提交失敗，請聯繫 LINE 官方帳號：https://lin.ee/Lut7wCe');
+					alert('提交失敗,請聯繫 LINE 官方帳號:https://lin.ee/Lut7wCe');
 				}
 			},
 			error: function() {
-				alert('提交失敗，請聯繫 LINE 官方帳號：https://lin.ee/Lut7wCe');
+				alert('提交失敗,請聯繫 LINE 官方帳號:https://lin.ee/Lut7wCe');
 			}
 		});
 	}
 	
 	// 磁碟升級申請
 	function wuRequestDiskUpgrade() {
-		if (!confirm('確定要發送磁碟升級申請嗎？')) {
+		if (!confirm('確定要發送磁碟升級申請嗎?')) {
 			return;
 		}
 		
@@ -608,13 +610,13 @@ function wu_render_unified_dashboard() {
 			},
 			success: function(response) {
 				if (response.success) {
-					alert('磁碟升級申請已送出，我們將盡快與您聯繫！');
+					alert('磁碟升級申請已送出,我們將盡快與您聯繫!');
 				} else {
-					alert('提交失敗，請聯繫 LINE 官方帳號：https://lin.ee/Lut7wCe');
+					alert('提交失敗,請聯繫 LINE 官方帳號:https://lin.ee/Lut7wCe');
 				}
 			},
 			error: function() {
-				alert('提交失敗，請聯繫 LINE 官方帳號：https://lin.ee/Lut7wCe');
+				alert('提交失敗,請聯繫 LINE 官方帳號:https://lin.ee/Lut7wCe');
 			}
 		});
 	}
@@ -696,7 +698,7 @@ function wu_handle_support_ticket() {
 	));
 	
 	if (is_wp_error($response)) {
-		wp_send_json_error(array('message' => '提交失敗，請稍後再試或聯繫 LINE 官方帳號'));
+		wp_send_json_error(array('message' => '提交失敗,請稍後再試或聯繫 LINE 官方帳號'));
 	}
 	
 	// 儲存工單紀錄
@@ -709,7 +711,7 @@ function wu_handle_support_ticket() {
 	update_option('wu_dashboard_support_tickets', $tickets);
 	
 	wp_send_json_success(array(
-		'message' => '工單已成功提交！工單編號：#' . $ticket_id . '。我們收到後將盡快安排處理。'
+		'message' => '工單已成功提交!工單編號:#' . $ticket_id . '。我們收到後將盡快安排處理。'
 	));
 }
 
@@ -750,7 +752,7 @@ function wu_handle_advanced_plan_request() {
 					),
 					array(
 						'name' => '方案內容',
-						'value' => 'NT$ 8,000 / 年（未稅）',
+						'value' => 'NT$ 8,000 / 年(未稅)',
 						'inline' => false
 					)
 				)
@@ -791,7 +793,7 @@ function wu_handle_disk_upgrade_request() {
 	$discord_message = array(
 		'embeds' => array(
 			array(
-				'title' => '💾 磁碟升級申請（緊急）',
+				'title' => '💾 磁碟升級申請(緊急)',
 				'color' => 15158332,
 				'fields' => array(
 					array(
@@ -826,7 +828,7 @@ function wu_handle_disk_upgrade_request() {
 					),
 					array(
 						'name' => '升級方案',
-						'value' => "• +5 GB：NT$ 2,000 / 年\n• +10 GB：NT$ 3,500 / 年",
+						'value' => "• +5 GB:NT$ 2,000 / 年\n• +10 GB:NT$ 3,500 / 年",
 						'inline' => false
 					)
 				)
@@ -863,7 +865,7 @@ function wu_get_ssl_info() {
 		$info = array(
 			'status' => 'HTTPS 已啟用',
 			'color' => '#46b450',
-			'description' => 'SSL 憑證確保資料傳輸加密，保護用戶隱私與網站信譽，提升 SEO 排名'
+			'description' => 'SSL 憑證確保資料傳輸加密,保護用戶隱私與網站信譽,提升 SEO 排名'
 		);
 	} else {
 		$info = array(
@@ -927,11 +929,11 @@ function wu_get_disk_info() {
 		$status_class = 'wu-disk-status-normal';
 		$color = '#46b450';
 	} elseif ($percentage < 90) {
-		$status_text = '磁碟空間即將達上限，建議清理或升級配額';
+		$status_text = '磁碟空間即將達上限,建議清理或升級配額';
 		$status_class = 'wu-disk-status-warning';
 		$color = '#f0b849';
 	} elseif ($percentage < 100) {
-		$status_text = '磁碟空間已接近上限，請盡快處理';
+		$status_text = '磁碟空間已接近上限,請盡快處理';
 		$status_class = 'wu-disk-status-danger';
 		$color = '#dc3232';
 	} elseif ($percentage == 100) {
@@ -1040,6 +1042,13 @@ function wu_dashboard_settings_page() {
 		}
 		update_option('wu_dashboard_services', $services);
 		
+		// 加值服務
+		$value_services = array();
+		if (!empty($_POST['value_services'])) {
+			$value_services = array_values(array_filter(array_map('sanitize_text_field', $_POST['value_services'])));
+		}
+		update_option('wu_dashboard_value_services', $value_services);
+		
 		update_option('wu_dashboard_hosting_plan', sanitize_text_field($_POST['hosting_plan'] ?? 'image'));
 		update_option('wu_dashboard_hosting_rating', sanitize_text_field($_POST['hosting_rating'] ?? ''));
 		update_option('wu_dashboard_disk_quota', intval($_POST['disk_quota'] ?? 5120));
@@ -1089,6 +1098,7 @@ function wu_dashboard_settings_page() {
 	$security_status = get_option('wu_dashboard_security_status', 'normal');
 	$recent_work = get_option('wu_dashboard_recent_work', array());
 	$services = get_option('wu_dashboard_services', array());
+	$value_services = get_option('wu_dashboard_value_services', array());
 	$hosting_plan = get_option('wu_dashboard_hosting_plan', 'image');
 	$hosting_rating = get_option('wu_dashboard_hosting_rating', '優良運作');
 	$disk_quota = get_option('wu_dashboard_disk_quota', 5120);
@@ -1104,10 +1114,10 @@ function wu_dashboard_settings_page() {
 		<div class="notice notice-info" style="padding:15px;">
 			<p style="margin:0;"><strong>系統說明</strong></p>
 			<ul style="margin:8px 0 0 20px;line-height:1.8;">
-				<li>儀表板採用 WordPress 原生風格設計，單欄式佈局</li>
+				<li>儀表板採用 WordPress 原生風格設計,單欄式佈局</li>
 				<li>網域名稱自動抓取當前網站網址</li>
-				<li>磁碟使用僅計算 WordPress 網站本身，不影響後台載入速度</li>
-				<li>所有統計資料使用快取機制，每 6-12 小時自動更新</li>
+				<li>磁碟使用僅計算 WordPress 網站本身,不影響後台載入速度</li>
+				<li>所有統計資料使用快取機制,每 6-12 小時自動更新</li>
 				<li>技術支援工單會自動發送到 Discord 通知</li>
 			</ul>
 		</div>
@@ -1231,6 +1241,27 @@ function wu_dashboard_settings_page() {
 				</tr>
 				
 				<tr>
+					<th><label>加值服務</label></th>
+					<td>
+						<p class="description">額外訂購的加值服務項目(獨立於基本維運服務)</p>
+						<div id="value-service-container">
+							<?php 
+							if (empty($value_services)) {
+								$value_services = array('');
+							}
+							foreach ($value_services as $service): 
+							?>
+							<div style="display:flex;gap:10px;margin-bottom:8px;">
+								<input type="text" name="value_services[]" value="<?php echo esc_attr($service); ?>" class="large-text" placeholder="例如:SSL憑證、網域代管、特殊功能開發等">
+								<button type="button" class="button" onclick="this.parentElement.remove()">刪除</button>
+							</div>
+							<?php endforeach; ?>
+						</div>
+						<button type="button" class="button" onclick="addValueService()">新增加值服務</button>
+					</td>
+				</tr>
+				
+				<tr>
 					<th><label>推薦回饋紀錄</label></th>
 					<td>
 						<div id="referral-container">
@@ -1258,18 +1289,21 @@ function wu_dashboard_settings_page() {
 				<tr>
 					<th><label>最近處理紀錄</label></th>
 					<td>
-						<div id="work-container">
+						<div id="work-container" style="position:relative;">
 							<?php 
 							if (empty($recent_work)) {
 								$recent_work = array(array('title' => '', 'date' => '', 'note' => ''));
 							}
-							foreach ($recent_work as $work): 
+							foreach ($recent_work as $idx => $work): 
 							?>
-							<div style="background:#f9f9f9;padding:15px;margin-bottom:10px;">
+							<div class="work-item" style="background:#f9f9f9;padding:15px;margin-bottom:10px;" data-order="<?php echo $idx; ?>">
+								<div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+									<span class="work-handle" style="cursor:move;padding:5px 10px;background:#ddd;border-radius:3px;">⋮⋮ 拖曳排序</span>
+									<button type="button" class="button" onclick="this.closest('.work-item').remove()">刪除</button>
+								</div>
 								<input type="text" name="work_titles[]" value="<?php echo esc_attr($work['title']); ?>" placeholder="處理項目" class="regular-text" style="margin-bottom:8px;">
 								<input type="date" name="work_dates[]" value="<?php echo esc_attr($work['date']); ?>" style="margin-bottom:8px;">
 								<textarea name="work_notes[]" rows="2" class="large-text" placeholder="說明 (選填)"><?php echo esc_textarea($work['note']); ?></textarea>
-								<button type="button" class="button" onclick="this.parentElement.remove()" style="margin-top:5px;">刪除</button>
 							</div>
 							<?php endforeach; ?>
 						</div>
@@ -1285,9 +1319,9 @@ function wu_dashboard_settings_page() {
 							if (empty($payments)) {
 								$payments = array(array('date' => '', 'item' => '', 'amount' => '', 'status' => 'pending'));
 							}
-							foreach ($payments as $payment): 
+							foreach ($payments as $idx => $payment): 
 							?>
-							<div style="background:#f9f9f9;padding:15px;margin-bottom:10px;display:grid;grid-template-columns:120px 1fr 120px 100px 80px;gap:10px;">
+							<div class="payment-item" style="background:#f9f9f9;padding:15px;margin-bottom:10px;display:grid;grid-template-columns:120px 1fr 120px 100px 80px;gap:10px;" data-order="<?php echo $idx; ?>">
 								<input type="date" name="payment_dates[]" value="<?php echo esc_attr($payment['date']); ?>">
 								<input type="text" name="payment_items[]" value="<?php echo esc_attr($payment['item']); ?>" placeholder="項目">
 								<input type="number" name="payment_amounts[]" value="<?php echo esc_attr($payment['amount']); ?>" placeholder="金額">
@@ -1309,7 +1343,18 @@ function wu_dashboard_settings_page() {
 		</form>
 	</div>
 	
+	<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 	<script>
+	// 加值服務
+	function addValueService() {
+		document.getElementById('value-service-container').insertAdjacentHTML('beforeend',
+			'<div style="display:flex;gap:10px;margin-bottom:8px;">' +
+			'<input type="text" name="value_services[]" class="large-text" placeholder="例如:SSL憑證、網域代管、特殊功能開發等">' +
+			'<button type="button" class="button" onclick="this.parentElement.remove()">刪除</button>' +
+			'</div>'
+		);
+	}
+	
 	function addService() {
 		document.getElementById('service-container').insertAdjacentHTML('beforeend',
 			'<div style="display:flex;gap:10px;margin-bottom:8px;">' +
@@ -1332,18 +1377,21 @@ function wu_dashboard_settings_page() {
 	
 	function addWork() {
 		document.getElementById('work-container').insertAdjacentHTML('beforeend',
-			'<div style="background:#f9f9f9;padding:15px;margin-bottom:10px;">' +
+			'<div class="work-item" style="background:#f9f9f9;padding:15px;margin-bottom:10px;">' +
+			'<div style="display:flex;justify-content:space-between;margin-bottom:8px;">' +
+			'<span class="work-handle" style="cursor:move;padding:5px 10px;background:#ddd;border-radius:3px;">⋮⋮ 拖曳排序</span>' +
+			'<button type="button" class="button" onclick="this.closest(\'.work-item\').remove()">刪除</button>' +
+			'</div>' +
 			'<input type="text" name="work_titles[]" placeholder="處理項目" class="regular-text" style="margin-bottom:8px;">' +
 			'<input type="date" name="work_dates[]" style="margin-bottom:8px;">' +
 			'<textarea name="work_notes[]" rows="2" class="large-text" placeholder="說明 (選填)"></textarea>' +
-			'<button type="button" class="button" onclick="this.parentElement.remove()" style="margin-top:5px;">刪除</button>' +
 			'</div>'
 		);
 	}
 	
 	function addPayment() {
 		document.getElementById('payment-container').insertAdjacentHTML('beforeend',
-			'<div style="background:#f9f9f9;padding:15px;margin-bottom:10px;display:grid;grid-template-columns:120px 1fr 120px 100px 80px;gap:10px;">' +
+			'<div class="payment-item" style="background:#f9f9f9;padding:15px;margin-bottom:10px;display:grid;grid-template-columns:120px 1fr 120px 100px 80px;gap:10px;">' +
 			'<input type="date" name="payment_dates[]">' +
 			'<input type="text" name="payment_items[]" placeholder="項目">' +
 			'<input type="number" name="payment_amounts[]" placeholder="金額">' +
@@ -1352,7 +1400,27 @@ function wu_dashboard_settings_page() {
 			'</div>'
 		);
 	}
+	
+	// 拖曳排序 - 工作紀錄
+	new Sortable(document.getElementById('work-container'), {
+		handle: '.work-handle',
+		animation: 150,
+		ghostClass: 'sortable-ghost'
+	});
+	
+	// 拖曳排序 - 款項紀錄
+	new Sortable(document.getElementById('payment-container'), {
+		animation: 150,
+		ghostClass: 'sortable-ghost'
+	});
 	</script>
+	
+	<style>
+	.sortable-ghost {
+		opacity: 0.4;
+		background: #c8d7e1;
+	}
+	</style>
 	<?php
 }
 
@@ -1850,6 +1918,83 @@ add_action('admin_head', function() {
 		line-height: 1.6;
 	}
 	
+	/* Card Grid (橫排卡片) */
+	.wu-card-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		gap: 15px;
+	}
+	
+	/* Record Card */
+	.wu-record-card {
+		padding: 15px;
+		background: #fff;
+		border: 1px solid #dcdcde;
+		border-left: 3px solid #2271b1;
+		transition: box-shadow 0.2s;
+	}
+	
+	.wu-record-card:hover {
+		box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+	}
+	
+	.wu-record-date {
+		font-size: 11px;
+		color: #646970;
+		margin-bottom: 8px;
+		font-weight: 600;
+	}
+	
+	.wu-record-title {
+		font-size: 14px;
+		font-weight: 600;
+		color: #1d2327;
+		margin-bottom: 8px;
+	}
+	
+	.wu-record-note {
+		font-size: 12px;
+		color: #50575e;
+		line-height: 1.6;
+	}
+	
+	/* Payment Card */
+	.wu-payment-card {
+		padding: 15px;
+		background: #fff;
+		border: 1px solid #dcdcde;
+		border-left: 3px solid #00a32a;
+		transition: box-shadow 0.2s;
+	}
+	
+	.wu-payment-card:hover {
+		box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+	}
+	
+	.wu-payment-date {
+		font-size: 11px;
+		color: #646970;
+		margin-bottom: 8px;
+		font-weight: 600;
+	}
+	
+	.wu-payment-item {
+		font-size: 13px;
+		color: #1d2327;
+		margin-bottom: 8px;
+	}
+	
+	.wu-payment-amount {
+		font-size: 18px;
+		font-weight: 700;
+		color: #2271b1;
+		margin-bottom: 8px;
+	}
+	
+	.wu-payment-status {
+		text-align: right;
+	}
+	
 	/* Support Form */
 	.wu-support-form {
 		background: #f6f7f7;
@@ -2020,6 +2165,10 @@ add_action('admin_head', function() {
 	/* Responsive */
 	@media (max-width: 782px) {
 		.wu-disk-grid {
+			grid-template-columns: 1fr;
+		}
+		
+		.wu-card-grid {
 			grid-template-columns: 1fr;
 		}
 		
